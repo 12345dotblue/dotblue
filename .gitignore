@@ -1,0 +1,37 @@
+# AI Assistant Tools
+.claude/
+.cursor/
+.windsai/
+.continue/
+.copilot/
+.agent-local-notes.md
+local-docs/
+
+# IDE
+.idea/
+.vscode/
+*.sw?
+*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build outputs
+bin/
+*.exe
+
+# Logs
+*.log
+logs/
+
+# Frontend temporary files
+web/node_modules/
+web/.vite/
+web/coverage/
+web/.eslintcache
+web/*.tsbuildinfo
+web/playwright-report/
+web/test-results/
+web/tmp/
+web/temp/

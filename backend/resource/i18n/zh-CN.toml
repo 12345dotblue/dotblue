@@ -1,0 +1,5 @@
+"auth_missing" = "缺少认证令牌"
+"auth_invalid" = "无效令牌: {error}"
+"storage_error" = "存储错误"
+"data_error" = "数据处理错误"
+"config_saved" = "配置保存成功"

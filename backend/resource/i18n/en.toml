@@ -1,0 +1,5 @@
+"auth_missing" = "Missing Authorization token"
+"auth_invalid" = "Invalid token: {error}"
+"storage_error" = "Storage error occurred"
+"data_error" = "Data processing error"
+"config_saved" = "Configuration saved successfully"
