@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "organization": {
+    "name": "dotblue",
+    "displayName": "dotblue",
+    "websiteUrl": "https://dotblue.ai",
+    "logo": "https://your-web-host.example.com/brand/dotblue-logo.svg",
+    "favicon": "https://your-web-host.example.com/brand/dotblue-favicon.svg",
+    "defaultApplication": "dotblue",
+    "themeData": {
+      "themeType": "default",
+      "colorPrimary": "#1677FF",
+      "borderRadius": 12,
+      "isCompact": false,
+      "isEnabled": true
+    }
+  },
+  "application": {
+    "name": "dotblue",
+    "displayName": "dotblue",
+    "title": "dotblue",
+    "description": "AI agent workspace for teams",
+    "organization": "dotblue",
+    "homepageUrl": "https://your-web-host.example.com",
+    "logo": "https://your-web-host.example.com/brand/dotblue-logo.svg",
+    "favicon": "https://your-web-host.example.com/brand/dotblue-favicon.svg",
+    "defaultGroup": "admin",
+    "redirectUris": [
+      "https://your-web-host.example.com/callback"
+    ],
+    "signinUrl": "",
+    "signupUrl": "",
+    "forgetUrl": "",
+    "formCss": ".login-panel{backdrop-filter:blur(18px);}",
+    "formSideHtml": "<div style=\"padding:32px;color:#0f172a;\"><h2 style=\"margin:0 0 12px;\">dotblue</h2><p style=\"margin:0;color:#475569;\">AI agent sandbox for modern teams.</p></div>",
+    "formBackgroundUrl": "https://your-web-host.example.com/brand/dotblue-login-bg.svg",
+    "themeData": {
+      "themeType": "default",
+      "colorPrimary": "#1677FF",
+      "borderRadius": 12,
+      "isCompact": false,
+      "isEnabled": true
+    },
+    "enablePassword": true,
+    "enableSignUp": true,
+    "disableSignin": false,
+    "enableSigninSession": true,
+    "enableAutoSignin": false
+  },
+  "admin": {
+    "username": "admin",
+    "displayName": "Platform Admin",
+    "email": "admin@example.com",
+    "passwordEnv": "DOTBLUE_ADMIN_PASSWORD"
+  },
+  "platform": {
+    "dataBasePath": "/var/lib/dotblue/agents",
+    "dataMountPath": "/var/lib/dotblue/agents",
+    "containerPort": 8642,
+    "runtimeMode": "host",
+    "endpointMode": "host_loopback",
+    "dockerEndpoint": "",
+    "dockerNetwork": ""
+  },
+  "provider": {
+    "type": "openai",
+    "apiBase": "https://api.openai.com/v1",
+    "apiKeyEnv": "DOTBLUE_LLM_API_KEY",
+    "model": "gpt-4.1-mini"
+  }
+}

@@ -1,0 +1,8 @@
+.git
+bin
+temp
+tmp
+coverage
+*.log
+manifest/config/config.yaml
+manifest/config/init_data.json

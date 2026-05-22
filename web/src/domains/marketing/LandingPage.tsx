@@ -12,6 +12,7 @@ import {
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import { useAuthState } from '../identity/useAuthState';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -22,6 +23,8 @@ const LandingPage: React.FC = () => {
   const navigate = useNavigate();
   const { token } = theme.useToken();
   const [yearly, setYearly] = useState(false);
+  const isAuthenticated = useAuthState();
+  const primaryTarget = isAuthenticated ? '/dashboard' : '/login';
 
   const features = [
     { title: t('feat_security_title'), desc: t('feat_security_desc'), icon: <SafetyCertificateOutlined />, color: '#52c41a' },
@@ -40,7 +43,7 @@ const LandingPage: React.FC = () => {
       cta: t('pricing_starter_cta'),
       popular: false,
       features: [t('pricing_starter_f1'), t('pricing_starter_f2'), t('pricing_starter_f3'), t('pricing_starter_f4')],
-      onClick: () => navigate('/login'),
+      onClick: () => navigate(primaryTarget),
     },
     {
       name: t('pricing_pro'),
@@ -49,7 +52,7 @@ const LandingPage: React.FC = () => {
       cta: t('pricing_pro_cta'),
       popular: true,
       features: [t('pricing_pro_f1'), t('pricing_pro_f2'), t('pricing_pro_f3'), t('pricing_pro_f4'), t('pricing_pro_f5'), t('pricing_pro_f6')],
-      onClick: () => navigate('/login'),
+      onClick: () => navigate(primaryTarget),
     },
     {
       name: t('pricing_enterprise'),
@@ -81,8 +84,8 @@ const LandingPage: React.FC = () => {
             {t('hero_subtitle')}
           </Paragraph>
           <Space size="middle" wrap>
-            <Button type="primary" size="large" shape="round" icon={<ArrowRightOutlined />} onClick={() => navigate('/login')} style={{ height: 52, padding: '0 36px', fontSize: 16 }}>
-              {t('hero_cta_primary')}
+            <Button type="primary" size="large" shape="round" icon={<ArrowRightOutlined />} onClick={() => navigate(primaryTarget)} style={{ height: 52, padding: '0 36px', fontSize: 16 }}>
+              {isAuthenticated ? 'Dashboard' : t('hero_cta_primary')}
             </Button>
             <Button size="large" shape="round" onClick={() => {
               document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
@@ -201,8 +204,8 @@ const LandingPage: React.FC = () => {
           <Paragraph style={{ color: 'rgba(255,255,255,0.85)', fontSize: 18, marginBottom: 40, maxWidth: 600, margin: '0 auto 40px' }}>
             {t('cta_subtitle')}
           </Paragraph>
-          <Button size="large" shape="round" ghost onClick={() => navigate('/login')} style={{ height: 52, padding: '0 48px', fontSize: 16, fontWeight: 600 }}>
-            {t('cta_button')}
+          <Button size="large" shape="round" ghost onClick={() => navigate(primaryTarget)} style={{ height: 52, padding: '0 48px', fontSize: 16, fontWeight: 600 }}>
+            {isAuthenticated ? 'Dashboard' : t('cta_button')}
           </Button>
         </div>
       </section>

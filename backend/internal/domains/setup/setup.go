@@ -7,7 +7,6 @@ import (
 
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
-	"dotblue/internal/domains/settings"
 )
 
 // installMu prevents concurrent install requests (race condition).
@@ -16,15 +15,15 @@ var installMu sync.Mutex
 // StatusHandler returns whether the platform has been initialized.
 // GET /api/setup/status — public, no auth required.
 func StatusHandler(r *ghttp.Request) {
-	initialized := settings.IsInitialized()
+	initialized := defaultService.IsInitialized()
 	r.Response.WriteJson(g.Map{"initialized": initialized})
 }
 
 // InstallReq is the request body for the install endpoint.
 type InstallReq struct {
-	AdminUsername string `json:"adminUsername" v:"required"`
-	AdminPassword string `json:"adminPassword" v:"required"`
-	AdminEmail    string `json:"adminEmail"    v:"required"`
+	AdminUsername string `json:"adminUsername"`
+	AdminPassword string `json:"adminPassword"`
+	AdminEmail    string `json:"adminEmail"`
 }
 
 // InstallHandler performs the first-time platform setup.
@@ -33,7 +32,7 @@ func InstallHandler(r *ghttp.Request) {
 	installMu.Lock()
 	defer installMu.Unlock()
 
-	if settings.IsInitialized() {
+	if defaultService.IsInitialized() {
 		r.Response.WriteStatus(http.StatusForbidden, "Platform already initialized")
 		return
 	}
@@ -44,10 +43,15 @@ func InstallHandler(r *ghttp.Request) {
 		return
 	}
 
-	if err := runInstall(r, &req); err != nil {
+	if err := defaultService.RunInstall(r.Context(), &req); err != nil {
 		g.Log().Errorf(r.Context(), "Installation failed: %v", err)
 		if errors.Is(err, ErrUserExists) {
 			r.Response.WriteStatus(http.StatusConflict, "USER_ALREADY_EXISTS")
+			return
+		}
+		var inputErr *InstallInputError
+		if errors.As(err, &inputErr) {
+			r.Response.WriteStatus(http.StatusBadRequest, inputErr.Error())
 			return
 		}
 		r.Response.WriteStatus(http.StatusInternalServerError, "Installation failed")

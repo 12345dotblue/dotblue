@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" fill="none" role="img" aria-labelledby="dotblue-login-bg-title">
+  <title id="dotblue-login-bg-title">dotblue login background</title>
+  <defs>
+    <linearGradient id="bg-main" x1="0" y1="0" x2="1600" y2="900" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F7FBFF"/>
+      <stop offset="0.48" stop-color="#EEF5FF"/>
+      <stop offset="1" stop-color="#E8F1FF"/>
+    </linearGradient>
+    <radialGradient id="bg-glow-1" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1220 165) rotate(90) scale(280 360)">
+      <stop stop-color="#7EB7FF" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#7EB7FF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="bg-glow-2" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(260 720) rotate(90) scale(300 420)">
+      <stop stop-color="#9FD0FF" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#9FD0FF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="card-top" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F0F7FF"/>
+    </linearGradient>
+    <linearGradient id="card-bottom" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6CB3FF"/>
+      <stop offset="0.5" stop-color="#1677FF"/>
+      <stop offset="1" stop-color="#0D57DB"/>
+    </linearGradient>
+    <linearGradient id="card-edge" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#A8D2FF" stop-opacity="0.2"/>
+      <stop offset="0.5" stop-color="#1677FF" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#0B4FD1" stop-opacity="0.2"/>
+    </linearGradient>
+    <filter id="soft-shadow" x="350" y="130" width="1020" height="700" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="26"/>
+      <feGaussianBlur stdDeviation="40"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.0862745 0 0 0 0 0.247059 0 0 0 0 0.505882 0 0 0 0.13 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_0_1"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_0_1" result="shape"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#bg-main)"/>
+  <rect width="1600" height="900" fill="url(#bg-glow-1)"/>
+  <rect width="1600" height="900" fill="url(#bg-glow-2)"/>
+
+  <g opacity="0.65">
+    <circle cx="1332" cy="139" r="6" fill="#A9CBFF"/>
+    <circle cx="1374" cy="206" r="4" fill="#A9CBFF"/>
+    <circle cx="1274" cy="235" r="3.5" fill="#A9CBFF"/>
+    <circle cx="286" cy="145" r="5" fill="#D2E6FF"/>
+    <circle cx="228" cy="208" r="3" fill="#D2E6FF"/>
+    <circle cx="1218" cy="742" r="5" fill="#C4DEFF"/>
+  </g>
+
+  <g filter="url(#soft-shadow)">
+    <rect x="553" y="238" width="490" height="300" rx="42" transform="rotate(30 553 238)" fill="url(#card-top)" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="2"/>
+    <rect x="555" y="352" width="490" height="300" rx="42" transform="rotate(30 555 352)" fill="url(#card-bottom)"/>
+    <path d="M705.083 440.271L1129.45 685.271" stroke="url(#card-edge)" stroke-width="12" stroke-linecap="round"/>
+    <path d="M601.083 380.271L1025.45 625.271" stroke="url(#card-edge)" stroke-width="12" stroke-linecap="round" opacity="0.72"/>
+    <path d="M633.083 318.271L1057.45 563.271" stroke="#CFE5FF" stroke-width="10" stroke-linecap="round" opacity="0.45"/>
+  </g>
+
+  <g opacity="0.92">
+    <path d="M220 744C330 654 425 620 545 615" stroke="#C9E0FF" stroke-width="2"/>
+    <path d="M1188 220C1275 264 1335 322 1382 420" stroke="#C9E0FF" stroke-width="2"/>
+    <path d="M170 272C245 234 310 220 402 224" stroke="#D7E9FF" stroke-width="2"/>
+  </g>
+</svg>

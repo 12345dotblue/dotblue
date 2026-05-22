@@ -32,9 +32,10 @@ import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { BACKEND_URL } from '../../config';
 import { casdoorService } from '../identity/CasdoorService';
+import IMSettingsTab from './IMSettingsTab';
 
 const { Paragraph, Text, Title } = Typography;
-const ENTERPRISE_ADMIN_TABS = ['organization', 'members', 'invitations'] as const;
+const ENTERPRISE_ADMIN_TABS = ['organization', 'members', 'invitations', 'im'] as const;
 type EnterpriseAdminTab = typeof ENTERPRISE_ADMIN_TABS[number];
 
 interface EnterpriseSummary {
@@ -148,6 +149,7 @@ const AdminSettings: React.FC = () => {
   const [savingOrgUnit, setSavingOrgUnit] = useState(false);
   const [addingMember, setAddingMember] = useState(false);
   const [creatingInvitation, setCreatingInvitation] = useState(false);
+  const [imCreateSignal, setIMCreateSignal] = useState(0);
   const [createEnterpriseForm] = Form.useForm<{ name: string }>();
   const [orgForm] = Form.useForm<OrgUnit>();
   const [memberForm] = Form.useForm<{ userId?: string; email?: string; role: string; orgUnitId?: string }>();
@@ -183,6 +185,13 @@ const AdminSettings: React.FC = () => {
         label: t('enterprise_admin_add_existing_member'),
         icon: <PlusOutlined />,
         onClick: () => setMemberModalOpen(true),
+      };
+    }
+    if (activeTab === 'im') {
+      return {
+        label: '新建 IM 连接',
+        icon: <PlusOutlined />,
+        onClick: () => setIMCreateSignal((current) => current + 1),
       };
     }
     return {
@@ -743,6 +752,11 @@ const AdminSettings: React.FC = () => {
                       </Card>
                     </Space>
                   ),
+                },
+                {
+                  key: 'im',
+                  label: 'IM 接入',
+                  children: <IMSettingsTab createSignal={imCreateSignal} />,
                 },
               ]}
             />

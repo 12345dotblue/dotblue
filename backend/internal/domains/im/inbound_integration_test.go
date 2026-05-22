@@ -1,3 +1,6 @@
+//go:build integration
+// +build integration
+
 package im
 
 import (
@@ -6,26 +9,13 @@ import (
 
 	_ "github.com/gogf/gf/contrib/drivers/pgsql/v2"
 	"github.com/gogf/gf/v2/frame/g"
+	"github.com/google/uuid"
 )
 
 func TestPersistInboundEventsIntegration(t *testing.T) {
 	ctx := context.Background()
-
-	if err := g.DB().PingMaster(); err != nil {
-		t.Skipf("database unavailable: %v", err)
-	}
-
-	var enterpriseID string
-	value, err := g.DB().Model("enterprises").Ctx(ctx).Order("created_at ASC").Value("id")
-	if err != nil {
-		t.Fatalf("load enterprise id failed: %v", err)
-	}
-	if err := value.Scan(&enterpriseID); err != nil {
-		t.Fatalf("scan enterprise id failed: %v", err)
-	}
-	if enterpriseID == "" {
-		t.Skip("no enterprise data available for integration test")
-	}
+	enterpriseID := requireIntegrationEnterpriseID(t, ctx)
+	var err error
 
 	const connectionID = "11111111-1111-7111-8111-111111111112"
 	const eventID = "evt_integration_persist_1"
@@ -85,9 +75,7 @@ func TestPersistInboundEventsIntegration(t *testing.T) {
 		t.Fatalf("second persist result = %+v, want accepted=0 duplicated=1", result)
 	}
 
-	count, err := g.DB().Model("external_message_events").Ctx(ctx).
-		Where("connection_id = ? AND event_id = ?", connectionID, eventID).
-		Count()
+	count, err := defaultConnectionRepository.CountInboundEvents(ctx, connectionID, eventID)
 	if err != nil {
 		t.Fatalf("count events failed: %v", err)
 	}
@@ -95,18 +83,76 @@ func TestPersistInboundEventsIntegration(t *testing.T) {
 		t.Fatalf("event count = %d, want 1", count)
 	}
 
-	var status string
-	value, err = g.DB().Model("im_connections").Ctx(ctx).
-		Where("id = ?", connectionID).
-		Value("status")
+	status, err := defaultConnectionRepository.GetConnectionStatusByID(ctx, connectionID)
 	if err != nil {
 		t.Fatalf("load connection status failed: %v", err)
 	}
-	if err := value.Scan(&status); err != nil {
-		t.Fatalf("scan connection status failed: %v", err)
-	}
 	if status != StatusActive {
 		t.Fatalf("connection status = %q, want %q", status, StatusActive)
+	}
+}
+
+func TestPersistInboundEventsMarksNoBindingStatus(t *testing.T) {
+	ctx := context.Background()
+	enterpriseID := requireIntegrationEnterpriseID(t, ctx)
+	var err error
+
+	connectionID := uuid.NewString()
+	connectionName := "integration-persist-no-binding-" + connectionID
+	eventID := "evt-no-binding-" + connectionID
+
+	cleanupIntegrationRows(t, ctx, connectionID)
+	t.Cleanup(func() {
+		cleanupIntegrationRows(t, ctx, connectionID)
+	})
+
+	_, err = g.DB().Model("im_connections").Ctx(ctx).Data(g.Map{
+		"id":              connectionID,
+		"enterprise_id":   enterpriseID,
+		"platform":        "feishu",
+		"name":            connectionName,
+		"status":          StatusDisabled,
+		"connection_mode": "socket_mode",
+		"config_json":     `{"appId":"cli_integration"}`,
+		"secret_json":     `{"appSecret":"integration-secret"}`,
+		"callback_path":   buildConnectionCallbackPath("feishu", connectionID),
+		"last_error":      "",
+		"created_by":      "integration-test",
+	}).Insert()
+	if err != nil {
+		t.Fatalf("insert connection failed: %v", err)
+	}
+
+	conn := Connection{
+		ID:           connectionID,
+		EnterpriseID: enterpriseID,
+		Platform:     "feishu",
+	}
+	events := []InboundEvent{
+		{
+			Platform:       "feishu",
+			EventID:        eventID,
+			MessageID:      "msg-" + connectionID,
+			ExternalChatID: "chat-" + connectionID,
+			Text:           "no binding here",
+			RawPayload:     []byte(`{"hello":"no-binding"}`),
+		},
+	}
+
+	result, err := persistInboundEvents(ctx, conn, events)
+	if err != nil {
+		t.Fatalf("persistInboundEvents() error = %v", err)
+	}
+	if result.Accepted != 1 || result.Duplicated != 0 {
+		t.Fatalf("persist result = %+v, want accepted=1 duplicated=0", result)
+	}
+
+	status, err := defaultConnectionRepository.GetInboundEventStatus(ctx, connectionID, eventID)
+	if err != nil {
+		t.Fatalf("load event status failed: %v", err)
+	}
+	if status != "no_binding" {
+		t.Fatalf("event status = %q, want no_binding", status)
 	}
 }
 

@@ -90,7 +90,7 @@ func (h *HermesEngine) writeConfigYaml(volPath string, pCfg *ProviderConfig) err
 		if pCfg.ApiBase != "" {
 			apiMode := "chat_completions"
 			baseURL := ensureV1Suffix(pCfg.ApiBase)
-			if pCfg.Type == "anthropic" {
+			if shouldUseAnthropicMessages(pCfg) {
 				apiMode = "anthropic_messages"
 				baseURL = strings.TrimRight(pCfg.ApiBase, "/")
 			}
@@ -129,6 +129,21 @@ func (h *HermesEngine) writeConfigYaml(volPath string, pCfg *ProviderConfig) err
 	return os.WriteFile(configPath, []byte(buf.String()), 0644)
 }
 
+func shouldUseAnthropicMessages(pCfg *ProviderConfig) bool {
+	if pCfg == nil || pCfg.Type != "anthropic" {
+		return false
+	}
+	base := strings.ToLower(strings.TrimSpace(pCfg.ApiBase))
+	if base == "" {
+		return true
+	}
+	// Volcengine Ark's /api/v3 endpoint is OpenAI-compatible and should stay on chat_completions.
+	if strings.Contains(base, "ark.cn-beijing.volces.com") || strings.Contains(base, "volces.com/api/v3") {
+		return false
+	}
+	return true
+}
+
 func (h *HermesEngine) writeDotEnv(volPath string, agent *AgentConfig) error {
 	var buf strings.Builder
 	buf.WriteString(fmt.Sprintf("API_SERVER_KEY=%s\n", agent.APIKey))
@@ -143,6 +158,9 @@ func (h *HermesEngine) writeDotEnv(volPath string, agent *AgentConfig) error {
 
 func ensureV1Suffix(url string) string {
 	u := strings.TrimRight(url, "/")
+	if strings.HasSuffix(strings.ToLower(u), "/api/v3") {
+		return u
+	}
 	if !strings.HasSuffix(u, "/v1") {
 		u += "/v1"
 	}

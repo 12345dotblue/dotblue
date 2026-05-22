@@ -166,6 +166,76 @@ func TestFeishuParseInbound(t *testing.T) {
 	}
 }
 
+func TestFeishuHandleInboundWebhookChallenge(t *testing.T) {
+	t.Parallel()
+
+	adapter := NewFeishuAdapter()
+	result, err := adapter.HandleInboundWebhook(context.Background(), InboundWebhookRequest{
+		Connection: Connection{Platform: "feishu"},
+		Payload: map[string]any{
+			"challenge": "challenge-token",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleInboundWebhook() error = %v", err)
+	}
+	if result == nil || result.ImmediateResponse == nil {
+		t.Fatal("expected immediate response for challenge webhook")
+	}
+	body, ok := result.ImmediateResponse.(map[string]any)
+	if !ok {
+		t.Fatalf("immediate response type = %T, want map[string]any", result.ImmediateResponse)
+	}
+	if body["challenge"] != "challenge-token" {
+		t.Fatalf("challenge = %v, want challenge-token", body["challenge"])
+	}
+}
+
+func TestFeishuHandleInboundWebhookParsesEvents(t *testing.T) {
+	t.Parallel()
+
+	adapter := NewFeishuAdapter()
+	result, err := adapter.HandleInboundWebhook(context.Background(), InboundWebhookRequest{
+		Connection: Connection{Platform: "feishu"},
+		Payload: map[string]any{
+			"header": map[string]any{
+				"event_id": "evt_webhook_1",
+			},
+			"event": map[string]any{
+				"sender": map[string]any{
+					"sender_id": map[string]any{
+						"open_id": "ou_webhook_1",
+					},
+				},
+				"message": map[string]any{
+					"chat_id":    "oc_webhook_1",
+					"message_id": "om_webhook_1",
+					"chat_type":  "group",
+					"content":    `{"text":"hello from webhook"}`,
+				},
+				"mentions": []any{
+					map[string]any{"name": "bot"},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleInboundWebhook() error = %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected webhook result")
+	}
+	if result.ImmediateResponse != nil {
+		t.Fatalf("unexpected immediate response: %v", result.ImmediateResponse)
+	}
+	if len(result.Events) != 1 {
+		t.Fatalf("event count = %d, want 1", len(result.Events))
+	}
+	if result.Events[0].Platform != "feishu" {
+		t.Fatalf("platform = %q, want feishu", result.Events[0].Platform)
+	}
+}
+
 func TestFeishuParseInboundFallbacks(t *testing.T) {
 	t.Parallel()
 

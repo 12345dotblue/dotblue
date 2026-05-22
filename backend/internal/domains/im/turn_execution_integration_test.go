@@ -1,3 +1,6 @@
+//go:build integration
+// +build integration
+
 package im
 
 import (
@@ -10,17 +13,13 @@ import (
 	"testing"
 
 	_ "github.com/gogf/gf/contrib/drivers/pgsql/v2"
-	"github.com/gogf/gf/v2/frame/g"
 
 	"dotblue/internal/domains/engine"
 )
 
 func TestExecuteInboundTurnIntegration(t *testing.T) {
 	ctx := context.Background()
-
-	if err := g.DB().PingMaster(); err != nil {
-		t.Skipf("database unavailable: %v", err)
-	}
+	enterpriseID := requireIntegrationEnterpriseID(t, ctx)
 
 	restore := installExecutionTestEngine()
 	defer restore()
@@ -46,35 +45,26 @@ func TestExecuteInboundTurnIntegration(t *testing.T) {
 	}))
 	defer mockFeishu.Close()
 
-	var enterpriseID string
-	value, err := g.DB().Model("enterprises").Ctx(ctx).Order("created_at ASC").Value("id")
-	if err != nil {
-		t.Fatalf("load enterprise id failed: %v", err)
-	}
-	if err := value.Scan(&enterpriseID); err != nil {
-		t.Fatalf("scan enterprise id failed: %v", err)
-	}
-	if enterpriseID == "" {
-		t.Skip("no enterprise data available for integration test")
+	fixture := routingFixture{
+		ConnectionID:   "11111111-1111-7111-8111-111111111131",
+		ConnectionName: "integration-routing-connection",
+		AgentID:        "11111111-1111-7111-8111-111111111132",
+		AgentName:      "integration-agent",
+		BindingID:      "11111111-1111-7111-8111-111111111133",
+		Priority:       10,
 	}
 
-	const (
-		connectionID = "11111111-1111-7111-8111-111111111131"
-		agentID      = "11111111-1111-7111-8111-111111111132"
-		bindingID    = "11111111-1111-7111-8111-111111111133"
-	)
-
-	cleanupRoutingIntegrationRows(t, ctx, connectionID, agentID, bindingID)
-	cleanupDeliveryLogs(t, ctx, connectionID)
+	cleanupRoutingIntegrationRows(t, ctx, fixture)
+	cleanupDeliveryLogs(t, ctx, fixture.ConnectionID)
 	t.Cleanup(func() {
-		cleanupDeliveryLogs(t, ctx, connectionID)
-		cleanupRoutingIntegrationRows(t, ctx, connectionID, agentID, bindingID)
+		cleanupDeliveryLogs(t, ctx, fixture.ConnectionID)
+		cleanupRoutingIntegrationRows(t, ctx, fixture)
 	})
 
-	seedRoutingFixtures(t, ctx, enterpriseID, connectionID, agentID, bindingID)
+	seedRoutingFixture(t, ctx, enterpriseID, fixture)
 
 	conn := Connection{
-		ID:           connectionID,
+		ID:           fixture.ConnectionID,
 		EnterpriseID: enterpriseID,
 		Platform:     "feishu",
 		Config: map[string]any{
@@ -115,10 +105,7 @@ func TestExecuteInboundTurnIntegration(t *testing.T) {
 		t.Fatalf("assistant content = %q, want integration assistant reply", routed.AssistantReply.Content)
 	}
 
-	var messageCount int
-	messageCount, err = g.DB().Model("messages").Ctx(ctx).
-		Where("conversation_id = ? AND role = ?", routed.ConversationID, "assistant").
-		Count()
+	messageCount, err := defaultConnectionRepository.CountMessagesByConversationRole(ctx, routed.ConversationID, "assistant")
 	if err != nil {
 		t.Fatalf("count assistant messages failed: %v", err)
 	}
@@ -126,79 +113,18 @@ func TestExecuteInboundTurnIntegration(t *testing.T) {
 		t.Fatalf("assistant message count = %d, want 1", messageCount)
 	}
 
-	var deliveryRow struct {
-		Status       string `json:"status"`
-		RequestJSON  string `json:"request_json"`
-		ResponseJSON string `json:"response_json"`
-		MessageID    string `json:"message_id"`
-	}
-	if err := g.DB().Model("channel_delivery_logs").Ctx(ctx).
-		Where("connection_id = ?", connectionID).
-		Order("created_at DESC").
-		Scan(&deliveryRow); err != nil {
+	deliveryRow, err := defaultConnectionRepository.GetLatestDeliveryLogByConnection(ctx, fixture.ConnectionID)
+	if err != nil {
 		t.Fatalf("load delivery log failed: %v", err)
+	}
+	if deliveryRow == nil {
+		t.Fatal("delivery log snapshot is nil")
 	}
 	if deliveryRow.Status != "accepted" {
 		t.Fatalf("delivery status = %q, want accepted", deliveryRow.Status)
 	}
 	if !strings.Contains(deliveryRow.RequestJSON, "integration assistant reply") {
 		t.Fatalf("delivery request_json = %q, want assistant content", deliveryRow.RequestJSON)
-	}
-}
-
-func seedRoutingFixtures(t *testing.T, ctx context.Context, enterpriseID, connectionID, agentID, bindingID string) {
-	t.Helper()
-
-	if _, err := g.DB().Model("im_connections").Ctx(ctx).Data(g.Map{
-		"id":              connectionID,
-		"enterprise_id":   enterpriseID,
-		"platform":        "feishu",
-		"name":            "integration-routing-connection",
-		"status":          StatusActive,
-		"connection_mode": "socket_mode",
-		"config_json":     `{"appId":"cli_integration"}`,
-		"secret_json":     `{"appSecret":"integration-secret"}`,
-		"callback_path":   buildConnectionCallbackPath("feishu", connectionID),
-		"last_error":      "",
-		"created_by":      "integration-test",
-	}).Insert(); err != nil {
-		t.Fatalf("insert connection failed: %v", err)
-	}
-
-	if _, err := g.DB().Model("agents").Ctx(ctx).Data(g.Map{
-		"id":             agentID,
-		"user_id":        "integration-user",
-		"group_id":       enterpriseID,
-		"agent_name":     "integration-agent",
-		"system_prompt":  "integration prompt",
-		"hermes_api_key": "dotblue-integration-key",
-		"engine_type":    "hermes",
-	}).Insert(); err != nil {
-		t.Fatalf("insert agent failed: %v", err)
-	}
-
-	if _, err := g.DB().Model("agent_channel_bindings").Ctx(ctx).Data(g.Map{
-		"id":                  bindingID,
-		"enterprise_id":       enterpriseID,
-		"agent_id":            agentID,
-		"connection_id":       connectionID,
-		"status":              StatusActive,
-		"trigger_mode":        TriggerModeMentionOnly,
-		"trigger_config_json": `{}`,
-		"session_strategy":    SessionStrategyPerChatPerUser,
-		"reply_mode":          "default",
-		"allow_group":         true,
-		"allow_dm":            true,
-		"priority":            10,
-	}).Insert(); err != nil {
-		t.Fatalf("insert binding failed: %v", err)
-	}
-}
-
-func cleanupDeliveryLogs(t *testing.T, ctx context.Context, connectionID string) {
-	t.Helper()
-	if _, err := g.DB().Model("channel_delivery_logs").Ctx(ctx).Where("connection_id = ?", connectionID).Delete(); err != nil {
-		t.Fatalf("cleanup channel_delivery_logs failed: %v", err)
 	}
 }
 

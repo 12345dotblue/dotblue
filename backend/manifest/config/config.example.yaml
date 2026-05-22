@@ -1,0 +1,44 @@
+server:
+  address: ":8000"
+  openapiPath: "/api.json"
+  swaggerPath: "/swagger"
+
+database:
+  default:
+    link: "pgsql:postgres:replace-me@tcp(127.0.0.1:5432)/dotblue"
+    debug: true
+
+casdoor:
+  endpoint: "https://your-casdoor.example.com"
+  clientId: "replace-with-runtime-client-id"
+  clientSecret: "replace-with-runtime-client-secret"
+  jwtSecret: |
+    -----BEGIN CERTIFICATE-----
+    replace-with-casdoor-application-certificate
+    -----END CERTIFICATE-----
+  organizationName: "dotblue"
+  applicationName: "dotblue"
+  bootstrap:
+    endpoint: ""
+    clientId: ""
+    clientSecret: ""
+    jwtSecret: ""
+
+setup:
+  initDataPath: ""
+
+logger:
+  level: "all"
+  stdout: true
+
+debug:
+  sse: true
+
+engine:
+  dataBasePath: "/var/lib/dotblue/agents"
+  dataMountPath: "/var/lib/dotblue/agents"
+  containerPort: 8642
+  runtimeMode: "host"
+  endpointMode: "host_loopback"
+  dockerEndpoint: ""
+  dockerNetwork: ""

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Card, Col, Divider, Form, Input, InputNumber, Row, Typography, message } from 'antd';
+import { Button, Card, Col, Divider, Form, Input, InputNumber, Row, Select, Typography, message } from 'antd';
 import { CloudServerOutlined, DatabaseOutlined, SettingOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
@@ -10,7 +10,12 @@ const { Paragraph, Title } = Typography;
 
 interface PlatformConfig {
   dataBasePath: string;
+  dataMountPath: string;
   containerPort: number;
+  runtimeMode: 'auto' | 'host' | 'container';
+  endpointMode: 'auto' | 'host_loopback' | 'docker_dns';
+  dockerEndpoint: string;
+  dockerNetwork: string;
 }
 
 interface ProviderConfig {
@@ -53,7 +58,12 @@ const PlatformSettingsPage: React.FC = () => {
       });
       platformForm.setFieldsValue({
         dataBasePath: data.platform?.dataBasePath || '',
+        dataMountPath: data.platform?.dataMountPath || '',
         containerPort: data.platform?.containerPort || 8642,
+        runtimeMode: data.platform?.runtimeMode || 'auto',
+        endpointMode: data.platform?.endpointMode || 'auto',
+        dockerEndpoint: data.platform?.dockerEndpoint || '',
+        dockerNetwork: data.platform?.dockerNetwork || '',
       });
     }).catch(() => {
       messageApi.error(t('platform_settings_load_failed'));
@@ -120,7 +130,13 @@ const PlatformSettingsPage: React.FC = () => {
                 name="dataBasePath"
                 rules={[{ required: true, message: t('platform_settings_database_path_required') }]}
               >
-                <Input placeholder="/data/hermes" />
+                <Input placeholder="/var/lib/dotblue/agents" />
+              </Form.Item>
+              <Form.Item
+                label={t('platform_settings_data_mount_path')}
+                name="dataMountPath"
+              >
+                <Input placeholder="/runtime-data" />
               </Form.Item>
               <Form.Item
                 label={t('platform_settings_container_port')}
@@ -128,6 +144,44 @@ const PlatformSettingsPage: React.FC = () => {
                 rules={[{ required: true, message: t('platform_settings_container_port_required') }]}
               >
                 <InputNumber style={{ width: '100%' }} placeholder="8642" />
+              </Form.Item>
+              <Form.Item
+                label={t('platform_settings_runtime_mode')}
+                name="runtimeMode"
+                rules={[{ required: true, message: t('platform_settings_runtime_mode_required') }]}
+              >
+                <Select
+                  options={[
+                    { value: 'auto', label: t('platform_settings_runtime_mode_auto') },
+                    { value: 'host', label: t('platform_settings_runtime_mode_host') },
+                    { value: 'container', label: t('platform_settings_runtime_mode_container') },
+                  ]}
+                />
+              </Form.Item>
+              <Form.Item
+                label={t('platform_settings_endpoint_mode')}
+                name="endpointMode"
+                rules={[{ required: true, message: t('platform_settings_endpoint_mode_required') }]}
+              >
+                <Select
+                  options={[
+                    { value: 'auto', label: t('platform_settings_endpoint_mode_auto') },
+                    { value: 'host_loopback', label: t('platform_settings_endpoint_mode_host_loopback') },
+                    { value: 'docker_dns', label: t('platform_settings_endpoint_mode_docker_dns') },
+                  ]}
+                />
+              </Form.Item>
+              <Form.Item
+                label={t('platform_settings_docker_endpoint')}
+                name="dockerEndpoint"
+              >
+                <Input placeholder="unix:///var/run/docker.sock" />
+              </Form.Item>
+              <Form.Item
+                label={t('platform_settings_docker_network')}
+                name="dockerNetwork"
+              >
+                <Input placeholder="dotblue_default" />
               </Form.Item>
               <Button type="primary" htmlType="submit" loading={savingPlatform}>
                 {t('platform_settings_save_runtime')}

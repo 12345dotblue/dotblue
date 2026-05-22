@@ -617,6 +617,14 @@ const ChatPage: React.FC = () => {
               {curConvId ? (selectedAgent?.agentName || t('chat_select_agent')) : t('chat_select_conversation_first')}
             </Text>
           </Space>
+          <Button
+            type="default"
+            size="small"
+            icon={<AppstoreOutlined />}
+            onClick={() => navigate('/dashboard')}
+          >
+            Dashboard
+          </Button>
           <Dropdown menu={{ items: [
             { key: 'en', label: 'English', onClick: () => i18n.changeLanguage('en') },
             { key: 'zh-CN', label: '简体中文', onClick: () => i18n.changeLanguage('zh-CN') },

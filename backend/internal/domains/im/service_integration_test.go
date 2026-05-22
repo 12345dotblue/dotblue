@@ -1,93 +1,38 @@
+//go:build integration
+// +build integration
+
 package im
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	_ "github.com/gogf/gf/contrib/drivers/pgsql/v2"
-	"github.com/gogf/gf/v2/frame/g"
 )
 
 func TestProcessInboundEventIntegration(t *testing.T) {
 	ctx := context.Background()
+	enterpriseID := requireIntegrationEnterpriseID(t, ctx)
 
-	if err := g.DB().PingMaster(); err != nil {
-		t.Skipf("database unavailable: %v", err)
+	fixture := routingFixture{
+		ConnectionID:   "11111111-1111-7111-8111-111111111121",
+		ConnectionName: "integration-routing-connection",
+		AgentID:        "11111111-1111-7111-8111-111111111122",
+		AgentName:      "integration-agent",
+		BindingID:      "11111111-1111-7111-8111-111111111123",
+		Priority:       10,
 	}
 
-	var enterpriseID string
-	value, err := g.DB().Model("enterprises").Ctx(ctx).Order("created_at ASC").Value("id")
-	if err != nil {
-		t.Fatalf("load enterprise id failed: %v", err)
-	}
-	if err := value.Scan(&enterpriseID); err != nil {
-		t.Fatalf("scan enterprise id failed: %v", err)
-	}
-	if enterpriseID == "" {
-		t.Skip("no enterprise data available for integration test")
-	}
-
-	const (
-		connectionID = "11111111-1111-7111-8111-111111111121"
-		agentID      = "11111111-1111-7111-8111-111111111122"
-		bindingID    = "11111111-1111-7111-8111-111111111123"
-	)
-
-	cleanupRoutingIntegrationRows(t, ctx, connectionID, agentID, bindingID)
+	cleanupRoutingIntegrationRows(t, ctx, fixture)
 	t.Cleanup(func() {
-		cleanupRoutingIntegrationRows(t, ctx, connectionID, agentID, bindingID)
+		cleanupRoutingIntegrationRows(t, ctx, fixture)
 	})
 
-	_, err = g.DB().Model("im_connections").Ctx(ctx).Data(g.Map{
-		"id":              connectionID,
-		"enterprise_id":   enterpriseID,
-		"platform":        "feishu",
-		"name":            "integration-routing-connection",
-		"status":          StatusActive,
-		"connection_mode": "socket_mode",
-		"config_json":     `{"appId":"cli_integration"}`,
-		"secret_json":     `{"appSecret":"integration-secret"}`,
-		"callback_path":   buildConnectionCallbackPath("feishu", connectionID),
-		"last_error":      "",
-		"created_by":      "integration-test",
-	}).Insert()
-	if err != nil {
-		t.Fatalf("insert connection failed: %v", err)
-	}
-
-	_, err = g.DB().Model("agents").Ctx(ctx).Data(g.Map{
-		"id":             agentID,
-		"user_id":        "integration-user",
-		"group_id":       enterpriseID,
-		"agent_name":     "integration-agent",
-		"system_prompt":  "integration prompt",
-		"hermes_api_key": "dotblue-integration-key",
-		"engine_type":    "hermes",
-	}).Insert()
-	if err != nil {
-		t.Fatalf("insert agent failed: %v", err)
-	}
-
-	_, err = g.DB().Model("agent_channel_bindings").Ctx(ctx).Data(g.Map{
-		"id":                  bindingID,
-		"enterprise_id":       enterpriseID,
-		"agent_id":            agentID,
-		"connection_id":       connectionID,
-		"status":              StatusActive,
-		"trigger_mode":        TriggerModeMentionOnly,
-		"trigger_config_json": `{}`,
-		"session_strategy":    SessionStrategyPerChatPerUser,
-		"reply_mode":          "default",
-		"allow_group":         true,
-		"allow_dm":            true,
-		"priority":            10,
-	}).Insert()
-	if err != nil {
-		t.Fatalf("insert binding failed: %v", err)
-	}
+	seedRoutingFixture(t, ctx, enterpriseID, fixture)
 
 	conn := Connection{
-		ID:           connectionID,
+		ID:           fixture.ConnectionID,
 		EnterpriseID: enterpriseID,
 		Platform:     "feishu",
 	}
@@ -114,10 +59,7 @@ func TestProcessInboundEventIntegration(t *testing.T) {
 		t.Fatalf("ProcessInboundEvent() result = %+v, want conversation/message ids", result)
 	}
 
-	var externalCount int
-	externalCount, err = g.DB().Model("external_sessions").Ctx(ctx).
-		Where("connection_id = ? AND agent_id = ?", connectionID, agentID).
-		Count()
+	externalCount, err := defaultConnectionRepository.CountExternalSessions(ctx, fixture.ConnectionID, fixture.AgentID)
 	if err != nil {
 		t.Fatalf("count external sessions failed: %v", err)
 	}
@@ -125,64 +67,107 @@ func TestProcessInboundEventIntegration(t *testing.T) {
 		t.Fatalf("external session count = %d, want 1", externalCount)
 	}
 
-	var conversationRow struct {
-		ID                 string `json:"id"`
-		SourceType         string `json:"source_type"`
-		SourceConnectionID string `json:"source_connection_id"`
-	}
-	if err := g.DB().Model("conversations").Ctx(ctx).Where("id = ?", result.ConversationID).Scan(&conversationRow); err != nil {
+	conversationRow, err := defaultConnectionRepository.GetConversationSnapshot(ctx, result.ConversationID)
+	if err != nil {
 		t.Fatalf("load conversation failed: %v", err)
 	}
-	if conversationRow.SourceType != "feishu" || conversationRow.SourceConnectionID != connectionID {
-		t.Fatalf("conversation source = %+v, want feishu/%s", conversationRow, connectionID)
+	if conversationRow == nil {
+		t.Fatal("conversation snapshot is nil")
+	}
+	if conversationRow.SourceType != "feishu" || conversationRow.SourceConnectionID != fixture.ConnectionID {
+		t.Fatalf("conversation source = %+v, want feishu/%s", conversationRow, fixture.ConnectionID)
 	}
 
-	var messageRow struct {
-		ID              string `json:"id"`
-		SourceMessageID string `json:"source_message_id"`
-		DeliveryStatus  string `json:"delivery_status"`
-	}
-	if err := g.DB().Model("messages").Ctx(ctx).Where("id = ?", result.MessageID).Scan(&messageRow); err != nil {
+	messageRow, err := defaultConnectionRepository.GetMessageSnapshot(ctx, result.MessageID)
+	if err != nil {
 		t.Fatalf("load message failed: %v", err)
+	}
+	if messageRow == nil {
+		t.Fatal("message snapshot is nil")
 	}
 	if messageRow.SourceMessageID != event.MessageID || messageRow.DeliveryStatus != "received" {
 		t.Fatalf("message row = %+v, want source message id and received status", messageRow)
 	}
+	var meta map[string]any
+	if err := json.Unmarshal([]byte(messageRow.MessageMetaJSON), &meta); err != nil {
+		t.Fatalf("unmarshal message meta json failed: %v", err)
+	}
+	if meta["platform"] != "feishu" || meta["mentions_bot"] != true {
+		t.Fatalf("message meta json = %+v, want platform=feishu mentions_bot=true", meta)
+	}
 }
 
-func cleanupRoutingIntegrationRows(t *testing.T, ctx context.Context, connectionID, agentID, bindingID string) {
-	t.Helper()
+func TestProcessInboundEventReusesExternalSession(t *testing.T) {
+	ctx := context.Background()
+	enterpriseID := requireIntegrationEnterpriseID(t, ctx)
 
-	var sessions []struct {
-		ConversationID string `json:"conversation_id"`
+	fixture := routingFixture{
+		ConnectionID:   "11111111-1111-7111-8111-111111111124",
+		ConnectionName: "integration-routing-reuse",
+		AgentID:        "11111111-1111-7111-8111-111111111125",
+		AgentName:      "integration-agent",
+		BindingID:      "11111111-1111-7111-8111-111111111126",
+		Priority:       10,
 	}
-	if err := g.DB().Model("external_sessions").Ctx(ctx).Where("connection_id = ?", connectionID).Fields("conversation_id").Scan(&sessions); err != nil {
-		t.Fatalf("load external session conversation ids failed: %v", err)
+
+	cleanupRoutingIntegrationRows(t, ctx, fixture)
+	t.Cleanup(func() {
+		cleanupRoutingIntegrationRows(t, ctx, fixture)
+	})
+
+	seedRoutingFixture(t, ctx, enterpriseID, fixture)
+
+	conn := Connection{
+		ID:           fixture.ConnectionID,
+		EnterpriseID: enterpriseID,
+		Platform:     "feishu",
 	}
-	conversationIDs := make([]string, 0, len(sessions))
-	for _, session := range sessions {
-		if session.ConversationID != "" {
-			conversationIDs = append(conversationIDs, session.ConversationID)
-		}
+	firstEvent := InboundEvent{
+		Platform:         "feishu",
+		EventID:          "evt_process_reuse_1",
+		MessageID:        "om_process_reuse_1",
+		ExternalChatID:   "oc_process_reuse",
+		ExternalThreadID: "ot_process_reuse",
+		ExternalUserID:   "ou_process_reuse",
+		ChatType:         "group",
+		MentionsBot:      true,
+		Text:             "hello from integration routing",
+		ReplyHandle: map[string]any{
+			"message_id": "om_process_reuse_1",
+		},
 	}
-	if _, err := g.DB().Model("external_sessions").Ctx(ctx).Where("connection_id = ?", connectionID).Delete(); err != nil {
-		t.Fatalf("cleanup external_sessions failed: %v", err)
+	secondEvent := firstEvent
+	secondEvent.EventID = "evt_process_reuse_2"
+	secondEvent.MessageID = "om_process_reuse_2"
+	secondEvent.Text = "hello again from integration routing"
+	secondEvent.ReplyHandle = map[string]any{
+		"message_id": "om_process_reuse_2",
 	}
-	if len(conversationIDs) > 0 {
-		if _, err := g.DB().Model("messages").Ctx(ctx).WhereIn("conversation_id", conversationIDs).Delete(); err != nil {
-			t.Fatalf("cleanup messages failed: %v", err)
-		}
-		if _, err := g.DB().Model("conversations").Ctx(ctx).WhereIn("id", conversationIDs).Delete(); err != nil {
-			t.Fatalf("cleanup conversations failed: %v", err)
-		}
+
+	firstResult, err := ProcessInboundEvent(ctx, conn, firstEvent)
+	if err != nil {
+		t.Fatalf("first ProcessInboundEvent() failed: %v", err)
 	}
-	if _, err := g.DB().Model("agent_channel_bindings").Ctx(ctx).Where("id = ?", bindingID).Delete(); err != nil {
-		t.Fatalf("cleanup agent_channel_bindings failed: %v", err)
+	secondResult, err := ProcessInboundEvent(ctx, conn, secondEvent)
+	if err != nil {
+		t.Fatalf("second ProcessInboundEvent() failed: %v", err)
 	}
-	if _, err := g.DB().Model("agents").Ctx(ctx).Where("id = ?", agentID).Delete(); err != nil {
-		t.Fatalf("cleanup agents failed: %v", err)
+
+	if firstResult.ExternalSession == nil || secondResult.ExternalSession == nil {
+		t.Fatal("external session is nil")
 	}
-	if _, err := g.DB().Model("im_connections").Ctx(ctx).Where("id = ?", connectionID).Delete(); err != nil {
-		t.Fatalf("cleanup im_connections failed: %v", err)
+	if firstResult.ExternalSession.ID != secondResult.ExternalSession.ID {
+		t.Fatalf("external session id mismatch: %q vs %q", firstResult.ExternalSession.ID, secondResult.ExternalSession.ID)
+	}
+	if firstResult.ConversationID != secondResult.ConversationID {
+		t.Fatalf("conversation id mismatch: %q vs %q", firstResult.ConversationID, secondResult.ConversationID)
+	}
+
+	externalCount, err := defaultConnectionRepository.CountExternalSessions(ctx, fixture.ConnectionID, fixture.AgentID)
+	if err != nil {
+		t.Fatalf("count external sessions failed: %v", err)
+	}
+	if externalCount != 1 {
+		t.Fatalf("external session count = %d, want 1", externalCount)
 	}
 }

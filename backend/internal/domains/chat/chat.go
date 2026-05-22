@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gogf/gf/v2/frame/g"
-	"github.com/gogf/gf/v2/net/ghttp"
 	"dotblue/internal/domains/conversation"
 	"dotblue/internal/domains/engine"
 	"dotblue/internal/domains/identity"
+	"github.com/gogf/gf/v2/frame/g"
+	"github.com/gogf/gf/v2/net/ghttp"
 )
 
 const engineStreamTimeout = 10 * time.Minute
@@ -109,26 +109,30 @@ func Handler(r *ghttp.Request) {
 		}
 
 		convId := prepared.ConversationID
-		proxyToHermes(r, ws, prepared.Endpoint, prepared.History, convId, EngineTypeForTurn(prepared.Agent))
+		proxyToHermes(r, ws, prepared)
 
 		// Send updated title to frontend
-		if conv, err := conversation.GetById(convId); err == nil && conv != nil {
-			wsSafeSend(ws, MsgRes{ConversationId: convId, Title: conv.Title, Status: "done"})
+		if title, err := ConversationTitle(convId); err == nil && title != "" {
+			wsSafeSend(ws, MsgRes{ConversationId: convId, Title: title, Status: "done"})
 		}
 	}
 }
 
-func proxyToHermes(r *ghttp.Request, ws *ghttp.WebSocket, ep *engine.AgentEndpoint, messages []interface{}, convId string, engineType string) {
-	upstreamCtx, cancel := context.WithTimeout(context.Background(), engineStreamTimeout)
-	defer cancel()
-
-	resp, err := engine.GetEngine(engineType)
+func proxyToHermes(r *ghttp.Request, ws *ghttp.WebSocket, prepared *PreparedTurn) {
+	if prepared == nil {
+		sendError(ws, "Prepared turn is incomplete")
+		return
+	}
+	eng, engineType, err := defaultService.ResolveEngine(prepared.Agent)
 	if err != nil {
 		sendError(ws, "Engine not available: "+engineType)
 		return
 	}
+	convId := prepared.ConversationID
+	upstreamCtx, cancel := context.WithTimeout(context.Background(), engineStreamTimeout)
+	defer cancel()
 
-	httpResp, err := resp.ProxyRequest(upstreamCtx, ep, messages, convId)
+	httpResp, err := eng.ProxyRequest(upstreamCtx, prepared.Endpoint, prepared.History, convId)
 	if err != nil {
 		g.Log().Errorf(r.Context(), "Hermes request failed: %v", err)
 		sendError(ws, "Hermes engine unreachable")
@@ -362,15 +366,15 @@ func CompletionsHandler(r *ghttp.Request) {
 	if sseDebugEnabled(r.Context()) {
 		g.Log().Debugf(r.Context(), "sse.proxy.begin conv=%s engine=%s", convId, engineType)
 	}
-	proxyToHermesSSE(r, prepared.Endpoint, prepared.History, convId, engineType)
+	proxyToHermesSSE(r, prepared)
 	if sseDebugEnabled(r.Context()) {
 		g.Log().Debugf(r.Context(), "sse.proxy.end conv=%s ctxErr=%v", convId, r.Context().Err())
 	}
 
 	// Send updated title if the client is still connected.
 	if r.Context().Err() == nil {
-		if conv, err := conversation.GetById(convId); err == nil && conv != nil {
-			sseWrite(r, "meta", MsgRes{ConversationId: convId, Title: conv.Title, Status: "done"})
+		if title, err := ConversationTitle(convId); err == nil && title != "" {
+			sseWrite(r, "meta", MsgRes{ConversationId: convId, Title: title, Status: "done"})
 		}
 	}
 
@@ -384,17 +388,22 @@ func CompletionsHandler(r *ghttp.Request) {
 	}
 }
 
-func proxyToHermesSSE(r *ghttp.Request, ep *engine.AgentEndpoint, messages []interface{}, convId string, engineType string) {
-	eng, err := engine.GetEngine(engineType)
+func proxyToHermesSSE(r *ghttp.Request, prepared *PreparedTurn) {
+	if prepared == nil {
+		sseWrite(r, "error", MsgRes{Content: "Prepared turn is incomplete", Status: "error"})
+		return
+	}
+	eng, engineType, err := defaultService.ResolveEngine(prepared.Agent)
 	if err != nil {
 		sseWrite(r, "error", MsgRes{Content: "Engine not available: " + engineType, Status: "error"})
 		return
 	}
+	convId := prepared.ConversationID
 
 	upstreamCtx, cancel := context.WithTimeout(context.Background(), engineStreamTimeout)
 	defer cancel()
 
-	resp, err := eng.ProxyRequest(upstreamCtx, ep, messages, convId)
+	resp, err := eng.ProxyRequest(upstreamCtx, prepared.Endpoint, prepared.History, convId)
 	if err != nil {
 		g.Log().Errorf(r.Context(), "Engine request failed: %v", err)
 		if r.Context().Err() == nil {

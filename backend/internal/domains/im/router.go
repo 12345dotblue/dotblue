@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"dotblue/internal/domains/agent"
-	"github.com/gogf/gf/v2/frame/g"
 )
 
 var ErrNoMatchedBinding = errors.New("no matched agent binding")
@@ -22,20 +21,20 @@ const (
 )
 
 type bindingRecord struct {
-	ID                string    `json:"id"`
-	EnterpriseID      string    `json:"enterprise_id"`
-	AgentID           string    `json:"agent_id"`
-	ConnectionID      string    `json:"connection_id"`
-	Status            string    `json:"status"`
-	TriggerMode       string    `json:"trigger_mode"`
-	TriggerConfigJSON string    `json:"trigger_config_json"`
-	SessionStrategy   string    `json:"session_strategy"`
-	ReplyMode         string    `json:"reply_mode"`
-	AllowGroup        bool      `json:"allow_group"`
-	AllowDM           bool      `json:"allow_dm"`
-	Priority          int       `json:"priority"`
-	CreatedAt         time.Time `json:"created_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
+	ID                string    `json:"id" orm:"id"`
+	EnterpriseID      string    `json:"enterprise_id" orm:"enterprise_id"`
+	AgentID           string    `json:"agent_id" orm:"agent_id"`
+	ConnectionID      string    `json:"connection_id" orm:"connection_id"`
+	Status            string    `json:"status" orm:"status"`
+	TriggerMode       string    `json:"trigger_mode" orm:"trigger_mode"`
+	TriggerConfigJSON string    `json:"trigger_config_json" orm:"trigger_config_json"`
+	SessionStrategy   string    `json:"session_strategy" orm:"session_strategy"`
+	ReplyMode         string    `json:"reply_mode" orm:"reply_mode"`
+	AllowGroup        bool      `json:"allow_group" orm:"allow_group"`
+	AllowDM           bool      `json:"allow_dm" orm:"allow_dm"`
+	Priority          int       `json:"priority" orm:"priority"`
+	CreatedAt         time.Time `json:"created_at" orm:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at" orm:"updated_at"`
 }
 
 type RoutedBinding struct {
@@ -43,12 +42,24 @@ type RoutedBinding struct {
 	Agent   *agent.Agent
 }
 
+type bindingResolverRepository interface {
+	ListActiveBindingsByConnection(ctx context.Context, enterpriseID, connectionID string) ([]bindingRecord, error)
+}
+
 func ResolveInboundBinding(ctx context.Context, conn Connection, event InboundEvent) (*RoutedBinding, error) {
-	var rows []bindingRecord
-	if err := g.DB().Model("agent_channel_bindings").Ctx(ctx).
-		Where("enterprise_id = ? AND connection_id = ? AND status = ?", conn.EnterpriseID, conn.ID, StatusActive).
-		Order("priority ASC, created_at ASC").
-		Scan(&rows); err != nil {
+	return resolveInboundBindingWith(ctx, defaultConnectionRepository, defaultIMAgentDomain{}, conn, event)
+}
+
+func resolveInboundBindingWith(ctx context.Context, repo bindingResolverRepository, agents imAgentDomain, conn Connection, event InboundEvent) (*RoutedBinding, error) {
+	if repo == nil {
+		return nil, ErrNoMatchedBinding
+	}
+	if agents == nil {
+		agents = defaultIMAgentDomain{}
+	}
+
+	rows, err := repo.ListActiveBindingsByConnection(ctx, conn.EnterpriseID, conn.ID)
+	if err != nil {
 		return nil, err
 	}
 
@@ -57,7 +68,7 @@ func ResolveInboundBinding(ctx context.Context, conn Connection, event InboundEv
 		if !bindingMatchesEvent(binding, event) {
 			continue
 		}
-		agentRec, err := agent.GetById(binding.AgentID)
+		agentRec, err := agents.GetById(binding.AgentID)
 		if err != nil {
 			return nil, err
 		}

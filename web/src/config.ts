@@ -1,19 +1,16 @@
-const LOCAL_WSL_BACKEND_URL = 'http://172.22.3.181:8000';
-const LOCALHOST_BACKEND_URLS = new Set([
-  'http://localhost:8000',
-  'http://127.0.0.1:8000',
-]);
-
 function resolveBackendUrl() {
   const configuredBackendUrl = import.meta.env.VITE_BACKEND_URL?.trim();
-  const runningOnLocalhost = typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname);
+  const isLocalBackendUrl = configuredBackendUrl === 'http://localhost:8000'
+    || configuredBackendUrl === 'http://127.0.0.1:8000';
 
-  if (configuredBackendUrl && (!runningOnLocalhost || !LOCALHOST_BACKEND_URLS.has(configuredBackendUrl))) {
-    return configuredBackendUrl;
+  // In local Vite dev, prefer same-origin `/api` unless the developer
+  // explicitly points to a non-local backend endpoint.
+  if (import.meta.env.DEV && (!configuredBackendUrl || isLocalBackendUrl)) {
+    return '';
   }
 
-  if (runningOnLocalhost) {
-    return LOCAL_WSL_BACKEND_URL;
+  if (configuredBackendUrl) {
+    return configuredBackendUrl;
   }
 
   return 'http://localhost:8000';

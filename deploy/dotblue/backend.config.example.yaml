@@ -1,0 +1,42 @@
+server:
+  address: ":8000"
+  openapiPath: "/api.json"
+  swaggerPath: "/swagger"
+
+database:
+  default:
+    link: "pgsql:__DOTBLUE_DB_USER__:__DOTBLUE_DB_PASSWORD__@tcp(db:5432)/__DOTBLUE_DB_NAME__"
+    debug: true
+
+casdoor:
+  endpoint: "__CASDOOR_INTERNAL_URL__"
+  clientId: "__DOTBLUE_CASDOOR_CLIENT_ID__"
+  clientSecret: "__DOTBLUE_CASDOOR_CLIENT_SECRET__"
+  jwtSecret: |
+__DOTBLUE_CASDOOR_CERT_PEM_BLOCK__
+  organizationName: "__CASDOOR_ORG_NAME__"
+  applicationName: "__CASDOOR_APP_NAME__"
+  bootstrap:
+    endpoint: ""
+    clientId: ""
+    clientSecret: ""
+    jwtSecret: ""
+
+setup:
+  initDataPath: ""
+
+logger:
+  level: "all"
+  stdout: true
+
+debug:
+  sse: true
+
+engine:
+  dataBasePath: "__DOTBLUE_ENGINE_HOST_DATA_PATH__"
+  dataMountPath: "__DOTBLUE_ENGINE_MOUNT_DATA_PATH__"
+  containerPort: 8642
+  runtimeMode: "__DOTBLUE_ENGINE_RUNTIME_MODE__"
+  endpointMode: "__DOTBLUE_ENGINE_ENDPOINT_MODE__"
+  dockerEndpoint: "__DOTBLUE_ENGINE_DOCKER_ENDPOINT__"
+  dockerNetwork: "__DOTBLUE_ENGINE_DOCKER_NETWORK__"

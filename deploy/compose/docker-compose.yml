@@ -1,0 +1,98 @@
+services:
+  casdoor-db:
+    image: ${POSTGRES_IMAGE}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${CASDOOR_DB_NAME}
+      POSTGRES_USER: ${CASDOOR_DB_USER}
+      POSTGRES_PASSWORD: ${CASDOOR_DB_PASSWORD}
+    volumes:
+      - casdoor-db-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${CASDOOR_DB_USER} -d ${CASDOOR_DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  db:
+    image: ${POSTGRES_IMAGE}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DOTBLUE_DB_NAME}
+      POSTGRES_USER: ${DOTBLUE_DB_USER}
+      POSTGRES_PASSWORD: ${DOTBLUE_DB_PASSWORD}
+    volumes:
+      - db-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DOTBLUE_DB_USER} -d ${DOTBLUE_DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  casdoor:
+    image: casbin/casdoor:latest
+    restart: unless-stopped
+    depends_on:
+      casdoor-db:
+        condition: service_healthy
+    ports:
+      - "${CASDOOR_PORT}:8000"
+    volumes:
+      - ./.generated/casdoor/app.conf:/conf/app.conf:ro
+      - ./.generated/casdoor/init_data.json:/init_data.json:ro
+      - ./.generated/casdoor/logs:/logs
+
+  backend:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+      args:
+        GOPROXY: ${GO_MODULE_PROXY}
+    restart: unless-stopped
+    group_add:
+      - "${DOTBLUE_ENGINE_DOCKER_SOCKET_GID}"
+    depends_on:
+      db:
+        condition: service_healthy
+      casdoor:
+        condition: service_started
+    command:
+      - /bin/sh
+      - -lc
+      - |
+        until wget -q -O /dev/null "${CASDOOR_INTERNAL_URL}/"; do
+          echo "waiting for casdoor..."
+          sleep 2
+        done
+        exec ./main
+    ports:
+      - "${DOTBLUE_BACKEND_PORT}:8000"
+    volumes:
+      - ./.generated/dotblue/config.yaml:/app/manifest/config/config.yaml:ro
+      - ./.generated/dotblue/init_data.json:/app/manifest/config/init_data.json:ro
+      - ${DOTBLUE_ENGINE_HOST_DATA_PATH}:${DOTBLUE_ENGINE_MOUNT_DATA_PATH}
+      - /var/run/docker.sock:/var/run/docker.sock
+      - app-data:/app/data
+
+  web:
+    build:
+      context: ../../web
+      dockerfile: Dockerfile
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY}
+        VITE_CASDOOR_SERVER_URL: ${CASDOOR_PUBLIC_URL}
+        VITE_CASDOOR_CLIENT_ID: ${DOTBLUE_CASDOOR_CLIENT_ID}
+        VITE_CASDOOR_ORG_NAME: ${CASDOOR_ORG_NAME}
+        VITE_CASDOOR_APP_NAME: ${CASDOOR_APP_NAME}
+        VITE_BACKEND_URL: ${DOTBLUE_BACKEND_PUBLIC_URL}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_started
+    ports:
+      - "${DOTBLUE_WEB_PORT}:80"
+
+volumes:
+  casdoor-db-data:
+  db-data:
+  app-data:

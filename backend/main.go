@@ -1,9 +1,7 @@
 package main
 
 import (
-	_ "dotblue/internal/packed"
 	_ "github.com/gogf/gf/contrib/drivers/pgsql/v2"
-
 
 	"github.com/gogf/gf/v2/os/gctx"
 

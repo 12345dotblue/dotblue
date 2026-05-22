@@ -1,0 +1,161 @@
+{
+  "organizations": [
+    {
+      "owner": "admin",
+      "name": "__CASDOOR_ORG_NAME__",
+      "displayName": "__DOTBLUE_BRAND_NAME__",
+      "websiteUrl": "__DOTBLUE_PUBLIC_URL__",
+      "favicon": "__DOTBLUE_PUBLIC_URL__/brand/dotblue-favicon.svg",
+      "defaultApplication": "__CASDOOR_APP_NAME__",
+      "passwordType": "bcrypt",
+      "passwordOptions": ["AtLeast6"],
+      "countryCodes": ["US", "CN", "DE", "JP", "SG"],
+      "languages": ["en", "zh"],
+      "isProfilePublic": true,
+      "disableSignin": false
+    }
+  ],
+  "applications": [
+    {
+      "owner": "admin",
+      "name": "__CASDOOR_APP_NAME__",
+      "displayName": "__DOTBLUE_BRAND_NAME__",
+      "logo": "__DOTBLUE_PUBLIC_URL__/brand/dotblue-logo.svg",
+      "favicon": "__DOTBLUE_PUBLIC_URL__/brand/dotblue-favicon.svg",
+      "homepageUrl": "__DOTBLUE_PUBLIC_URL__",
+      "organization": "__CASDOOR_ORG_NAME__",
+      "cert": "__DOTBLUE_CASDOOR_CERT_NAME__",
+      "defaultGroup": "admin",
+      "enablePassword": true,
+      "enableSignUp": true,
+      "disableSignin": false,
+      "enableSigninSession": true,
+      "clientId": "__DOTBLUE_CASDOOR_CLIENT_ID__",
+      "clientSecret": "__DOTBLUE_CASDOOR_CLIENT_SECRET__",
+      "signinMethods": [
+        {
+          "name": "Password",
+          "displayName": "Password",
+          "rule": "All"
+        }
+      ],
+      "signupItems": [
+        {
+          "name": "Username",
+          "visible": true,
+          "required": true,
+          "prompted": false,
+          "rule": "None"
+        },
+        {
+          "name": "Display name",
+          "visible": true,
+          "required": true,
+          "prompted": false,
+          "rule": "None"
+        },
+        {
+          "name": "Password",
+          "visible": true,
+          "required": true,
+          "prompted": false,
+          "rule": "None"
+        },
+        {
+          "name": "Confirm password",
+          "visible": true,
+          "required": true,
+          "prompted": false,
+          "rule": "None"
+        },
+        {
+          "name": "Email",
+          "visible": true,
+          "required": true,
+          "prompted": false,
+          "rule": "None"
+        }
+      ],
+      "grantTypes": [
+        "authorization_code",
+        "password",
+        "client_credentials",
+        "refresh_token"
+      ],
+      "redirectUris": [
+        "__DOTBLUE_PUBLIC_URL__/callback"
+      ],
+      "tokenFormat": "JWT",
+      "tokenFields": [],
+      "expireInHours": 168,
+      "signupUrl": "",
+      "signinUrl": "",
+      "forgetUrl": "",
+      "themeData": {
+        "themeType": "default",
+        "colorPrimary": "__DOTBLUE_THEME_PRIMARY__",
+        "borderRadius": 12,
+        "isCompact": false,
+        "isEnabled": true
+      },
+      "formCss": ".login-panel{backdrop-filter:blur(18px);}.ant-btn-primary{box-shadow:none;}",
+      "formSideHtml": "<div style=\"padding:32px;color:#0f172a;\"><h2 style=\"margin:0 0 12px;\">__DOTBLUE_BRAND_NAME__</h2><p style=\"margin:0;color:#475569;\">AI agent sandbox for modern teams.</p></div>",
+      "formBackgroundUrl": "__DOTBLUE_PUBLIC_URL__/brand/dotblue-login-bg.svg"
+    }
+  ],
+  "users": [
+    {
+      "owner": "__CASDOOR_ORG_NAME__",
+      "name": "__DOTBLUE_ADMIN_USERNAME__",
+      "type": "normal-user",
+      "password": "__DOTBLUE_ADMIN_PASSWORD__",
+      "displayName": "__DOTBLUE_ADMIN_DISPLAY_NAME__",
+      "avatar": "",
+      "email": "__DOTBLUE_ADMIN_EMAIL__",
+      "phone": "",
+      "countryCode": "",
+      "address": [],
+      "addresses": [],
+      "affiliation": "",
+      "tag": "",
+      "score": 2000,
+      "ranking": 1,
+      "isAdmin": true,
+      "isForbidden": false,
+      "isDeleted": false,
+      "signupApplication": "__CASDOOR_APP_NAME__",
+      "createdIp": "",
+      "groups": ["admin"]
+    }
+  ],
+  "certs": [
+    {
+      "owner": "admin",
+      "name": "__DOTBLUE_CASDOOR_CERT_NAME__",
+      "displayName": "__DOTBLUE_BRAND_NAME__ JWT",
+      "scope": "JWT",
+      "type": "x509",
+      "cryptoAlgorithm": "RS256",
+      "bitSize": 2048,
+      "expireInYears": 10,
+      "certificate": "__DOTBLUE_CASDOOR_CERT_PEM__",
+      "privateKey": "__DOTBLUE_CASDOOR_CERT_PRIVATE_KEY__"
+    }
+  ],
+  "groups": [
+    {
+      "owner": "__CASDOOR_ORG_NAME__",
+      "name": "admin",
+      "displayName": "Platform Admins",
+      "manager": "__DOTBLUE_ADMIN_USERNAME__",
+      "contactEmail": "__DOTBLUE_ADMIN_EMAIL__",
+      "type": "Virtual",
+      "parent_id": "",
+      "isTopGroup": true,
+      "title": "",
+      "key": "",
+      "children": [],
+      "isEnabled": true
+    }
+  ]
+}

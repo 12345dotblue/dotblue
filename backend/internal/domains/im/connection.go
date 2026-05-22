@@ -9,7 +9,6 @@ import (
 	"dotblue/internal/domains/identity"
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
-	"github.com/google/uuid"
 )
 
 const maskedSecretValue = "********"
@@ -21,20 +20,20 @@ const (
 )
 
 type connectionRecord struct {
-	ID              string          `json:"id"`
-	EnterpriseID    string          `json:"enterprise_id"`
-	Platform        string          `json:"platform"`
-	Name            string          `json:"name"`
-	Status          string          `json:"status"`
-	ConnectionMode  string          `json:"connection_mode"`
-	ConfigJSON      json.RawMessage `json:"config_json"`
-	SecretJSON      json.RawMessage `json:"secret_json"`
-	CallbackPath    string          `json:"callback_path"`
-	LastConnectedAt *time.Time      `json:"last_connected_at"`
-	LastError       string          `json:"last_error"`
-	CreatedBy       string          `json:"created_by"`
-	CreatedAt       time.Time       `json:"created_at"`
-	UpdatedAt       time.Time       `json:"updated_at"`
+	ID              string          `json:"id" orm:"id"`
+	EnterpriseID    string          `json:"enterprise_id" orm:"enterprise_id"`
+	Platform        string          `json:"platform" orm:"platform"`
+	Name            string          `json:"name" orm:"name"`
+	Status          string          `json:"status" orm:"status"`
+	ConnectionMode  string          `json:"connection_mode" orm:"connection_mode"`
+	ConfigJSON      json.RawMessage `json:"config_json" orm:"config_json"`
+	SecretJSON      json.RawMessage `json:"secret_json" orm:"secret_json"`
+	CallbackPath    string          `json:"callback_path" orm:"callback_path"`
+	LastConnectedAt *time.Time      `json:"last_connected_at" orm:"last_connected_at"`
+	LastError       string          `json:"last_error" orm:"last_error"`
+	CreatedBy       string          `json:"created_by" orm:"created_by"`
+	CreatedAt       time.Time       `json:"created_at" orm:"created_at"`
+	UpdatedAt       time.Time       `json:"updated_at" orm:"updated_at"`
 }
 
 type createConnectionReq struct {
@@ -53,38 +52,38 @@ type updateConnectionReq struct {
 }
 
 type eventRecord struct {
-	ID                string    `json:"id"`
-	EventID           string    `json:"event_id"`
-	ExternalMessageID string    `json:"external_message_id"`
-	Direction         string    `json:"direction"`
-	Status            string    `json:"status"`
-	ErrorMessage      string    `json:"error_message"`
-	CreatedAt         time.Time `json:"created_at"`
+	ID                string    `json:"id" orm:"id"`
+	EventID           string    `json:"event_id" orm:"event_id"`
+	ExternalMessageID string    `json:"external_message_id" orm:"external_message_id"`
+	Direction         string    `json:"direction" orm:"direction"`
+	Status            string    `json:"status" orm:"status"`
+	ErrorMessage      string    `json:"error_message" orm:"error_message"`
+	CreatedAt         time.Time `json:"created_at" orm:"created_at"`
 }
 
 type deliveryRecord struct {
-	ID             string    `json:"id"`
-	ConversationID string    `json:"conversation_id"`
-	MessageID      string    `json:"message_id"`
-	Attempt        int       `json:"attempt"`
-	Status         string    `json:"status"`
-	ErrorMessage   string    `json:"error_message"`
-	CreatedAt      time.Time `json:"created_at"`
+	ID             string    `json:"id" orm:"id"`
+	ConversationID string    `json:"conversation_id" orm:"conversation_id"`
+	MessageID      string    `json:"message_id" orm:"message_id"`
+	Attempt        int       `json:"attempt" orm:"attempt"`
+	Status         string    `json:"status" orm:"status"`
+	ErrorMessage   string    `json:"error_message" orm:"error_message"`
+	CreatedAt      time.Time `json:"created_at" orm:"created_at"`
 }
 
 func GetConnectionHandler(r *ghttp.Request) {
 	enterpriseID := identity.GetCurrentEnterpriseId(r)
 	id := r.Get("id").String()
-	record, err := defaultConnectionRepository.Get(r.Context(), enterpriseID, id)
+	connection, err := defaultConnectionService.GetConnection(r.Context(), enterpriseID, id)
+	if err == ErrConnectionNotFound {
+		r.Response.WriteStatus(http.StatusNotFound, "Connection not found")
+		return
+	}
 	if err != nil {
 		r.Response.WriteStatus(http.StatusInternalServerError, "Failed to load connection")
 		return
 	}
-	if record == nil {
-		r.Response.WriteStatus(http.StatusNotFound, "Connection not found")
-		return
-	}
-	r.Response.WriteJson(toConnection(*record))
+	r.Response.WriteJson(connection)
 }
 
 func ListConnectionsHandler(r *ghttp.Request) {
@@ -94,7 +93,7 @@ func ListConnectionsHandler(r *ghttp.Request) {
 		return
 	}
 
-	rows, err := defaultConnectionRepository.List(r.Context(), enterpriseID, ConnectionListFilters{
+	rows, err := defaultConnectionService.ListConnections(r.Context(), enterpriseID, ConnectionListFilters{
 		Platform: r.Get("platform").String(),
 		Status:   r.Get("status").String(),
 		Keyword:  r.Get("keyword").String(),
@@ -104,36 +103,21 @@ func ListConnectionsHandler(r *ghttp.Request) {
 		return
 	}
 
-	resp := make([]Connection, 0, len(rows))
-	for _, row := range rows {
-		resp = append(resp, toConnection(row))
-	}
-	r.Response.WriteJson(resp)
+	r.Response.WriteJson(rows)
 }
 
 func ListConnectionEventsHandler(r *ghttp.Request) {
 	enterpriseID := identity.GetCurrentEnterpriseId(r)
 	id := r.Get("id").String()
-	if exists, err := defaultConnectionRepository.Exists(r.Context(), enterpriseID, id); err != nil {
-		r.Response.WriteStatus(http.StatusInternalServerError, "Failed to list events")
-		return
-	} else if !exists {
+	rows, err := defaultConnectionService.ListConnectionEvents(r.Context(), enterpriseID, id, ConnectionEventListFilters{
+		Direction: r.Get("direction").String(),
+		Status:    r.Get("status").String(),
+		Limit:     r.Get("limit").Int(),
+	})
+	if err == ErrConnectionNotFound {
 		r.Response.WriteStatus(http.StatusNotFound, "Connection not found")
 		return
 	}
-
-	limit := r.Get("limit").Int()
-	if limit <= 0 || limit > 100 {
-		limit = 50
-	}
-	rows, err := defaultConnectionRepository.ListEvents(
-		r.Context(),
-		enterpriseID,
-		id,
-		r.Get("direction").String(),
-		r.Get("status").String(),
-		limit,
-	)
 	if err != nil {
 		r.Response.WriteStatus(http.StatusInternalServerError, "Failed to list events")
 		return
@@ -147,25 +131,14 @@ func ListConnectionEventsHandler(r *ghttp.Request) {
 func ListConnectionDeliveriesHandler(r *ghttp.Request) {
 	enterpriseID := identity.GetCurrentEnterpriseId(r)
 	id := r.Get("id").String()
-	if exists, err := defaultConnectionRepository.Exists(r.Context(), enterpriseID, id); err != nil {
-		r.Response.WriteStatus(http.StatusInternalServerError, "Failed to list deliveries")
-		return
-	} else if !exists {
+	rows, err := defaultConnectionService.ListConnectionDeliveries(r.Context(), enterpriseID, id, ConnectionDeliveryListFilters{
+		Status: r.Get("status").String(),
+		Limit:  r.Get("limit").Int(),
+	})
+	if err == ErrConnectionNotFound {
 		r.Response.WriteStatus(http.StatusNotFound, "Connection not found")
 		return
 	}
-
-	limit := r.Get("limit").Int()
-	if limit <= 0 || limit > 100 {
-		limit = 50
-	}
-	rows, err := defaultConnectionRepository.ListDeliveries(
-		r.Context(),
-		enterpriseID,
-		id,
-		r.Get("status").String(),
-		limit,
-	)
 	if err != nil {
 		r.Response.WriteStatus(http.StatusInternalServerError, "Failed to list deliveries")
 		return
@@ -182,58 +155,14 @@ func CreateConnectionHandler(r *ghttp.Request) {
 		r.Response.WriteStatus(http.StatusBadRequest, err.Error())
 		return
 	}
-	if strings.TrimSpace(req.Platform) == "" || strings.TrimSpace(req.Name) == "" || strings.TrimSpace(req.ConnectionMode) == "" {
-		r.Response.WriteStatus(http.StatusBadRequest, "platform, name and connectionMode are required")
-		return
-	}
-
-	if err := validateConnectionInput(req.Platform, req.ConnectionMode, req.Config, req.Secrets); err != nil {
+	enterpriseID := identity.GetCurrentEnterpriseId(r)
+	userID := identity.GetUserId(r)
+	connection, err := defaultConnectionService.CreateConnection(r.Context(), enterpriseID, userID, req)
+	if err != nil {
 		r.Response.WriteStatus(http.StatusBadRequest, err.Error())
 		return
 	}
-
-	configJSON, err := json.Marshal(safeMap(req.Config))
-	if err != nil {
-		r.Response.WriteStatus(http.StatusBadRequest, "Invalid config")
-		return
-	}
-	secretJSON, err := json.Marshal(safeMap(req.Secrets))
-	if err != nil {
-		r.Response.WriteStatus(http.StatusBadRequest, "Invalid secrets")
-		return
-	}
-
-	now := time.Now()
-	id := uuid.NewString()
-	enterpriseID := identity.GetCurrentEnterpriseId(r)
-	userID := identity.GetUserId(r)
-	callbackPath := buildConnectionCallbackPath(req.Platform, id)
-	err = defaultConnectionRepository.Create(r.Context(), g.Map{
-		"id":              id,
-		"enterprise_id":   enterpriseID,
-		"platform":        req.Platform,
-		"name":            req.Name,
-		"status":          StatusDisabled,
-		"connection_mode": req.ConnectionMode,
-		"config_json":     string(configJSON),
-		"secret_json":     string(secretJSON),
-		"callback_path":   callbackPath,
-		"last_error":      "",
-		"created_by":      userID,
-		"created_at":      now,
-		"updated_at":      now,
-	})
-	if err != nil {
-		r.Response.WriteStatus(http.StatusInternalServerError, "Failed to create connection")
-		return
-	}
-
-	record, err := defaultConnectionRepository.Get(r.Context(), enterpriseID, id)
-	if err != nil {
-		r.Response.WriteStatus(http.StatusInternalServerError, "Failed to load connection")
-		return
-	}
-	r.Response.WriteJson(toConnection(*record))
+	r.Response.WriteJson(connection)
 }
 
 func UpdateConnectionHandler(r *ghttp.Request) {
@@ -244,55 +173,16 @@ func UpdateConnectionHandler(r *ghttp.Request) {
 	}
 	enterpriseID := identity.GetCurrentEnterpriseId(r)
 	id := r.Get("id").String()
-	record, err := defaultConnectionRepository.Get(r.Context(), enterpriseID, id)
-	if err != nil || record == nil {
+	connection, err := defaultConnectionService.UpdateConnection(r.Context(), enterpriseID, id, req)
+	if err == ErrConnectionNotFound {
 		r.Response.WriteStatus(http.StatusNotFound, "Connection not found")
 		return
 	}
-
-	currentConfig := decodeJSONMap(record.ConfigJSON)
-	currentSecrets := decodeJSONMap(record.SecretJSON)
-
-	if req.Name != "" {
-		record.Name = req.Name
-	}
-	if req.ConnectionMode != "" {
-		record.ConnectionMode = req.ConnectionMode
-	}
-	if req.Config != nil {
-		currentConfig = req.Config
-	}
-	if req.Secrets != nil {
-		currentSecrets = mergeSecretsPreservingMask(currentSecrets, req.Secrets)
-	}
-
-	if err := validateConnectionInput(record.Platform, record.ConnectionMode, currentConfig, currentSecrets); err != nil {
+	if err != nil {
 		r.Response.WriteStatus(http.StatusBadRequest, err.Error())
 		return
 	}
-
-	configJSON, _ := json.Marshal(safeMap(currentConfig))
-	secretJSON, _ := json.Marshal(safeMap(currentSecrets))
-	callbackPath := buildConnectionCallbackPath(record.Platform, id)
-	err = defaultConnectionRepository.Update(r.Context(), enterpriseID, id, g.Map{
-		"name":            record.Name,
-		"connection_mode": record.ConnectionMode,
-		"config_json":     string(configJSON),
-		"secret_json":     string(secretJSON),
-		"callback_path":   callbackPath,
-		"updated_at":      time.Now(),
-	})
-	if err != nil {
-		r.Response.WriteStatus(http.StatusInternalServerError, "Failed to update connection")
-		return
-	}
-
-	updated, err := defaultConnectionRepository.Get(r.Context(), enterpriseID, id)
-	if err != nil || updated == nil {
-		r.Response.WriteStatus(http.StatusInternalServerError, "Failed to load connection")
-		return
-	}
-	r.Response.WriteJson(toConnection(*updated))
+	r.Response.WriteJson(connection)
 }
 
 func EnableConnectionHandler(r *ghttp.Request) {

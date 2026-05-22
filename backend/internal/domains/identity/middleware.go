@@ -2,11 +2,8 @@ package identity
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/casdoor/casdoor-go-sdk/casdoorsdk"
 	"github.com/gogf/gf/v2/frame/g"
@@ -47,13 +44,9 @@ func Middleware(r *ghttp.Request) {
 		return
 	}
 
-	if strings.HasPrefix(tokenString, "Bearer ") {
-		tokenString = tokenString[7:]
-	}
-
-	claims, err := casdoorsdk.ParseJwtToken(tokenString)
+	session, err := defaultService.ParseSession(tokenString)
 	if err != nil {
-		tokenPreview := tokenString
+		tokenPreview := normalizeBearerToken(tokenString)
 		if len(tokenPreview) > 10 {
 			tokenPreview = tokenPreview[:10]
 		}
@@ -64,70 +57,19 @@ func Middleware(r *ghttp.Request) {
 		return
 	}
 
-	payload := decodeTokenPayload(tokenString)
-	email := payload["email"]
-	displayName := payload["displayName"]
-	if displayName == "" {
-		displayName = payload["name"]
-	}
-	avatar := payload["avatar"]
+	r.SetCtxVar("userId", session.UserID)
+	r.SetCtxVar("organizationId", session.OrganizationID)
+	r.SetCtxVar("isAdmin", session.IsAdmin)
+	r.SetCtxVar("groups", strings.Join(session.Groups, ","))
+	r.SetCtxVar("email", session.Email)
+	r.SetCtxVar("displayName", session.DisplayName)
+	r.SetCtxVar("avatar", session.Avatar)
 
-	r.SetCtxVar("userId", claims.Name)
-	r.SetCtxVar("organizationId", claims.Owner)
-	r.SetCtxVar("isAdmin", claims.IsAdmin)
-	r.SetCtxVar("groups", strings.Join(claims.Groups, ","))
-	r.SetCtxVar("email", email)
-	r.SetCtxVar("displayName", displayName)
-	r.SetCtxVar("avatar", avatar)
-
-	if err := syncLocalUser(r, claims.Name, claims.Owner, email, displayName, avatar); err != nil {
+	if err := defaultService.SyncLocalUser(session); err != nil {
 		g.Log().Warningf(r.Context(), "failed to sync local user profile: %v", err)
 	}
 
 	r.Middleware.Next()
-}
-
-func decodeTokenPayload(tokenString string) map[string]string {
-	parts := strings.Split(tokenString, ".")
-	if len(parts) != 3 {
-		return map[string]string{}
-	}
-	decoded, err := base64.RawURLEncoding.DecodeString(parts[1])
-	if err != nil {
-		return map[string]string{}
-	}
-	var payload map[string]interface{}
-	if err := json.Unmarshal(decoded, &payload); err != nil {
-		return map[string]string{}
-	}
-	out := make(map[string]string)
-	for _, key := range []string{"email", "displayName", "name", "avatar"} {
-		if val, ok := payload[key].(string); ok {
-			out[key] = val
-		}
-	}
-	return out
-}
-
-func syncLocalUser(r *ghttp.Request, userId, sourceOrgId, email, displayName, avatar string) error {
-	if userId == "" {
-		return nil
-	}
-	now := time.Now()
-	_, err := g.DB().Exec(r.Context(), `
-		INSERT INTO users (
-			user_id, email, display_name, avatar, source_organization_id, created_at, updated_at, last_login_at
-		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT (user_id) DO UPDATE SET
-			email = EXCLUDED.email,
-			display_name = EXCLUDED.display_name,
-			avatar = EXCLUDED.avatar,
-			source_organization_id = EXCLUDED.source_organization_id,
-			updated_at = EXCLUDED.updated_at,
-			last_login_at = EXCLUDED.last_login_at
-	`, userId, email, displayName, avatar, sourceOrgId, now, now, now)
-	return err
 }
 
 func GetUserId(r *ghttp.Request) string {

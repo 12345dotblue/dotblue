@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "syncCasdoor": false,
+  "organization": {
+    "name": "__CASDOOR_ORG_NAME__",
+    "displayName": "__DOTBLUE_BRAND_NAME__"
+  },
+  "admin": {
+    "username": "__DOTBLUE_ADMIN_USERNAME__",
+    "displayName": "__DOTBLUE_ADMIN_DISPLAY_NAME__",
+    "email": "__DOTBLUE_ADMIN_EMAIL__",
+    "password": "__DOTBLUE_ADMIN_PASSWORD__"
+  },
+  "platform": {
+    "dataBasePath": "__DOTBLUE_ENGINE_HOST_DATA_PATH__",
+    "dataMountPath": "__DOTBLUE_ENGINE_MOUNT_DATA_PATH__",
+    "containerPort": 8642,
+    "runtimeMode": "__DOTBLUE_ENGINE_RUNTIME_MODE__",
+    "endpointMode": "__DOTBLUE_ENGINE_ENDPOINT_MODE__",
+    "dockerEndpoint": "__DOTBLUE_ENGINE_DOCKER_ENDPOINT__",
+    "dockerNetwork": "__DOTBLUE_ENGINE_DOCKER_NETWORK__"
+  },
+  "provider": {
+    "type": "__DOTBLUE_LLM_PROVIDER_TYPE__",
+    "apiBase": "__DOTBLUE_LLM_API_BASE__",
+    "apiKey": "__DOTBLUE_LLM_API_KEY__",
+    "model": "__DOTBLUE_LLM_MODEL__"
+  }
+}

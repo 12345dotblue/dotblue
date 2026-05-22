@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"dotblue/internal/domains/settings"
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
-	"dotblue/internal/domains/settings"
 )
 
 // settingsUpdateReq is the request body for the unified settings endpoint.

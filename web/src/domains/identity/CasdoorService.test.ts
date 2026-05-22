@@ -65,4 +65,11 @@ describe('CasdoorService', () => {
     expect(casdoorService.getGroups()).toEqual([]);
     expect(casdoorService.isAdmin()).toBe(false);
   });
+
+  it('should treat malformed token as authenticated but return empty claims', () => {
+    casdoorService.setToken('malformed-token');
+    expect(casdoorService.isAuthenticated()).toBe(true);
+    expect(casdoorService.getOrganization()).toBe('');
+    expect(casdoorService.getUsername()).toBe('');
+  });
 });

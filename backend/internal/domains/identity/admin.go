@@ -12,19 +12,11 @@ const AdminGroup = "admin"
 // Must be placed after Middleware (which sets ctxVar "isAdmin" and "groups").
 func AdminMiddleware(r *ghttp.Request) {
 	isAdmin := r.GetCtxVar("isAdmin").Bool()
-	if isAdmin {
+	groups := r.GetCtxVar("groups").Strings()
+	if defaultService.HasAdminAccess(isAdmin, groups) {
 		r.Middleware.Next()
 		return
 	}
-
-	groups := r.GetCtxVar("groups").Strings()
-	for _, g := range groups {
-		if g == AdminGroup {
-			r.Middleware.Next()
-			return
-		}
-	}
-
 	r.Response.WriteStatus(http.StatusForbidden, "Admin access required")
 	r.ExitAll()
 }

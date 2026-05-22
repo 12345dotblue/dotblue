@@ -2,6 +2,8 @@ package im
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/gogf/gf/v2/frame/g"
@@ -11,6 +13,179 @@ import (
 type ConnectionService struct{}
 
 var defaultConnectionService = &ConnectionService{}
+
+type ConnectionEventListFilters struct {
+	Direction string
+	Status    string
+	Limit     int
+}
+
+type ConnectionDeliveryListFilters struct {
+	Status string
+	Limit  int
+}
+
+func (s *ConnectionService) GetConnection(ctx context.Context, enterpriseID, id string) (Connection, error) {
+	record, err := defaultConnectionRepository.Get(ctx, enterpriseID, id)
+	if err != nil {
+		return Connection{}, err
+	}
+	if record == nil {
+		return Connection{}, ErrConnectionNotFound
+	}
+	return toConnection(*record), nil
+}
+
+func (s *ConnectionService) GetConnectionByPlatform(ctx context.Context, id, platform string) (Connection, error) {
+	record, err := defaultConnectionRepository.GetByID(ctx, id)
+	if err != nil {
+		return Connection{}, err
+	}
+	if record == nil {
+		return Connection{}, ErrConnectionNotFound
+	}
+	if expected := strings.TrimSpace(platform); expected != "" && strings.TrimSpace(record.Platform) != expected {
+		return Connection{}, ErrConnectionNotFound
+	}
+	return toConnection(*record), nil
+}
+
+func (s *ConnectionService) ListConnections(ctx context.Context, enterpriseID string, filters ConnectionListFilters) ([]Connection, error) {
+	rows, err := defaultConnectionRepository.List(ctx, enterpriseID, filters)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]Connection, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, toConnection(row))
+	}
+	return result, nil
+}
+
+func (s *ConnectionService) ListConnectionEvents(ctx context.Context, enterpriseID, id string, filters ConnectionEventListFilters) ([]eventRecord, error) {
+	exists, err := defaultConnectionRepository.Exists(ctx, enterpriseID, id)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, ErrConnectionNotFound
+	}
+
+	return defaultConnectionRepository.ListEvents(
+		ctx,
+		enterpriseID,
+		id,
+		filters.Direction,
+		filters.Status,
+		normalizeConnectionListLimit(filters.Limit),
+	)
+}
+
+func (s *ConnectionService) ListConnectionDeliveries(ctx context.Context, enterpriseID, id string, filters ConnectionDeliveryListFilters) ([]deliveryRecord, error) {
+	exists, err := defaultConnectionRepository.Exists(ctx, enterpriseID, id)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, ErrConnectionNotFound
+	}
+
+	return defaultConnectionRepository.ListDeliveries(
+		ctx,
+		enterpriseID,
+		id,
+		filters.Status,
+		normalizeConnectionListLimit(filters.Limit),
+	)
+}
+
+func (s *ConnectionService) CreateConnection(ctx context.Context, enterpriseID, userID string, req createConnectionReq) (Connection, error) {
+	if strings.TrimSpace(req.Platform) == "" || strings.TrimSpace(req.Name) == "" || strings.TrimSpace(req.ConnectionMode) == "" {
+		return Connection{}, ErrInvalidConnectionConfig
+	}
+	if err := validateConnectionInput(req.Platform, req.ConnectionMode, req.Config, req.Secrets); err != nil {
+		return Connection{}, err
+	}
+
+	configJSON, err := json.Marshal(safeMap(req.Config))
+	if err != nil {
+		return Connection{}, ErrInvalidConnectionConfig
+	}
+	secretJSON, err := json.Marshal(safeMap(req.Secrets))
+	if err != nil {
+		return Connection{}, ErrInvalidConnectionConfig
+	}
+
+	now := time.Now()
+	id := uuid.NewString()
+	callbackPath := buildConnectionCallbackPath(req.Platform, id)
+	if err := defaultConnectionRepository.Create(ctx, g.Map{
+		"id":              id,
+		"enterprise_id":   enterpriseID,
+		"platform":        req.Platform,
+		"name":            req.Name,
+		"status":          StatusDisabled,
+		"connection_mode": req.ConnectionMode,
+		"config_json":     string(configJSON),
+		"secret_json":     string(secretJSON),
+		"callback_path":   callbackPath,
+		"last_error":      "",
+		"created_by":      userID,
+		"created_at":      now,
+		"updated_at":      now,
+	}); err != nil {
+		return Connection{}, err
+	}
+
+	return s.GetConnection(ctx, enterpriseID, id)
+}
+
+func (s *ConnectionService) UpdateConnection(ctx context.Context, enterpriseID, id string, req updateConnectionReq) (Connection, error) {
+	record, err := defaultConnectionRepository.Get(ctx, enterpriseID, id)
+	if err != nil {
+		return Connection{}, err
+	}
+	if record == nil {
+		return Connection{}, ErrConnectionNotFound
+	}
+
+	currentConfig := decodeJSONMap(record.ConfigJSON)
+	currentSecrets := decodeJSONMap(record.SecretJSON)
+
+	if req.Name != "" {
+		record.Name = req.Name
+	}
+	if req.ConnectionMode != "" {
+		record.ConnectionMode = req.ConnectionMode
+	}
+	if req.Config != nil {
+		currentConfig = req.Config
+	}
+	if req.Secrets != nil {
+		currentSecrets = mergeSecretsPreservingMask(currentSecrets, req.Secrets)
+	}
+
+	if err := validateConnectionInput(record.Platform, record.ConnectionMode, currentConfig, currentSecrets); err != nil {
+		return Connection{}, err
+	}
+
+	configJSON, _ := json.Marshal(safeMap(currentConfig))
+	secretJSON, _ := json.Marshal(safeMap(currentSecrets))
+	callbackPath := buildConnectionCallbackPath(record.Platform, id)
+	if err := defaultConnectionRepository.Update(ctx, enterpriseID, id, g.Map{
+		"name":            record.Name,
+		"connection_mode": record.ConnectionMode,
+		"config_json":     string(configJSON),
+		"secret_json":     string(secretJSON),
+		"callback_path":   callbackPath,
+		"updated_at":      time.Now(),
+	}); err != nil {
+		return Connection{}, err
+	}
+
+	return s.GetConnection(ctx, enterpriseID, id)
+}
 
 func (s *ConnectionService) TestConnection(ctx context.Context, enterpriseID, id string) (string, error) {
 	record, err := defaultConnectionRepository.Get(ctx, enterpriseID, id)
@@ -123,4 +298,11 @@ func updateConnectionErrorState(ctx context.Context, connectionID string, lastEr
 
 func updateConnectionRuntimeFieldsByID(ctx context.Context, connectionID string, data g.Map) error {
 	return defaultConnectionRepository.UpdateRuntimeFieldsByID(ctx, connectionID, data)
+}
+
+func normalizeConnectionListLimit(limit int) int {
+	if limit <= 0 || limit > 100 {
+		return 50
+	}
+	return limit
 }

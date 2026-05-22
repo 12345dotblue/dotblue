@@ -200,6 +200,21 @@ func (a *FeishuAdapter) processFeishuSocketPayload(ctx context.Context, conn Con
 	return err
 }
 
+func (a *FeishuAdapter) HandleInboundWebhook(ctx context.Context, req InboundWebhookRequest) (*InboundWebhookResult, error) {
+	// Keep challenge handshake compatible for webhook-style validation.
+	if challenge := str(req.Payload["challenge"]); challenge != "" {
+		return &InboundWebhookResult{
+			ImmediateResponse: map[string]any{"challenge": challenge},
+		}, nil
+	}
+
+	events, err := a.ParseInbound(ctx, req.Payload)
+	if err != nil {
+		return nil, err
+	}
+	return &InboundWebhookResult{Events: events}, nil
+}
+
 func isExpectedFeishuRuntimeStop(err error) bool {
 	if err == nil {
 		return true

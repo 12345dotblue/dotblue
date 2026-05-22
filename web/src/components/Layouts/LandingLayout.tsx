@@ -1,8 +1,10 @@
 import React from 'react';
 import { Layout, Button, Space, Typography, Row, Col, Divider, theme } from 'antd';
-import { GlobalOutlined } from '@ant-design/icons';
+import { AppstoreOutlined, GlobalOutlined, LogoutOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
+import { casdoorService } from '../../domains/identity/CasdoorService';
+import { useAuthState } from '../../domains/identity/useAuthState';
 
 const { Header, Content, Footer } = Layout;
 const { Title, Text, Paragraph } = Typography;
@@ -11,6 +13,7 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { token } = theme.useToken();
+  const isAuthenticated = useAuthState();
 
   const changeLanguage = (lng: string) => {
     i18n.changeLanguage(lng);
@@ -53,9 +56,28 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           <Button type="text" onClick={() => changeLanguage(i18n.language === 'en' ? 'zh-CN' : 'en')} icon={<GlobalOutlined />}>
             {i18n.language === 'en' ? '中文' : 'English'}
           </Button>
-          <Button type="primary" shape="round" onClick={() => navigate('/login')}>
-            {t('login')}
-          </Button>
+          {isAuthenticated ? (
+            <>
+              <Button shape="round" icon={<AppstoreOutlined />} onClick={() => navigate('/dashboard')}>
+                Dashboard
+              </Button>
+              <Button
+                type="primary"
+                shape="round"
+                icon={<LogoutOutlined />}
+                onClick={() => {
+                  casdoorService.removeToken();
+                  navigate('/login');
+                }}
+              >
+                {t('logout')}
+              </Button>
+            </>
+          ) : (
+            <Button type="primary" shape="round" onClick={() => navigate('/login')}>
+              {t('login')}
+            </Button>
+          )}
         </Space>
       </Header>
 
@@ -77,7 +99,7 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             <Title level={5}>{t('footer_product')}</Title>
             <Space direction="vertical">
               <Link to="/">{t('welcome')}</Link>
-              <Link to="/login">{t('get_started')}</Link>
+              <Link to={isAuthenticated ? "/dashboard" : "/login"}>{isAuthenticated ? "Dashboard" : t('get_started')}</Link>
               <a href="/#pricing">{t('view_pricing')}</a>
             </Space>
           </Col>

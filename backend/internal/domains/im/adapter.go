@@ -23,6 +23,24 @@ type Adapter interface {
 	SendOutbound(ctx context.Context, conn Connection, msg OutboundEnvelope) error
 }
 
+type InboundWebhookRequest struct {
+	Connection Connection
+	Headers    map[string]string
+	Payload    map[string]any
+}
+
+type InboundWebhookResult struct {
+	Events            []InboundEvent
+	ImmediateResponse any
+}
+
+// InboundWebhookAdapter is optional and allows a platform to customize
+// webhook handshake, signature validation, and payload parsing while still
+// reusing the shared inbound pipeline.
+type InboundWebhookAdapter interface {
+	HandleInboundWebhook(ctx context.Context, req InboundWebhookRequest) (*InboundWebhookResult, error)
+}
+
 // ConnectionTester is optional and enables adapters to perform a real
 // connectivity or credential check beyond static config validation.
 type ConnectionTester interface {

@@ -26,38 +26,19 @@ func (p *InboundPipeline) PersistEvents(ctx context.Context, conn Connection, ev
 	result := inboundPersistResult{}
 	now := time.Now()
 	for _, event := range events {
-		event.ConnectionID = conn.ID
-		event.EnterpriseID = conn.EnterpriseID
-		if strings.TrimSpace(event.Platform) == "" {
-			event.Platform = conn.Platform
-		}
-		addr := BuildSessionAddress(conn, event)
-		if event.ReplyHandle == nil {
-			event.ReplyHandle = map[string]any{}
-		}
-		event.ReplyHandle["session_key"] = BuildSessionKey("", "", addr)
-		event.ReplyHandle["session_address"] = map[string]any{
-			"platform":      addr.Platform,
-			"connection_id": addr.ConnectionID,
-			"chat_id":       addr.ChatID,
-			"thread_id":     addr.ThreadID,
-			"user_id":       addr.UserID,
-			"chat_type":     addr.ChatType,
-		}
-
+		event = prepareInboundEvent(conn, event)
 		payloadJSON := normalizeInboundPayloadJSON(event.RawPayload)
-		_, err := g.DB().Model("external_message_events").Ctx(ctx).Data(g.Map{
-			"enterprise_id":       conn.EnterpriseID,
-			"platform":            event.Platform,
-			"connection_id":       conn.ID,
-			"event_id":            event.EventID,
-			"external_message_id": event.MessageID,
-			"direction":           "inbound",
-			"payload_json":        payloadJSON,
-			"status":              "received",
-			"error_message":       "",
-			"created_at":          now,
-		}).Insert()
+		err := defaultConnectionRepository.InsertInboundEvent(ctx, InboundEventRecord{
+			EnterpriseID:      conn.EnterpriseID,
+			Platform:          event.Platform,
+			ConnectionID:      conn.ID,
+			EventID:           event.EventID,
+			ExternalMessageID: event.MessageID,
+			PayloadJSON:       payloadJSON,
+			Status:            "received",
+			ErrorMessage:      "",
+			CreatedAt:         now,
+		})
 		if err != nil {
 			if isDuplicatedInboundEventError(err) {
 				result.Duplicated++
@@ -67,22 +48,13 @@ func (p *InboundPipeline) PersistEvents(ctx context.Context, conn Connection, ev
 		}
 		if err := p.processAcceptedEvent(ctx, conn, event); err != nil {
 			if IsNoMatchedBinding(err) {
-				_, _ = g.DB().Model("external_message_events").Ctx(ctx).Data(g.Map{
-					"status":        "no_binding",
-					"error_message": err.Error(),
-				}).Where("connection_id = ? AND event_id = ?", conn.ID, event.EventID).Update()
+				_ = defaultConnectionRepository.UpdateInboundEventStatus(ctx, conn.ID, event.EventID, "no_binding", err.Error())
 			} else {
-				_, _ = g.DB().Model("external_message_events").Ctx(ctx).Data(g.Map{
-					"status":        "error",
-					"error_message": err.Error(),
-				}).Where("connection_id = ? AND event_id = ?", conn.ID, event.EventID).Update()
+				_ = defaultConnectionRepository.UpdateInboundEventStatus(ctx, conn.ID, event.EventID, "error", err.Error())
 				return result, err
 			}
 		} else {
-			_, _ = g.DB().Model("external_message_events").Ctx(ctx).Data(g.Map{
-				"status":        "routed",
-				"error_message": "",
-			}).Where("connection_id = ? AND event_id = ?", conn.ID, event.EventID).Update()
+			_ = defaultConnectionRepository.UpdateInboundEventStatus(ctx, conn.ID, event.EventID, "routed", "")
 		}
 		result.Accepted++
 	}
@@ -90,6 +62,28 @@ func (p *InboundPipeline) PersistEvents(ctx context.Context, conn Connection, ev
 	_ = updateConnectionActiveState(ctx, conn.ID, now)
 
 	return result, nil
+}
+
+func prepareInboundEvent(conn Connection, event InboundEvent) InboundEvent {
+	event.ConnectionID = conn.ID
+	event.EnterpriseID = conn.EnterpriseID
+	if strings.TrimSpace(event.Platform) == "" {
+		event.Platform = conn.Platform
+	}
+	addr := BuildSessionAddress(conn, event)
+	if event.ReplyHandle == nil {
+		event.ReplyHandle = map[string]any{}
+	}
+	event.ReplyHandle["session_key"] = BuildSessionKey("", "", addr)
+	event.ReplyHandle["session_address"] = map[string]any{
+		"platform":      addr.Platform,
+		"connection_id": addr.ConnectionID,
+		"chat_id":       addr.ChatID,
+		"thread_id":     addr.ThreadID,
+		"user_id":       addr.UserID,
+		"chat_type":     addr.ChatType,
+	}
+	return event
 }
 
 func (p *InboundPipeline) processAcceptedEvent(ctx context.Context, conn Connection, event InboundEvent) error {

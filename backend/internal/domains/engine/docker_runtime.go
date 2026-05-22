@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,44 +22,138 @@ import (
 	"dotblue/internal/domains/settings"
 )
 
+type runtimeAgentInfo struct {
+	ID           string
+	SystemPrompt string
+	EngineAPIKey string
+	EngineType   string
+}
+
+type runtimePlatformConfig struct {
+	DataBasePath   string
+	DataMountPath  string
+	ContainerPort  int
+	RuntimeMode    string
+	EndpointMode   string
+	DockerEndpoint string
+	DockerNetwork  string
+}
+
+type runtimeAgentReader interface {
+	GetById(id string) (*runtimeAgentInfo, error)
+}
+
+type runtimeSettingsReader interface {
+	GetPlatformConfig() (*runtimePlatformConfig, error)
+	GetProviderConfig() (*ProviderConfig, error)
+}
+
+type runtimeEngineRegistry interface {
+	GetEngine(name string) (Engine, error)
+}
+
+type defaultRuntimeAgentReader struct{}
+
+func (defaultRuntimeAgentReader) GetById(id string) (*runtimeAgentInfo, error) {
+	rec, err := agent.GetById(id)
+	if err != nil || rec == nil {
+		return nil, err
+	}
+	return &runtimeAgentInfo{
+		ID:           rec.Id,
+		SystemPrompt: rec.SystemPrompt,
+		EngineAPIKey: rec.EngineAPIKey,
+		EngineType:   rec.EngineType,
+	}, nil
+}
+
+type defaultRuntimeSettingsReader struct{}
+
+func (defaultRuntimeSettingsReader) GetPlatformConfig() (*runtimePlatformConfig, error) {
+	cfg, err := settings.GetPlatformConfig()
+	if err != nil || cfg == nil {
+		return nil, err
+	}
+	return &runtimePlatformConfig{
+		DataBasePath:   cfg.DataBasePath,
+		DataMountPath:  cfg.DataMountPath,
+		ContainerPort:  cfg.ContainerPort,
+		RuntimeMode:    cfg.RuntimeMode,
+		EndpointMode:   cfg.EndpointMode,
+		DockerEndpoint: cfg.DockerEndpoint,
+		DockerNetwork:  cfg.DockerNetwork,
+	}, nil
+}
+
+func (defaultRuntimeSettingsReader) GetProviderConfig() (*ProviderConfig, error) {
+	return settings.GetProviderConfig()
+}
+
+type defaultRuntimeEngineRegistry struct{}
+
+func (defaultRuntimeEngineRegistry) GetEngine(name string) (Engine, error) {
+	return GetEngine(name)
+}
+
 // DockerRuntime manages agent containers via Docker.
-type DockerRuntime struct{}
+type DockerRuntime struct {
+	agents      runtimeAgentReader
+	settings    runtimeSettingsReader
+	registry    runtimeEngineRegistry
+	readyWaiter func(ctx context.Context, endpoint string) error
+}
+
+type runtimePlan struct {
+	platformConfig *runtimePlatformConfig
+	providerConfig *ProviderConfig
+	agentRecord    *runtimeAgentInfo
+	engineType     string
+	engineImpl     Engine
+	workspacePath  string
+	volumePath     string
+	containerPort  string
+	apiKey         string
+	endpointMode   string
+	dockerEndpoint string
+	dockerNetwork  string
+}
+
+const (
+	runtimeModeAuto      = "auto"
+	runtimeModeHost      = "host"
+	runtimeModeContainer = "container"
+
+	endpointModeAuto         = "auto"
+	endpointModeHostLoopback = "host_loopback"
+	endpointModeDockerDNS    = "docker_dns"
+)
+
+func NewDockerRuntime() *DockerRuntime {
+	return &DockerRuntime{
+		agents:      defaultRuntimeAgentReader{},
+		settings:    defaultRuntimeSettingsReader{},
+		registry:    defaultRuntimeEngineRegistry{},
+		readyWaiter: waitForReady,
+	}
+}
 
 func containerName(agentID string) string {
 	return "hermes_" + agentID
 }
 
 func profileVolumePath(basePath, agentID string) string {
-	return fmt.Sprintf("%s/%s", basePath, agentID)
+	return filepath.Join(basePath, agentID)
 }
 
 func (d *DockerRuntime) EnsureRunning(ctx context.Context, orgID, userID, agentID string) (*AgentEndpoint, error) {
-	platCfg, err := settings.GetPlatformConfig()
-	if err != nil || platCfg == nil || platCfg.DataBasePath == "" {
-		return nil, ErrPlatformConfigMissing
-	}
-	containerPort := HermesAPIPort
-
-	agentRec, err := agent.GetById(agentID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load agent: %w", err)
-	}
-	if agentRec == nil {
-		return nil, fmt.Errorf("agent not found: %s", agentID)
-	}
-
-	engineType := agentRec.EngineType
-	if engineType == "" {
-		engineType = "hermes"
-	}
-	eng, err := GetEngine(engineType)
+	plan, err := d.resolveRuntimePlan(ctx, agentID)
 	if err != nil {
 		return nil, err
 	}
 
 	name := containerName(agentID)
 
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := newDockerClient(plan.dockerEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Docker daemon: %w", err)
 	}
@@ -69,42 +166,35 @@ func (d *DockerRuntime) EnsureRunning(ctx context.Context, orgID, userID, agentI
 		return nil, fmt.Errorf("failed to list containers: %w", err)
 	}
 	if len(containers) > 0 {
-		endpoint, err := d.resolveEndpoint(ctx, cli, containers[0].ID, containerPort, agentRec.EngineAPIKey)
+		endpoint, err := d.resolveEndpoint(ctx, cli, containers[0].ID, name, plan.containerPort, plan.endpointMode, plan.apiKey)
 		if err != nil {
 			return nil, err
 		}
 		return endpoint, nil
 	}
 
-	volPath := profileVolumePath(platCfg.DataBasePath, agentID)
-
-	pCfg, err := settings.GetProviderConfig()
-	if err != nil {
-		g.Log().Warningf(ctx, "Failed to get provider config: %v", err)
-	}
-
 	agentCfg := &AgentConfig{
-		ID:           agentID,
-		SystemPrompt: agentRec.SystemPrompt,
-		APIKey:       agentRec.EngineAPIKey,
+		ID:           plan.agentRecord.ID,
+		SystemPrompt: plan.agentRecord.SystemPrompt,
+		APIKey:       plan.apiKey,
 	}
-	if err := eng.PrepareVolume(ctx, volPath, agentCfg, pCfg); err != nil {
+	if err := plan.engineImpl.PrepareVolume(ctx, plan.workspacePath, agentCfg, plan.providerConfig); err != nil {
 		return nil, fmt.Errorf("failed to initialize volume: %w", err)
 	}
 
-	spec, err := eng.ContainerSpec(agentID, volPath, containerPort)
+	spec, err := plan.engineImpl.ContainerSpec(agentID, plan.workspacePath, plan.containerPort)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get container spec: %w", err)
 	}
 
-	resp, err := d.createContainer(ctx, cli, spec, volPath, name)
+	resp, err := d.createContainer(ctx, cli, spec, plan, name)
 	if err != nil {
 		if strings.Contains(err.Error(), "Conflict") && strings.Contains(err.Error(), "already in use") {
 			g.Log().Warningf(ctx, "Container %s conflict, removing old container and retrying", name)
 			if rmErr := cli.ContainerRemove(ctx, name, container.RemoveOptions{Force: true}); rmErr != nil {
 				return nil, fmt.Errorf("failed to remove conflicting container: %w", rmErr)
 			}
-			resp, err = d.createContainer(ctx, cli, spec, volPath, name)
+			resp, err = d.createContainer(ctx, cli, spec, plan, name)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create container after cleanup: %w", err)
 			}
@@ -117,23 +207,84 @@ func (d *DockerRuntime) EnsureRunning(ctx context.Context, orgID, userID, agentI
 		return nil, fmt.Errorf("failed to start container %s: %w", resp.ID, err)
 	}
 
-	endpoint, err := d.resolveEndpoint(ctx, cli, resp.ID, containerPort, agentRec.EngineAPIKey)
+	endpoint, err := d.resolveEndpoint(ctx, cli, resp.ID, name, plan.containerPort, plan.endpointMode, plan.apiKey)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := waitForReady(ctx, endpoint.URL); err != nil {
+	if err := d.readyWaiter(ctx, endpoint.URL); err != nil {
 		return nil, err
 	}
 
-	g.Log().Infof(ctx, "Container started for agent %s (engine: %s) at %s", agentID, engineType, endpoint.URL)
+	g.Log().Infof(ctx, "Container started for agent %s (engine: %s) at %s", agentID, plan.engineType, endpoint.URL)
 	return endpoint, nil
+}
+
+func (d *DockerRuntime) resolveRuntimePlan(ctx context.Context, agentID string) (*runtimePlan, error) {
+	if d == nil {
+		return nil, fmt.Errorf("docker runtime is not configured")
+	}
+
+	platformConfig, err := d.settings.GetPlatformConfig()
+	if err != nil || platformConfig == nil || platformConfig.DataBasePath == "" {
+		return nil, ErrPlatformConfigMissing
+	}
+
+	agentRecord, err := d.agents.GetById(agentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load agent: %w", err)
+	}
+	if agentRecord == nil {
+		return nil, fmt.Errorf("agent not found: %s", agentID)
+	}
+
+	engineType := agentRecord.EngineType
+	if engineType == "" {
+		engineType = "hermes"
+	}
+	engineImpl, err := d.registry.GetEngine(engineType)
+	if err != nil {
+		return nil, err
+	}
+
+	providerConfig, err := d.settings.GetProviderConfig()
+	if err != nil {
+		g.Log().Warningf(ctx, "Failed to get provider config: %v", err)
+	}
+
+	runtimeMode := resolveRuntimeMode(platformConfig.RuntimeMode)
+	endpointMode := resolveEndpointMode(platformConfig.EndpointMode, runtimeMode)
+	dockerNetwork := strings.TrimSpace(platformConfig.DockerNetwork)
+	if endpointMode == endpointModeDockerDNS && dockerNetwork == "" {
+		return nil, fmt.Errorf("docker network is required when endpoint mode is %s", endpointModeDockerDNS)
+	}
+
+	return &runtimePlan{
+		platformConfig: platformConfig,
+		providerConfig: providerConfig,
+		agentRecord:    agentRecord,
+		engineType:     engineType,
+		engineImpl:     engineImpl,
+		workspacePath:  profileVolumePath(resolveWorkspaceBasePath(platformConfig), agentID),
+		volumePath:     profileVolumePath(platformConfig.DataBasePath, agentID),
+		containerPort:  resolveContainerPort(platformConfig),
+		apiKey:         agentRecord.EngineAPIKey,
+		endpointMode:   endpointMode,
+		dockerEndpoint: strings.TrimSpace(platformConfig.DockerEndpoint),
+		dockerNetwork:  dockerNetwork,
+	}, nil
 }
 
 func (d *DockerRuntime) Stop(ctx context.Context, agentID string) error {
 	name := containerName(agentID)
 
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	platformConfig, cfgErr := d.settings.GetPlatformConfig()
+	dockerEndpoint := ""
+	if cfgErr == nil && platformConfig != nil {
+		dockerEndpoint = strings.TrimSpace(platformConfig.DockerEndpoint)
+	}
+
+	cli, err := newDockerClient(dockerEndpoint)
 	if err != nil {
 		return fmt.Errorf("failed to connect to Docker daemon: %w", err)
 	}
@@ -142,19 +293,23 @@ func (d *DockerRuntime) Stop(ctx context.Context, agentID string) error {
 	return cli.ContainerRemove(ctx, name, container.RemoveOptions{Force: true})
 }
 
-func (d *DockerRuntime) createContainer(ctx context.Context, cli *client.Client, spec *ContainerSpec, volPath, name string) (container.CreateResponse, error) {
+func (d *DockerRuntime) createContainer(ctx context.Context, cli *client.Client, spec *ContainerSpec, plan *runtimePlan, name string) (container.CreateResponse, error) {
 	hostConfig := &container.HostConfig{
 		Mounts: []mount.Mount{
 			{
 				Type:   mount.TypeBind,
-				Source: volPath,
+				Source: plan.volumePath,
 				Target: spec.DataDir,
 			},
 		},
-		PortBindings: map[nat.Port][]nat.PortBinding{
+	}
+	if plan.endpointMode == endpointModeHostLoopback {
+		hostConfig.PortBindings = map[nat.Port][]nat.PortBinding{
 			nat.Port(spec.ExposedPort + "/tcp"): {{HostIP: "127.0.0.1", HostPort: ""}},
-		},
-		NetworkMode: "bridge",
+		}
+		hostConfig.NetworkMode = "bridge"
+	} else if plan.dockerNetwork != "" {
+		hostConfig.NetworkMode = container.NetworkMode(plan.dockerNetwork)
 	}
 	if spec.Runtime != "" {
 		hostConfig.Runtime = spec.Runtime
@@ -174,7 +329,14 @@ func (d *DockerRuntime) createContainer(ctx context.Context, cli *client.Client,
 	)
 }
 
-func (d *DockerRuntime) resolveEndpoint(ctx context.Context, cli *client.Client, containerID, containerPort, apiKey string) (*AgentEndpoint, error) {
+func (d *DockerRuntime) resolveEndpoint(ctx context.Context, cli *client.Client, containerID, containerName, containerPort, endpointMode, apiKey string) (*AgentEndpoint, error) {
+	if endpointMode == endpointModeDockerDNS {
+		return &AgentEndpoint{
+			URL:    fmt.Sprintf("http://%s:%s", containerName, containerPort),
+			APIKey: apiKey,
+		}, nil
+	}
+
 	inspect, err := cli.ContainerInspect(ctx, containerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to inspect container %s: %w", containerID, err)
@@ -197,9 +359,72 @@ func (d *DockerRuntime) resolveEndpoint(ctx context.Context, cli *client.Client,
 	}, nil
 }
 
+func resolveWorkspaceBasePath(cfg *runtimePlatformConfig) string {
+	if cfg == nil {
+		return ""
+	}
+	if path := strings.TrimSpace(cfg.DataMountPath); path != "" {
+		return path
+	}
+	return strings.TrimSpace(cfg.DataBasePath)
+}
+
+func resolveContainerPort(cfg *runtimePlatformConfig) string {
+	if cfg != nil && cfg.ContainerPort > 0 {
+		return strconv.Itoa(cfg.ContainerPort)
+	}
+	return HermesAPIPort
+}
+
+func resolveRuntimeMode(mode string) string {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case runtimeModeHost:
+		return runtimeModeHost
+	case runtimeModeContainer:
+		return runtimeModeContainer
+	default:
+		if isRunningInContainer() {
+			return runtimeModeContainer
+		}
+		return runtimeModeHost
+	}
+}
+
+func resolveEndpointMode(mode string, runtimeMode string) string {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case endpointModeHostLoopback:
+		return endpointModeHostLoopback
+	case endpointModeDockerDNS:
+		return endpointModeDockerDNS
+	default:
+		if resolveRuntimeMode(runtimeMode) == runtimeModeContainer {
+			return endpointModeDockerDNS
+		}
+		return endpointModeHostLoopback
+	}
+}
+
+func isRunningInContainer() bool {
+	if _, err := os.Stat("/.dockerenv"); err == nil {
+		return true
+	}
+	return false
+}
+
+func newDockerClient(dockerEndpoint string) (*client.Client, error) {
+	opts := []client.Opt{client.WithAPIVersionNegotiation()}
+	if endpoint := strings.TrimSpace(dockerEndpoint); endpoint != "" {
+		opts = append(opts, client.WithHost(endpoint))
+	} else {
+		opts = append(opts, client.FromEnv)
+	}
+	return client.NewClientWithOpts(opts...)
+}
+
 func waitForReady(ctx context.Context, endpoint string) error {
 	healthPaths := []string{"/v1/models", "/health", "/"}
-	deadline := time.Now().Add(30 * time.Second)
+	// Hermes cold start can spend noticeable time materializing bundled assets.
+	deadline := time.Now().Add(2 * time.Minute)
 	for time.Now().Before(deadline) {
 		for _, path := range healthPaths {
 			resp, err := http.Get(endpoint + path)
@@ -213,5 +438,5 @@ func waitForReady(ctx context.Context, endpoint string) error {
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
-	return fmt.Errorf("container at %s did not become ready within 30s", endpoint)
+	return fmt.Errorf("container at %s did not become ready within 2m", endpoint)
 }
