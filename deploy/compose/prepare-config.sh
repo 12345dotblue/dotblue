@@ -208,7 +208,7 @@ httpport = 8000
 runmode = prod
 copyrequestbody = true
 driverName = postgres
-dataSourceName = "user=${CASDOOR_DB_USER} password=${CASDOOR_DB_PASSWORD} host=casdoor-db port=5432 sslmode=disable dbname=${CASDOOR_DB_NAME}"
+dataSourceName = "user=${CASDOOR_DB_USER} password=${CASDOOR_DB_PASSWORD} host=postgres port=5432 sslmode=disable dbname=${CASDOOR_DB_NAME}"
 dbName = ${CASDOOR_DB_NAME}
 tableNamePrefix =
 showSql = false
@@ -409,7 +409,7 @@ server:
 
 database:
   default:
-    link: "pgsql:${DOTBLUE_DB_USER}:${DOTBLUE_DB_PASSWORD}@tcp(db:5432)/${DOTBLUE_DB_NAME}"
+    link: "pgsql:${DOTBLUE_DB_USER}:${DOTBLUE_DB_PASSWORD}@tcp(postgres:5432)/${DOTBLUE_DB_NAME}"
     debug: true
 
 casdoor:
@@ -435,6 +435,34 @@ logger:
 
 debug:
   sse: true
+
+im:
+  asyncTurn: true
+
+redis:
+  address: "redis:6379"
+  password: ""
+  db: 0
+  keyPrefix: "dot"
+
+session:
+  ownerTTL: "30s"
+  fenceTTL: "2m"
+  gateTTL: "2m"
+  stateTTL: "2h"
+
+worker:
+  id: "compose-all-in-one"
+  embedded: true
+  metaTTL: "30s"
+  heartbeatInterval: "10s"
+  inboxTTL: "2h"
+  claimBlock: "2s"
+
+dataplane:
+  requestStateRunningTTL: "30m"
+  requestStateFinalTTL: "1h"
+  streamMaxLen: 5000
 
 engine:
   dataBasePath: "${DOTBLUE_ENGINE_HOST_DATA_PATH_ABS}"

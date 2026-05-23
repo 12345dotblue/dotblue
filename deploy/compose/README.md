@@ -1,5 +1,13 @@
 # Compose Quick Start
 
+Local all-in-one startup for DotBlue, an enterprise-grade self-hosted AI assistant platform for private deployment, team collaboration, and incremental support for mainstream assistant ecosystems.
+
+## Important Reminder
+
+- If you change the platform-level LLM provider or model in the admin UI after `hermes_*` agent containers are already running, recycle or restart those existing agent containers before re-testing chat.
+- Reason: each running agent container keeps its own generated runtime config, so provider changes are not applied to that container until it is recreated.
+- In the Compose setup here, this is easy to miss during end-to-end testing because the backend and worker loop are all-in-one, while agent runtimes are still separate `hermes_*` containers.
+
 ## Files
 
 - `.env.example`: user-editable deployment variables
@@ -21,6 +29,14 @@ The prepare scripts write ignored local files into `.generated/`:
 - They also append generated `DOTBLUE_CASDOOR_*` values to `.env`
 
 ## Quick Start
+
+This Compose setup is optimized for local demo and quick testing:
+
+- one `dotblue` service
+- embedded worker loop inside that `dotblue` service
+- one `redis` dependency for async session/queue/event flow
+- one shared `postgres` service for both Casdoor and DotBlue
+- no extra `worker` container to start or explain
 
 1. Copy `.env.example` to `.env`
 2. Edit `.env` and set:
@@ -68,10 +84,10 @@ or on Windows:
 
 ## Services
 
-- `casdoor-db`: PostgreSQL for Casdoor
-- `db`: PostgreSQL for dotblue backend
+- `postgres`: shared PostgreSQL for Casdoor and DotBlue
+- `redis`: Redis for session control plane and dataplane
 - `casdoor`: auth server with first-boot `init_data.json`
-- `backend`: Go backend using generated runtime config
+- `dotblue`: Go application service using generated runtime config and an embedded worker loop
 - `web`: static frontend image built with generated `VITE_*` values
 
 ## Important Notes
@@ -80,13 +96,14 @@ or on Windows:
 - `.env` and `.generated/` are ignored and should stay local
 - `CASDOOR_PUBLIC_URL` is for browser access
 - `CASDOOR_INTERNAL_URL` is for container-to-container access
-- `DOTBLUE_BACKEND_INTERNAL_URL` defaults to `http://backend:8000`
+- `DOTBLUE_BACKEND_INTERNAL_URL` defaults to `http://dotblue:8000`
 - All published ports are user-configurable in `.env`
 - `postgres:18-alpine` expects the data volume to be mounted at `/var/lib/postgresql`
+- The generated DotBlue config enables `worker.embedded=true`, so local async chat works without a second app role
 - When accessing from another machine or via host IP, set `CASDOOR_PUBLIC_URL`, `DOTBLUE_PUBLIC_URL`, and `DOTBLUE_BACKEND_PUBLIC_URL` to that reachable IP or domain instead of `localhost`
-- Container runtime mode auto-detects the host `docker.sock` group id during `prepare-config` and injects it into the `backend` service so non-root backend processes can talk to Docker
+- Container runtime mode auto-detects the host `docker.sock` group id during `prepare-config` and injects it into the `dotblue` service so non-root app processes can talk to Docker
 - If auto-detection is unavailable in your environment, set `DOTBLUE_ENGINE_DOCKER_SOCKET_GID` manually in `.env` before running the prepare script
-- `runtime-doctor` checks the effective runtime mode, backend container group wiring, `docker.sock` metadata, compose status, and currently running `hermes_*` containers
+- `runtime-doctor` checks the effective runtime mode, dotblue container group wiring, `docker.sock` metadata, compose status, and currently running `hermes_*` containers
 
 ## Runtime Modes
 

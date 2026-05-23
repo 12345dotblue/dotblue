@@ -45,6 +45,9 @@ var (
 			if err := setup.TryAutoInstall(ctx); err != nil {
 				g.Log().Fatalf(ctx, "Automatic setup failed: %v", err)
 			}
+			if err := startEmbeddedWorkerIfEnabled(ctx); err != nil {
+				g.Log().Fatalf(ctx, "Failed to start embedded worker: %v", err)
+			}
 
 			s := g.Server()
 			// Allow CORS from the frontend dev server
@@ -150,3 +153,7 @@ var (
 		},
 	}
 )
+
+func init() {
+	_ = Main.AddCommand(&Worker)
+}

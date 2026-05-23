@@ -81,10 +81,10 @@ read_generated_engine_value() {
 cd "${SCRIPT_DIR}"
 load_env_file
 
-require_compose_service backend
+require_compose_service dotblue
 
-backend_cid="$(container_id_for_service backend)"
-[[ -n "${backend_cid}" ]] || fail "backend container is not created"
+backend_cid="$(container_id_for_service dotblue)"
+[[ -n "${backend_cid}" ]] || fail "dotblue container is not created"
 
 host_socket_gid=""
 if [[ -S /var/run/docker.sock ]]; then
@@ -113,18 +113,18 @@ if [[ -n "${host_socket_gid}" ]]; then
 else
   echo "[warn] host docker.sock gid: unavailable from current shell"
 fi
-check_non_empty "backend group_add" "${backend_group_add}"
-check_non_empty "backend user" "${backend_user}"
-check_non_empty "backend state" "${backend_status}"
-check_non_empty "backend networks" "${backend_networks}"
-check_non_empty "backend socket stat" "${backend_socket_meta}"
-check_non_empty "backend id" "${backend_identity}"
+check_non_empty "dotblue group_add" "${backend_group_add}"
+check_non_empty "dotblue user" "${backend_user}"
+check_non_empty "dotblue state" "${backend_status}"
+check_non_empty "dotblue networks" "${backend_networks}"
+check_non_empty "dotblue socket stat" "${backend_socket_meta}"
+check_non_empty "dotblue id" "${backend_identity}"
 
 if [[ -n "${DOTBLUE_ENGINE_DOCKER_SOCKET_GID:-}" && -n "${backend_group_add}" ]]; then
   if [[ ",${backend_group_add}," == *",${DOTBLUE_ENGINE_DOCKER_SOCKET_GID},"* ]]; then
-    echo "[ok] backend group_add contains docker socket gid"
+    echo "[ok] dotblue group_add contains docker socket gid"
   else
-    echo "[warn] backend group_add missing docker socket gid ${DOTBLUE_ENGINE_DOCKER_SOCKET_GID}"
+    echo "[warn] dotblue group_add missing docker socket gid ${DOTBLUE_ENGINE_DOCKER_SOCKET_GID}"
   fi
 fi
 

@@ -5,7 +5,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="${SCRIPT_DIR}/.env"
 
-required_services=(casdoor-db db casdoor backend web)
+required_services=(postgres redis casdoor dotblue web)
 max_attempts=20
 retry_interval_seconds=2
 
@@ -91,7 +91,7 @@ for service in "${required_services[@]}"; do
 done
 
 check_http "casdoor" "http://127.0.0.1:${CASDOOR_PORT}/"
-check_json_contains "backend setup status" "http://127.0.0.1:${DOTBLUE_BACKEND_PORT}/api/setup/status" '"initialized":true'
+check_json_contains "dotblue setup status" "http://127.0.0.1:${DOTBLUE_BACKEND_PORT}/api/setup/status" '"initialized":true'
 check_http "web" "http://127.0.0.1:${DOTBLUE_WEB_PORT}/"
 
 echo "smoke test passed"

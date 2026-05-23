@@ -11,6 +11,9 @@ bin/
 gf
 main
 main.exe
+dotblue
+dotblue.exe
+dotblue_test
 output/
 manifest/output/
 temp/

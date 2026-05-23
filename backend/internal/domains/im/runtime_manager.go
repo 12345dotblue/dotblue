@@ -17,6 +17,7 @@ type RuntimeStarter func(ctx context.Context, enqueue RuntimePayloadHandler) err
 type RuntimeHooks struct {
 	Start              RuntimeStarter
 	ProcessPayload     RuntimePayloadHandler
+	ProcessOutbound    func(ctx context.Context) error
 	IsExpectedStop     func(error) bool
 	ReconnectBaseDelay time.Duration
 	ReconnectMaxDelay  time.Duration
@@ -72,6 +73,9 @@ func (m *RuntimeManager) Start(ctx context.Context, conn Connection, hooks Runti
 	}
 
 	go m.runWorker(runtimeCtx, runtime)
+	if runtime.hooks.ProcessOutbound != nil {
+		go m.runOutboundWorker(runtimeCtx, runtime)
+	}
 	go m.runLoop(runtimeCtx, runtime)
 	return nil
 }
@@ -99,6 +103,15 @@ func (m *RuntimeManager) runWorker(ctx context.Context, runtime managedRuntime) 
 				m.recordRuntimeError(runtime.Connection.ID, runtime.StartedAt, runtime.hooks, err)
 			}
 		}
+	}
+}
+
+func (m *RuntimeManager) runOutboundWorker(ctx context.Context, runtime managedRuntime) {
+	if runtime.hooks.ProcessOutbound == nil {
+		return
+	}
+	if err := runtime.hooks.ProcessOutbound(ctx); err != nil && ctx.Err() == nil {
+		m.recordRuntimeError(runtime.Connection.ID, runtime.StartedAt, runtime.hooks, err)
 	}
 }
 

@@ -92,9 +92,9 @@ Push-Location $scriptDir
 try {
   $envMap = Load-EnvFile $envFile
 
-  $backendCid = Invoke-Docker compose ps -q backend
+  $backendCid = Invoke-Docker compose ps -q dotblue
   if ([string]::IsNullOrWhiteSpace($backendCid)) {
-    Fail "backend container is not created"
+    Fail "dotblue container is not created"
   }
   $backendCid = $backendCid.Trim()
 
@@ -130,19 +130,19 @@ try {
   else {
     Write-Check "host docker.sock gid vs env" $hostSocketGid.Trim() $envMap["DOTBLUE_ENGINE_DOCKER_SOCKET_GID"]
   }
-  Write-Value "backend user" $backendUser
-  Write-Value "backend state" $backendState
-  Write-Value "backend networks" $backendNetworks
-  Write-Value "backend socket stat" ([string]$backendSocketMeta).Trim()
-  Write-Value "backend id" ([string]$backendIdentity).Trim()
+  Write-Value "dotblue user" $backendUser
+  Write-Value "dotblue state" $backendState
+  Write-Value "dotblue networks" $backendNetworks
+  Write-Value "dotblue socket stat" ([string]$backendSocketMeta).Trim()
+  Write-Value "dotblue id" ([string]$backendIdentity).Trim()
 
   $expectedGid = $envMap["DOTBLUE_ENGINE_DOCKER_SOCKET_GID"]
   if (-not [string]::IsNullOrWhiteSpace($expectedGid)) {
     if (($backendIdentity | Out-String) -match "(^|[^\d])$([regex]::Escape($expectedGid))\(") {
-      Write-Host "[ok] backend identity contains docker socket gid"
+      Write-Host "[ok] dotblue identity contains docker socket gid"
     }
     else {
-      Write-Host "[warn] backend identity missing docker socket gid $expectedGid"
+      Write-Host "[warn] dotblue identity missing docker socket gid $expectedGid"
     }
   }
 

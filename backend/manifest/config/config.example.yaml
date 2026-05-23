@@ -34,6 +34,34 @@ logger:
 debug:
   sse: true
 
+im:
+  asyncTurn: false
+
+redis:
+  address: "127.0.0.1:6379"
+  password: ""
+  db: 0
+  keyPrefix: "dot"
+
+session:
+  ownerTTL: "30s"
+  fenceTTL: "2m"
+  gateTTL: "2m"
+  stateTTL: "2h"
+
+worker:
+  id: "worker-1"
+  embedded: true
+  metaTTL: "30s"
+  heartbeatInterval: "10s"
+  inboxTTL: "2h"
+  claimBlock: "2s"
+
+dataplane:
+  requestStateRunningTTL: "30m"
+  requestStateFinalTTL: "1h"
+  streamMaxLen: 5000
+
 engine:
   dataBasePath: "/var/lib/dotblue/agents"
   dataMountPath: "/var/lib/dotblue/agents"

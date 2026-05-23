@@ -87,6 +87,7 @@ func (a *FeishuAdapter) Start(ctx context.Context, conn Connection) error {
 			return a.startRuntime(runtimeCtx, conn, enqueue)
 		},
 		ProcessPayload:     a.processRuntimePayload(conn),
+		ProcessOutbound:    func(runtimeCtx context.Context) error { return processOutboundOutbox(runtimeCtx, conn) },
 		IsExpectedStop:     isExpectedFeishuRuntimeStop,
 		ReconnectBaseDelay: a.reconnectBaseDelay,
 		ReconnectMaxDelay:  a.reconnectMaxDelay,

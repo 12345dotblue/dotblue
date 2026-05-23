@@ -6,7 +6,9 @@ import (
 	"strings"
 	"time"
 
+	"dotblue/internal/domains/gateway"
 	"github.com/gogf/gf/v2/frame/g"
+	"github.com/google/uuid"
 )
 
 type inboundPersistResult struct {
@@ -91,7 +93,36 @@ func (p *InboundPipeline) processAcceptedEvent(ctx context.Context, conn Connect
 	if err != nil {
 		return err
 	}
-	return ExecuteInboundTurn(ctx, conn, routed, event)
+	if !g.Cfg().MustGet(ctx, "im.asyncTurn").Bool() {
+		return ExecuteInboundTurn(ctx, conn, routed, event)
+	}
+	sessionKey := routed.SessionKey
+	if sessionKey == "" {
+		sessionKey = routed.ConversationID
+	}
+	gw, err := gateway.Default(ctx)
+	if err != nil {
+		return err
+	}
+	requestID := uuid.NewString()
+	dispatchReq := gateway.BuildIMDispatchRequest(gateway.IMIngressInput{
+		RequestID:        requestID,
+		SessionKey:       sessionKey,
+		EnterpriseID:     conn.EnterpriseID,
+		UserID:           routed.AgentUserID,
+		AgentID:          routed.AgentID,
+		ConversationID:   routed.ConversationID,
+		ConnectionID:     conn.ID,
+		Platform:         conn.Platform,
+		InboundMessageID: routed.MessageID,
+		ExternalChatID:   event.ExternalChatID,
+		ExternalThreadID: event.ExternalThreadID,
+		ReplyHandle:      event.ReplyHandle,
+		Content:          event.Text,
+		CreatedAt:        time.Now(),
+	})
+	_, err = gw.Dispatch(ctx, dispatchReq)
+	return err
 }
 
 func normalizeInboundPayloadJSON(raw []byte) string {

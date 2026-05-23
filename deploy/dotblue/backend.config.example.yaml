@@ -5,7 +5,7 @@ server:
 
 database:
   default:
-    link: "pgsql:__DOTBLUE_DB_USER__:__DOTBLUE_DB_PASSWORD__@tcp(db:5432)/__DOTBLUE_DB_NAME__"
+    link: "pgsql:__DOTBLUE_DB_USER__:__DOTBLUE_DB_PASSWORD__@tcp(postgres:5432)/__DOTBLUE_DB_NAME__"
     debug: true
 
 casdoor:
@@ -31,6 +31,34 @@ logger:
 
 debug:
   sse: true
+
+im:
+  asyncTurn: true
+
+redis:
+  address: "redis:6379"
+  password: ""
+  db: 0
+  keyPrefix: "dot"
+
+session:
+  ownerTTL: "30s"
+  fenceTTL: "2m"
+  gateTTL: "2m"
+  stateTTL: "2h"
+
+worker:
+  id: "compose-all-in-one"
+  embedded: true
+  metaTTL: "30s"
+  heartbeatInterval: "10s"
+  inboxTTL: "2h"
+  claimBlock: "2s"
+
+dataplane:
+  requestStateRunningTTL: "30m"
+  requestStateFinalTTL: "1h"
+  streamMaxLen: 5000
 
 engine:
   dataBasePath: "__DOTBLUE_ENGINE_HOST_DATA_PATH__"

@@ -1,8 +1,19 @@
 # DotBlue
 
-DotBlue is an AI agent sandbox platform for professionals and enterprise teams.
+DotBlue is an enterprise-grade, self-hosted AI assistant and AI agent platform for private deployment.
 
-It brings agent management, real-time chat, enterprise administration, platform-wide configuration, and deployment workflows into one system, making it a solid foundation for building manageable, extensible, and self-hosted AI agent workspaces.
+It is built for teams that want more than a chat demo: agent management, real-time chat, enterprise administration, platform-wide LLM configuration, IM integration, and deployment workflows all live in one system.
+
+DotBlue aims to become a practical open-source foundation for private AI assistant platforms, enterprise AI workspaces, and multi-agent products. It already supports OpenAI-compatible providers and is designed to incrementally support more mainstream assistants, models, and enterprise channels over time.
+
+Keywords: enterprise AI assistant platform, self-hosted AI agent platform, private deployment AI platform, multi-agent platform, LLM ops platform, AI workspace, AI agent management, enterprise chatbot platform, IM-integrated assistant platform.
+
+## Tagline
+
+- Enterprise-grade and self-hosted by design
+- Built for private deployment, team collaboration, and controlled runtime isolation
+- Designed to support mainstream assistants, models, and enterprise channels incrementally
+- Ready for full-stack delivery with frontend, backend, auth, runtime, and Compose deployment assets
 
 ## Why DotBlue
 
@@ -10,6 +21,14 @@ It brings agent management, real-time chat, enterprise administration, platform-
 - Built for safer runtime isolation: each agent runs in its own container sandbox with isolated runtime data
 - Built for extensibility: supports external LLM providers and includes IM integration capabilities
 - Built for deployment: ships with frontend, backend, authentication, databases, and Docker Compose setup
+
+## What Makes It Useful
+
+- Self-hosted and private-deployment friendly for internal enterprise environments
+- Multi-agent ready, with clear boundaries for agent management and runtime orchestration
+- Enterprise-aware, with organizations, members, roles, invitations, and admin workflows
+- LLM-provider aware, with centralized platform configuration for model access
+- Extensible toward more popular assistants, models, and message channels as the project evolves
 
 ## Core Capabilities
 
@@ -77,7 +96,11 @@ More detail:
 
 ## Quick Start
 
-The recommended way to get started is Docker Compose. It gives you the most complete end-to-end setup.
+The recommended way to get started is Docker Compose. It gives you the most complete end-to-end setup with the lowest local complexity.
+
+Important reminder:
+
+- If you update the platform-level LLM provider in the admin UI after agent containers have already started, recycle or restart the existing `hermes_*` agent containers before re-testing. Running agent containers keep their existing runtime config until they are recreated.
 
 ### Option 1: Docker Compose
 
@@ -134,10 +157,10 @@ Default local endpoints:
 
 The Compose setup starts:
 
-- `casdoor-db`
-- `db`
+- `postgres`
+- `redis`
 - `casdoor`
-- `backend`
+- `dotblue` in all-in-one mode, with the worker loop embedded
 - `web`
 
 ## Local Development
