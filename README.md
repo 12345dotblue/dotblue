@@ -1,19 +1,19 @@
 # DotBlue
 
-DotBlue is an enterprise-grade, self-hosted AI assistant and AI agent platform for private deployment.
+DotBlue is an enterprise-grade AI assistant governance platform for teams that want to manage AI assistants with less operational overhead.
 
-It is built for teams that want more than a chat demo: agent management, real-time chat, enterprise administration, platform-wide LLM configuration, IM integration, and deployment workflows all live in one system.
+It combines enterprise AI assistant management, real-time chat, enterprise administration, platform-wide LLM configuration, IM integration, and deployment workflows in one stack, so teams can build, govern, and deliver AI assistants instead of stitching together disconnected tools.
 
-DotBlue aims to become a practical open-source foundation for private AI assistant platforms, enterprise AI workspaces, and multi-agent products. It already supports OpenAI-compatible providers and is designed to incrementally support more mainstream assistants, models, and enterprise channels over time.
+DotBlue supports self-hosted and cloud-hosted deployment patterns, automatically hosts isolated assistant runtimes, and centralizes LLM provider credentials and access token management at the platform level. It already works with OpenAI-compatible providers and is designed to incrementally support more mainstream AI assistants, models, and enterprise channels over time.
 
-Keywords: enterprise AI assistant platform, self-hosted AI agent platform, private deployment AI platform, multi-agent platform, LLM ops platform, AI workspace, AI agent management, enterprise chatbot platform, IM-integrated assistant platform.
+Keywords: enterprise AI assistant platform, AI assistant governance platform, self-hosted AI agent platform, cloud-hosted AI assistant platform, private deployment AI platform, multi-agent platform, LLM ops platform, AI workspace, AI agent management, enterprise chatbot platform, IM-integrated assistant platform, LLM token management.
 
 ## Tagline
 
-- Enterprise-grade and self-hosted by design
-- Built for private deployment, team collaboration, and controlled runtime isolation
-- Designed to support mainstream assistants, models, and enterprise channels incrementally
-- Ready for full-stack delivery with frontend, backend, auth, runtime, and Compose deployment assets
+- Govern enterprise AI assistants with less operational overhead
+- Run assistants in self-hosted or cloud-hosted environments with automated isolated runtime hosting
+- Support mainstream AI assistant and model ecosystems incrementally
+- Centralize LLM provider credentials, access tokens, and platform-wide management in one place
 
 ## Why DotBlue
 
