@@ -8,27 +8,60 @@ export interface ToolCallItem {
   status: string;
 }
 
+export interface MessagePart {
+  type: 'text' | 'image' | 'file';
+  text?: string;
+  fileId?: string;
+  name?: string;
+  mimeType?: string;
+  size?: number;
+  previewUrl?: string;
+  downloadUrl?: string;
+  width?: number;
+  height?: number;
+}
+
+export interface AttachmentItem {
+  id?: string;
+  fileId: string;
+  kind: 'image' | 'file';
+  name: string;
+  mimeType: string;
+  size: number;
+  previewUrl?: string;
+  downloadUrl?: string;
+  width?: number;
+  height?: number;
+  status?: 'uploaded' | 'processing' | 'failed';
+}
+
 export interface SSEChunk {
   content?: string;
   thinking?: string;
   toolCall?: ToolCallItem;
   conversationId?: string;
   title?: string;
+  parts?: MessagePart[];
+  attachments?: AttachmentItem[];
   status: string;
 }
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
+  parts?: MessagePart[];
+  attachments?: AttachmentItem[];
   thinking?: string;
   toolCalls?: ToolCallItem[];
   createdAt?: string;
+  status?: 'pending' | 'streaming' | 'done' | 'error';
 }
 
 export interface ChatInput {
   content: string;
   agentId: string;
   conversationId: string;
+  parts?: MessagePart[];
 }
 
 export interface SSEProviderEvents {
@@ -70,10 +103,14 @@ class SSEChatProvider extends AbstractChatProvider<ChatMessage, ChatInput, SSECh
   }
 
   transformLocalMessage(requestParams: Partial<ChatInput>): ChatMessage {
+    const parts = requestParams.parts || buildTextParts(requestParams.content || '');
     return {
       role: 'user',
       content: requestParams.content || '',
+      parts,
+      attachments: partsToAttachments(parts),
       createdAt: new Date().toISOString(),
+      status: 'pending',
     };
   }
 
@@ -93,9 +130,12 @@ class SSEChatProvider extends AbstractChatProvider<ChatMessage, ChatInput, SSECh
       return {
         role: 'assistant',
         content,
+        ...(chunks.flatMap((c) => c.parts || []).length > 0 ? { parts: coalesceParts(chunks, originMessage) } : {}),
+        ...(chunks.flatMap((c) => c.attachments || []).length > 0 ? { attachments: coalesceAttachments(chunks, originMessage) } : {}),
         ...(thinking ? { thinking } : {}),
         ...(toolCalls.length > 0 ? { toolCalls: finalizeToolCalls(toolCalls) } : {}),
         createdAt: originMessage?.createdAt || new Date().toISOString(),
+        status: 'done',
       };
     }
 
@@ -112,14 +152,54 @@ class SSEChatProvider extends AbstractChatProvider<ChatMessage, ChatInput, SSECh
       return {
         role: 'assistant',
         content,
+        ...(chunk.parts || prev.parts ? { parts: chunk.parts || prev.parts } : {}),
+        ...(chunk.attachments || prev.attachments ? { attachments: chunk.attachments || prev.attachments } : {}),
         ...(thinking ? { thinking } : {}),
         ...(toolCalls.length > 0 ? { toolCalls } : {}),
         createdAt: prev.createdAt || new Date().toISOString(),
+        status: chunk.status === 'error' ? 'error' : 'streaming',
       };
     }
 
     return originMessage || { role: 'assistant', content: '' };
   }
+}
+
+function buildTextParts(content: string): MessagePart[] {
+  const text = content.trim();
+  if (!text) return [];
+  return [{ type: 'text', text }];
+}
+
+function partsToAttachments(parts: MessagePart[]): AttachmentItem[] {
+  return parts
+    .filter((part) => !!part.fileId && (part.type === 'image' || part.type === 'file'))
+    .map((part) => ({
+      fileId: part.fileId!,
+      kind: part.type === 'image' ? 'image' : 'file',
+      name: part.name || '',
+      mimeType: part.mimeType || '',
+      size: part.size || 0,
+      previewUrl: part.previewUrl,
+      downloadUrl: part.downloadUrl,
+      width: part.width,
+      height: part.height,
+      status: 'uploaded',
+    }));
+}
+
+function coalesceParts(chunks: SSEChunk[], originMessage?: ChatMessage): MessagePart[] | undefined {
+  for (let i = chunks.length - 1; i >= 0; i -= 1) {
+    if (chunks[i].parts?.length) return chunks[i].parts;
+  }
+  return originMessage?.parts;
+}
+
+function coalesceAttachments(chunks: SSEChunk[], originMessage?: ChatMessage): AttachmentItem[] | undefined {
+  for (let i = chunks.length - 1; i >= 0; i -= 1) {
+    if (chunks[i].attachments?.length) return chunks[i].attachments;
+  }
+  return originMessage?.attachments;
 }
 
 function createSSETransformStream(events: SSEProviderEvents): TransformStream<string, SSEChunk> {

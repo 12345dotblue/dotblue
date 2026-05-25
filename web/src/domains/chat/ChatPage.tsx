@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Bubble, Sender, Welcome, Conversations } from '@ant-design/x';
+import { Bubble, Sender, Welcome, Conversations, FileCard } from '@ant-design/x';
 import {
   Typography, Space, theme, Tooltip, Avatar, Button, Empty, Collapse,
   Input, Dropdown, Layout, Tag,
@@ -8,6 +8,7 @@ import {
   RobotOutlined, UserOutlined, ThunderboltOutlined, PlusOutlined, BulbOutlined,
   DeleteOutlined, SearchOutlined, MenuFoldOutlined,
   MenuUnfoldOutlined, AppstoreOutlined, GlobalOutlined, LogoutOutlined,
+  PaperClipOutlined, CloseCircleOutlined,
 } from '@ant-design/icons';
 import Markdown from '@ant-design/x-markdown';
 import { useTranslation } from 'react-i18next';
@@ -17,7 +18,14 @@ import { useXChat } from '@ant-design/x-sdk';
 import { BACKEND_URL } from '../../config';
 import { casdoorService } from '../identity/CasdoorService';
 import { getOrCreateProvider } from './SSEChatProvider';
-import type { ChatInput, ChatMessage, SSEChunk, ToolCallItem } from './SSEChatProvider';
+import type {
+  AttachmentItem,
+  ChatInput,
+  ChatMessage,
+  MessagePart,
+  SSEChunk,
+  ToolCallItem,
+} from './SSEChatProvider';
 
 const { Text } = Typography;
 
@@ -36,6 +44,21 @@ interface ConversationItem {
   agentId: string;
   agentName: string;
   updatedAt: string;
+}
+
+interface PendingUpload {
+  uid: string;
+  fileId?: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  kind: 'image' | 'file';
+  previewUrl?: string;
+  downloadUrl?: string;
+  width?: number;
+  height?: number;
+  status: 'uploading' | 'uploaded' | 'failed';
+  error?: string;
 }
 
 const renderConversationLabel = (title: string | undefined, agentName: string | undefined, t: any): React.ReactNode => {
@@ -71,6 +94,227 @@ function formatMessageTime(value?: string, locale = 'zh-CN'): string {
   return new Intl.DateTimeFormat(locale, isToday
     ? { hour: '2-digit', minute: '2-digit' }
     : { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date);
+}
+
+function resolveBackendAssetUrl(url?: string): string | undefined {
+  if (!url) return undefined;
+  return /^https?:\/\//i.test(url) ? url : `${BACKEND_URL}${url}`;
+}
+
+async function fetchAuthorizedBlob(url: string, token: string): Promise<Blob> {
+  const response = await axios.get(url, {
+    responseType: 'blob',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return response.data as Blob;
+}
+
+function revokeObjectUrlLater(objectUrl: string): void {
+  window.setTimeout(() => {
+    URL.revokeObjectURL(objectUrl);
+  }, 60_000);
+}
+
+function downloadBlob(blob: Blob, fileName: string): void {
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = fileName || 'download';
+  link.rel = 'noopener noreferrer';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  revokeObjectUrlLater(objectUrl);
+}
+
+interface AuthenticatedFileCardProps {
+  name: string;
+  byte: number;
+  type: 'image' | 'file';
+  previewUrl?: string;
+  downloadUrl?: string;
+  description?: string;
+  loading?: boolean;
+  token?: string | null;
+}
+
+const AuthenticatedFileCard: React.FC<AuthenticatedFileCardProps> = ({
+  name,
+  byte,
+  type,
+  previewUrl,
+  downloadUrl,
+  description,
+  loading,
+  token,
+}) => {
+  const [previewSrc, setPreviewSrc] = useState<string>();
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string>();
+
+  useEffect(() => {
+    let disposed = false;
+    let currentObjectUrl: string | undefined;
+    const jwt = (token || '').trim();
+    const targetUrl = type === 'image' ? resolveBackendAssetUrl(previewUrl || downloadUrl) : undefined;
+
+    setPreviewSrc(undefined);
+    setPreviewError(undefined);
+    if (!targetUrl || !jwt) {
+      setPreviewLoading(false);
+      return undefined;
+    }
+
+    setPreviewLoading(true);
+    void fetchAuthorizedBlob(targetUrl, jwt)
+      .then((blob) => {
+        const objectUrl = URL.createObjectURL(blob);
+        if (disposed) {
+          URL.revokeObjectURL(objectUrl);
+          return;
+        }
+        currentObjectUrl = objectUrl;
+        setPreviewSrc(objectUrl);
+      })
+      .catch(() => {
+        if (!disposed) {
+          setPreviewError('预览加载失败');
+        }
+      })
+      .finally(() => {
+        if (!disposed) {
+          setPreviewLoading(false);
+        }
+      });
+
+    return () => {
+      disposed = true;
+      if (currentObjectUrl) {
+        URL.revokeObjectURL(currentObjectUrl);
+      }
+    };
+  }, [type, previewUrl, downloadUrl, token]);
+
+  const handleOpen = useCallback(async () => {
+    const jwt = (token || '').trim();
+    const targetUrl = resolveBackendAssetUrl(type === 'image' ? (previewUrl || downloadUrl) : downloadUrl);
+    if (!targetUrl || !jwt) return;
+    const blob = await fetchAuthorizedBlob(targetUrl, jwt);
+    if (type === 'image') {
+      const objectUrl = URL.createObjectURL(blob);
+      window.open(objectUrl, '_blank', 'noopener,noreferrer');
+      revokeObjectUrlLater(objectUrl);
+      return;
+    }
+    downloadBlob(blob, name);
+  }, [type, previewUrl, downloadUrl, token, name]);
+
+  if (type === 'image') {
+    return (
+      <div
+        onClick={() => { void handleOpen(); }}
+        style={{
+          width: '100%',
+          maxWidth: 360,
+          border: '1px solid #f0f0f0',
+          borderRadius: 14,
+          padding: 8,
+          background: '#fff',
+          cursor: 'pointer',
+        }}
+      >
+        {previewSrc ? (
+          <img
+            src={previewSrc}
+            alt={name}
+            style={{
+              display: 'block',
+              width: '100%',
+              maxHeight: 220,
+              objectFit: 'contain',
+              borderRadius: 10,
+              background: '#fafafa',
+            }}
+          />
+        ) : (
+          <div
+            style={{
+              height: 160,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 10,
+              background: '#fafafa',
+              color: '#8c8c8c',
+              fontSize: 12,
+            }}
+          >
+            {loading || previewLoading ? '图片加载中...' : '图片预览暂不可用'}
+          </div>
+        )}
+        <div style={{ marginTop: 8, fontSize: 12, color: '#262626', wordBreak: 'break-all' }}>
+          {name}
+        </div>
+        <div style={{ marginTop: 4, fontSize: 12, color: '#8c8c8c' }}>
+          {previewError || description}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <FileCard
+      name={name}
+      byte={byte}
+      type={type}
+      loading={loading || previewLoading}
+      description={previewError || description}
+      onClick={() => { void handleOpen(); }}
+    />
+  );
+}
+
+function pendingUploadsToParts(items: PendingUpload[], content: string): MessagePart[] {
+  const parts: MessagePart[] = [];
+  const trimmed = content.trim();
+  if (trimmed) {
+    parts.push({ type: 'text', text: trimmed });
+  }
+  items
+    .filter((item) => item.status === 'uploaded' && item.fileId)
+    .forEach((item) => {
+      parts.push({
+        type: item.kind,
+        fileId: item.fileId,
+        name: item.name,
+        mimeType: item.mimeType,
+        size: item.size,
+        previewUrl: item.previewUrl,
+        downloadUrl: item.downloadUrl,
+        width: item.width,
+        height: item.height,
+      });
+    });
+  return parts;
+}
+
+function messageAttachments(msg?: ChatMessage): AttachmentItem[] {
+  if (!msg) return [];
+  if (msg.attachments?.length) return msg.attachments;
+  return (msg.parts || [])
+    .filter((part) => !!part.fileId && (part.type === 'image' || part.type === 'file'))
+    .map((part) => ({
+      fileId: part.fileId!,
+      kind: part.type === 'image' ? 'image' : 'file',
+      name: part.name || '',
+      mimeType: part.mimeType || '',
+      size: part.size || 0,
+      previewUrl: part.previewUrl,
+      downloadUrl: part.downloadUrl,
+      width: part.width,
+      height: part.height,
+      status: 'uploaded',
+    }));
 }
 
 function getToolStatusMeta(status: string, t: any): { label: string; color: string; background: string; border: string } {
@@ -130,6 +374,10 @@ const ConversationPane: React.FC<ConversationPaneProps> = ({
   bubbleRole,
 }) => {
   const senderRef = useRef<any>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
+  const uploadingCount = pendingUploads.filter((item) => item.status === 'uploading').length;
+  const assetToken = getJwt();
 
   const { onRequest, isRequesting, abort, parsedMessages } = useXChat<ChatMessage, ChatMessage, ChatInput, SSEChunk>({
     provider,
@@ -145,6 +393,8 @@ const ConversationPane: React.FC<ConversationPaneProps> = ({
               message: {
                 role: m.role,
                 content: m.content,
+                ...(m.parts ? { parts: m.parts } : {}),
+                ...(m.attachments ? { attachments: m.attachments } : {}),
                 ...(m.thinking ? { thinking: m.thinking } : {}),
                 ...(m.toolCalls ? { toolCalls: normalizeFinishedToolCalls(m.toolCalls) } : {}),
                 ...(m.createdAt ? { createdAt: m.createdAt } : {}),
@@ -160,11 +410,81 @@ const ConversationPane: React.FC<ConversationPaneProps> = ({
     requestFallback: { role: 'assistant', content: t('chat_thinking') },
   });
 
+  useEffect(() => {
+    setPendingUploads([]);
+  }, [conversationId]);
+
+  const uploadFiles = useCallback(async (files: FileList | File[]) => {
+    const list = Array.from(files || []);
+    if (!conversationId || list.length === 0) return;
+    const jwt = getJwt();
+    if (!jwt) return;
+
+    const seedItems: PendingUpload[] = list.map((file) => ({
+      uid: `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`,
+      name: file.name,
+      mimeType: file.type || 'application/octet-stream',
+      size: file.size,
+      kind: file.type.startsWith('image/') ? 'image' : 'file',
+      status: 'uploading',
+    }));
+    setPendingUploads((prev) => [...prev, ...seedItems]);
+
+    await Promise.all(seedItems.map(async (item, index) => {
+      const currentFile = list[index];
+      const formData = new FormData();
+      formData.append('file', currentFile);
+      formData.append('conversationId', conversationId);
+      formData.append('kind', item.kind);
+      try {
+        const res = await axios.post(`${BACKEND_URL}/api/files`, formData, {
+          headers: { Authorization: `Bearer ${jwt}` },
+        });
+        setPendingUploads((prev) => prev.map((upload) => (
+          upload.uid === item.uid
+            ? {
+                ...upload,
+                fileId: res.data.id,
+                previewUrl: res.data.previewUrl,
+                downloadUrl: res.data.downloadUrl,
+                width: res.data.width,
+                height: res.data.height,
+                status: 'uploaded',
+              }
+            : upload
+        )));
+      } catch (error: any) {
+        const errorMessage = error?.response?.data || error?.message || '上传失败';
+        setPendingUploads((prev) => prev.map((upload) => (
+          upload.uid === item.uid
+            ? { ...upload, status: 'failed', error: String(errorMessage) }
+            : upload
+        )));
+      }
+    }));
+  }, [conversationId, getJwt, t]);
+
   const handleSend = useCallback((content: string) => {
-    if (!content.trim() || !selectedAgentId || !conversationId) return;
-    onRequest({ content, agentId: selectedAgentId, conversationId });
+    if (!selectedAgentId || !conversationId || uploadingCount > 0) return;
+    const parts = pendingUploadsToParts(pendingUploads, content);
+    if (parts.length === 0) return;
+    onRequest({
+      content: content.trim(),
+      agentId: selectedAgentId,
+      conversationId,
+      parts,
+    });
+    setPendingUploads([]);
     senderRef.current?.clear();
-  }, [selectedAgentId, conversationId, onRequest]);
+  }, [selectedAgentId, conversationId, onRequest, pendingUploads, uploadingCount]);
+
+  const handleOpenFilePicker = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleRemoveUpload = useCallback((uid: string) => {
+    setPendingUploads((prev) => prev.filter((item) => item.uid !== uid));
+  }, []);
 
   const bubbleItems = [...parsedMessages].map((item) => {
     const msg = item.message as ChatMessage;
@@ -200,13 +520,65 @@ const ConversationPane: React.FC<ConversationPaneProps> = ({
       )}
 
       <div style={{ padding: '16px 24px', borderTop: '1px solid #f0f0f0' }}>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          style={{ display: 'none' }}
+          onChange={(event) => {
+            if (event.target.files?.length) {
+              void uploadFiles(event.target.files);
+              event.target.value = '';
+            }
+          }}
+        />
         <Sender
           ref={senderRef}
           loading={isRequesting}
           onSubmit={handleSend}
           onCancel={() => abort()}
+          onPasteFile={(files) => { void uploadFiles(files); }}
           placeholder={conversationId ? t('chat_placeholder') : t('chat_select_conversation_first')}
-          disabled={!conversationId}
+          disabled={!conversationId || uploadingCount > 0}
+          header={pendingUploads.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
+              {pendingUploads.map((item) => (
+                <div key={item.uid} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <AuthenticatedFileCard
+                      name={item.name}
+                      byte={item.size}
+                      type={item.kind === 'image' ? 'image' : 'file'}
+                      previewUrl={item.previewUrl}
+                      downloadUrl={item.downloadUrl}
+                      loading={item.status === 'uploading'}
+                      description={item.error || item.mimeType}
+                      token={assetToken}
+                    />
+                  </div>
+                  <Button
+                    type="text"
+                    icon={<CloseCircleOutlined />}
+                    onClick={() => handleRemoveUpload(item.uid)}
+                    disabled={item.status === 'uploading'}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : null}
+          suffix={(oriNode) => (
+            <Space size={4}>
+              <Tooltip title="上传附件">
+                <Button
+                  type="text"
+                  icon={<PaperClipOutlined />}
+                  onClick={handleOpenFilePicker}
+                  disabled={!conversationId || isRequesting}
+                />
+              </Tooltip>
+              {oriNode}
+            </Space>
+          )}
           allowSpeech
         />
         <div style={{ textAlign: 'center', marginTop: 8 }}>
@@ -242,6 +614,7 @@ const ChatPage: React.FC = () => {
   const authHeaders = useCallback(() => ({
     headers: { Authorization: `Bearer ${getJwt()}` },
   }), [getJwt]);
+  const assetToken = getJwt();
 
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [curConvId, setCurConvId] = useState('');
@@ -533,6 +906,34 @@ const ChatPage: React.FC = () => {
     );
   };
 
+  const renderAttachments = (attachments: AttachmentItem[], align: 'left' | 'right') => {
+    if (!attachments.length) return null;
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+        alignItems: align === 'right' ? 'flex-end' : 'flex-start',
+        marginTop: 10,
+      }}
+      >
+        {attachments.map((attachment, index) => (
+          <div key={`${attachment.fileId}-${index}`} style={{ maxWidth: 360, width: '100%' }}>
+            <AuthenticatedFileCard
+              name={attachment.name}
+              byte={attachment.size}
+              type={attachment.kind === 'image' ? 'image' : 'file'}
+              previewUrl={attachment.previewUrl}
+              downloadUrl={attachment.downloadUrl}
+              description={attachment.mimeType}
+              token={assetToken}
+            />
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   // --- Bubble role config ---
   const bubbleRole = {
     assistant: {
@@ -564,6 +965,7 @@ const ChatPage: React.FC = () => {
             <div style={{ color: token.colorText, lineHeight: 1.7 }}>
               {msg.content ? <Markdown>{msg.content}</Markdown> : t('chat_thinking')}
             </div>
+            {renderAttachments(messageAttachments(msg), 'left')}
             {renderTimestamp(msg.createdAt, 'left')}
           </div>
         );
@@ -580,6 +982,7 @@ const ChatPage: React.FC = () => {
             <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7, color: token.colorText }}>
               {msg.content}
             </div>
+            {renderAttachments(messageAttachments(msg), 'right')}
             {renderTimestamp(msg.createdAt, 'right')}
           </div>
         );
