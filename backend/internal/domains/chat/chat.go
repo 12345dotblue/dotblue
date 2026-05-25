@@ -13,6 +13,7 @@ import (
 	"dotblue/internal/domains/conversation"
 	"dotblue/internal/domains/engine"
 	"dotblue/internal/domains/identity"
+	"dotblue/internal/domains/metering"
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
 )
@@ -29,8 +30,9 @@ func sseDebugEnabled(ctx context.Context) bool {
 
 // MsgReq represents the message format sent from the frontend.
 type MsgReq struct {
-	Content        string `json:"content"`
-	ConversationId string `json:"conversationId,omitempty"`
+	Content        string                     `json:"content"`
+	ConversationId string                     `json:"conversationId,omitempty"`
+	Parts          []conversation.MessagePart `json:"parts,omitempty"`
 }
 
 // ToolCallInfo represents a tool invocation progress item.
@@ -43,12 +45,14 @@ type ToolCallInfo struct {
 
 // MsgRes represents the message format returned to the frontend.
 type MsgRes struct {
-	Content        string        `json:"content"`
-	Thinking       string        `json:"thinking,omitempty"`
-	ToolCall       *ToolCallInfo `json:"toolCall,omitempty"`
-	ConversationId string        `json:"conversationId,omitempty"`
-	Title          string        `json:"title,omitempty"`
-	Status         string        `json:"status"` // "thinking", "streaming", "done", "error"
+	Content        string                        `json:"content"`
+	Thinking       string                        `json:"thinking,omitempty"`
+	ToolCall       *ToolCallInfo                 `json:"toolCall,omitempty"`
+	ConversationId string                        `json:"conversationId,omitempty"`
+	Title          string                        `json:"title,omitempty"`
+	Parts          []conversation.MessagePart    `json:"parts,omitempty"`
+	Attachments    []conversation.AttachmentItem `json:"attachments,omitempty"`
+	Status         string                        `json:"status"` // "thinking", "streaming", "done", "error"
 }
 
 func Handler(r *ghttp.Request) {
@@ -92,6 +96,7 @@ func Handler(r *ghttp.Request) {
 			AgentID:            agentId,
 			ConversationID:     req.ConversationId,
 			Content:            req.Content,
+			Parts:              req.Parts,
 			CreateConversation: true,
 		})
 		if err != nil {
@@ -132,8 +137,15 @@ func proxyToHermes(r *ghttp.Request, ws *ghttp.WebSocket, prepared *PreparedTurn
 	upstreamCtx, cancel := context.WithTimeout(context.Background(), engineStreamTimeout)
 	defer cancel()
 
+	usageEvent, err := defaultService.startMeteringInvocation(prepared, "")
+	if err != nil {
+		sendError(ws, err.Error())
+		return
+	}
+
 	httpResp, err := eng.ProxyRequest(upstreamCtx, prepared.Endpoint, prepared.History, convId)
 	if err != nil {
+		defaultService.failMeteringInvocation(usageEvent, err)
 		g.Log().Errorf(r.Context(), "Hermes request failed: %v", err)
 		sendError(ws, "Hermes engine unreachable")
 		return
@@ -142,6 +154,7 @@ func proxyToHermes(r *ghttp.Request, ws *ghttp.WebSocket, prepared *PreparedTurn
 
 	if httpResp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(httpResp.Body)
+		defaultService.failMeteringInvocation(usageEvent, errors.New(strings.TrimSpace(string(body))))
 		g.Log().Errorf(r.Context(), "Hermes error: %s", string(body))
 		sendError(ws, "Hermes error: "+string(body))
 		return
@@ -151,6 +164,7 @@ func proxyToHermes(r *ghttp.Request, ws *ghttp.WebSocket, prepared *PreparedTurn
 	var fullContent strings.Builder
 	var fullThinking strings.Builder
 	var toolCalls []conversation.ToolCallItem
+	var reportedUsage *metering.UsageSummary
 
 	// Read SSE stream
 	reader := bufio.NewReader(httpResp.Body)
@@ -167,6 +181,7 @@ func proxyToHermes(r *ghttp.Request, ws *ghttp.WebSocket, prepared *PreparedTurn
 			} else {
 				g.Log().Warningf(r.Context(), "SSE read error: %v", err)
 			}
+			defaultService.failMeteringInvocation(usageEvent, err)
 			sendError(ws, "Stream interrupted")
 			return
 		}
@@ -197,6 +212,10 @@ func proxyToHermes(r *ghttp.Request, ws *ghttp.WebSocket, prepared *PreparedTurn
 		if data == "[DONE]" {
 			break
 		}
+		if usage := parseReportedUsage(currentEvent, data); usage != nil {
+			reportedUsage = usage
+			continue
+		}
 
 		switch currentEvent {
 		case "hermes.tool.progress":
@@ -217,9 +236,13 @@ func proxyToHermes(r *ghttp.Request, ws *ghttp.WebSocket, prepared *PreparedTurn
 
 	wsSafeSend(ws, MsgRes{Status: "done"})
 
-	if err := PersistAssistantTurn(convId, fullContent.String(), fullThinking.String(), toolCalls); err != nil {
+	messageID, err := PersistAssistantTurnWithMessageID(convId, fullContent.String(), fullThinking.String(), toolCalls)
+	if err != nil {
+		defaultService.failMeteringInvocation(usageEvent, err)
 		g.Log().Errorf(r.Context(), "Failed to save assistant message: %v", err)
+		return
 	}
+	defaultService.completeMeteringInvocation(usageEvent, prepared, messageID, fullContent.String(), fullThinking.String(), reportedUsage)
 }
 
 // handleToolProgress forwards Hermes tool progress events as thinking indicators.
@@ -310,9 +333,10 @@ func truncate(s string, maxLen int) string {
 // --- SSE Chat Handler ---
 
 type CompletionsReq struct {
-	Content        string `json:"content" p:"content" v:"required"`
-	AgentId        string `json:"agentId" p:"agentId" v:"required"`
-	ConversationId string `json:"conversationId" p:"conversationId" v:"required"`
+	Content        string                     `json:"content" p:"content"`
+	AgentId        string                     `json:"agentId" p:"agentId" v:"required"`
+	ConversationId string                     `json:"conversationId" p:"conversationId" v:"required"`
+	Parts          []conversation.MessagePart `json:"parts"`
 }
 
 func CompletionsHandler(r *ghttp.Request) {
@@ -335,9 +359,17 @@ func CompletionsHandler(r *ghttp.Request) {
 		AgentID:            req.AgentId,
 		ConversationID:     req.ConversationId,
 		Content:            req.Content,
+		Parts:              req.Parts,
 		CreateConversation: false,
 	})
 	if err != nil {
+		g.Log().Errorf(
+			r.Context(),
+			"chat.completions.prepare.error agent=%s conversation=%s err=%v",
+			req.AgentId,
+			req.ConversationId,
+			err,
+		)
 		switch {
 		case errors.Is(err, engine.ErrPlatformConfigMissing):
 			r.Response.WriteStatus(http.StatusBadRequest, "ERR_PLATFORM_CONFIG_MISSING")
@@ -403,8 +435,15 @@ func proxyToHermesSSE(r *ghttp.Request, prepared *PreparedTurn) {
 	upstreamCtx, cancel := context.WithTimeout(context.Background(), engineStreamTimeout)
 	defer cancel()
 
+	usageEvent, err := defaultService.startMeteringInvocation(prepared, "")
+	if err != nil {
+		sseWrite(r, "error", MsgRes{Content: err.Error(), Status: "error"})
+		return
+	}
+
 	resp, err := eng.ProxyRequest(upstreamCtx, prepared.Endpoint, prepared.History, convId)
 	if err != nil {
+		defaultService.failMeteringInvocation(usageEvent, err)
 		g.Log().Errorf(r.Context(), "Engine request failed: %v", err)
 		if r.Context().Err() == nil {
 			sseWrite(r, "error", MsgRes{Content: "Engine unreachable", Status: "error"})
@@ -415,6 +454,7 @@ func proxyToHermesSSE(r *ghttp.Request, prepared *PreparedTurn) {
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
+		defaultService.failMeteringInvocation(usageEvent, errors.New(strings.TrimSpace(string(body))))
 		g.Log().Errorf(r.Context(), "Hermes error: %s", string(body))
 		sseWrite(r, "error", MsgRes{Content: "Hermes error: " + string(body), Status: "error"})
 		return
@@ -423,6 +463,7 @@ func proxyToHermesSSE(r *ghttp.Request, prepared *PreparedTurn) {
 	var fullContent strings.Builder
 	var fullThinking strings.Builder
 	var toolCalls []conversation.ToolCallItem
+	var reportedUsage *metering.UsageSummary
 
 	reader := bufio.NewReader(resp.Body)
 	var currentEvent string
@@ -443,6 +484,7 @@ func proxyToHermesSSE(r *ghttp.Request, prepared *PreparedTurn) {
 			} else {
 				g.Log().Warningf(r.Context(), "SSE read error: %v", err)
 			}
+			defaultService.failMeteringInvocation(usageEvent, err)
 			if r.Context().Err() == nil {
 				sseWrite(r, "error", MsgRes{Content: "Stream interrupted", Status: "error"})
 			}
@@ -475,6 +517,10 @@ func proxyToHermesSSE(r *ghttp.Request, prepared *PreparedTurn) {
 		if data == "[DONE]" {
 			break
 		}
+		if usage := parseReportedUsage(currentEvent, data); usage != nil {
+			reportedUsage = usage
+			continue
+		}
 
 		switch currentEvent {
 		case "hermes.tool.progress":
@@ -496,9 +542,13 @@ func proxyToHermesSSE(r *ghttp.Request, prepared *PreparedTurn) {
 		}
 	}
 
-	if err := PersistAssistantTurn(convId, fullContent.String(), fullThinking.String(), toolCalls); err != nil {
+	messageID, err := PersistAssistantTurnWithMessageID(convId, fullContent.String(), fullThinking.String(), toolCalls)
+	if err != nil {
+		defaultService.failMeteringInvocation(usageEvent, err)
 		g.Log().Errorf(r.Context(), "Failed to save assistant message: %v", err)
+		return
 	}
+	defaultService.completeMeteringInvocation(usageEvent, prepared, messageID, fullContent.String(), fullThinking.String(), reportedUsage)
 }
 
 func handleToolProgressSSE(r *ghttp.Request, data string) *conversation.ToolCallItem {

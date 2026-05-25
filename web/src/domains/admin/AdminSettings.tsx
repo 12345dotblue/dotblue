@@ -32,10 +32,12 @@ import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { BACKEND_URL } from '../../config';
 import { casdoorService } from '../identity/CasdoorService';
+import EnterpriseLLMSettingsTab from './EnterpriseLLMSettingsTab';
+import EnterpriseUsageSettingsTab from './EnterpriseUsageSettingsTab';
 import IMSettingsTab from './IMSettingsTab';
 
 const { Paragraph, Text, Title } = Typography;
-const ENTERPRISE_ADMIN_TABS = ['organization', 'members', 'invitations', 'im'] as const;
+const ENTERPRISE_ADMIN_TABS = ['organization', 'members', 'invitations', 'llm', 'usage', 'im'] as const;
 type EnterpriseAdminTab = typeof ENTERPRISE_ADMIN_TABS[number];
 
 interface EnterpriseSummary {
@@ -149,6 +151,7 @@ const AdminSettings: React.FC = () => {
   const [savingOrgUnit, setSavingOrgUnit] = useState(false);
   const [addingMember, setAddingMember] = useState(false);
   const [creatingInvitation, setCreatingInvitation] = useState(false);
+  const [llmCreateSignal, setLLMCreateSignal] = useState(0);
   const [imCreateSignal, setIMCreateSignal] = useState(0);
   const [createEnterpriseForm] = Form.useForm<{ name: string }>();
   const [orgForm] = Form.useForm<OrgUnit>();
@@ -187,11 +190,25 @@ const AdminSettings: React.FC = () => {
         onClick: () => setMemberModalOpen(true),
       };
     }
+    if (activeTab === 'llm') {
+      return {
+        label: t('enterprise_admin_llm_create'),
+        icon: <PlusOutlined />,
+        onClick: () => setLLMCreateSignal((current) => current + 1),
+      };
+    }
     if (activeTab === 'im') {
       return {
         label: '新建 IM 连接',
         icon: <PlusOutlined />,
         onClick: () => setIMCreateSignal((current) => current + 1),
+      };
+    }
+    if (activeTab === 'usage') {
+      return {
+        label: '刷新用量数据',
+        icon: <PlusOutlined />,
+        onClick: () => window.location.reload(),
       };
     }
     return {
@@ -752,6 +769,16 @@ const AdminSettings: React.FC = () => {
                       </Card>
                     </Space>
                   ),
+                },
+                {
+                  key: 'llm',
+                  label: t('enterprise_admin_tab_llm'),
+                  children: <EnterpriseLLMSettingsTab createSignal={llmCreateSignal} />,
+                },
+                {
+                  key: 'usage',
+                  label: '用量审计',
+                  children: <EnterpriseUsageSettingsTab />,
                 },
                 {
                   key: 'im',

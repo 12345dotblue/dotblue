@@ -3,6 +3,7 @@ package conversation
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"dotblue/internal/domains/agent"
@@ -175,28 +176,31 @@ func (s *Service) Delete(id string) error {
 }
 
 func (s *Service) SaveMessage(convId, role, content, thinking, toolCallsJSON, status string) (*Message, error) {
-	if s == nil || s.repo == nil {
-		return nil, errors.New("conversation repository is not configured")
-	}
-
-	message := &Message{
+	return s.SaveStructuredMessage(&Message{
 		ConversationId: convId,
 		Role:           role,
 		Content:        content,
 		Thinking:       thinking,
 		ToolCalls:      toolCallsJSON,
 		Status:         status,
+	})
+}
+
+func (s *Service) SaveStructuredMessage(message *Message) (*Message, error) {
+	if s == nil || s.repo == nil {
+		return nil, errors.New("conversation repository is not configured")
+	}
+	if message == nil {
+		return nil, errors.New("message is required")
+	}
+	if strings.TrimSpace(message.Id) == "" {
+		message.Id = s.idGenerator()
+	}
+	if message.Status == "" {
+		message.Status = "done"
 	}
 	if err := s.repo.SaveMessage(message); err != nil {
 		return nil, err
-	}
-
-	latest, err := s.repo.GetLatestMessage(convId)
-	if err != nil {
-		return nil, err
-	}
-	if latest != nil {
-		return latest, nil
 	}
 	return message, nil
 }
@@ -219,13 +223,15 @@ func (s *Service) ListMessages(convId, before string, limit int) ([]*MessagePubl
 	result := make([]*MessagePublic, 0, len(raw))
 	for i := len(raw) - 1; i >= 0; i-- {
 		message := &MessagePublic{
-			Id:        raw[i].Id,
-			Role:      raw[i].Role,
-			Content:   raw[i].Content,
-			Thinking:  raw[i].Thinking,
-			Status:    raw[i].Status,
-			CreatedAt: raw[i].CreatedAt,
+			Id:          raw[i].Id,
+			Role:        raw[i].Role,
+			Content:     raw[i].Content,
+			Thinking:    raw[i].Thinking,
+			Attachments: raw[i].Attachments,
+			Status:      raw[i].Status,
+			CreatedAt:   raw[i].CreatedAt,
 		}
+		message.Parts = normalizeMessageParts(raw[i].Content, raw[i].PartsJSON, raw[i].Attachments)
 		if raw[i].ToolCalls != "" && raw[i].ToolCalls != "[]" {
 			var toolCalls []ToolCallItem
 			if err := json.Unmarshal([]byte(raw[i].ToolCalls), &toolCalls); err == nil && len(toolCalls) > 0 {
@@ -235,6 +241,51 @@ func (s *Service) ListMessages(convId, before string, limit int) ([]*MessagePubl
 		result = append(result, message)
 	}
 	return result, nil
+}
+
+func normalizeMessageParts(content, partsJSON string, attachments []AttachmentItem) []MessagePart {
+	if strings.TrimSpace(partsJSON) != "" && strings.TrimSpace(partsJSON) != "[]" {
+		var parts []MessagePart
+		if err := json.Unmarshal([]byte(partsJSON), &parts); err == nil && len(parts) > 0 {
+			if len(attachments) > 0 {
+				attachmentByFileID := make(map[string]AttachmentItem, len(attachments))
+				for _, attachment := range attachments {
+					attachmentByFileID[attachment.FileId] = attachment
+				}
+				for i := range parts {
+					if attachment, ok := attachmentByFileID[parts[i].FileId]; ok {
+						parts[i].Name = firstNonEmpty(parts[i].Name, attachment.Name)
+						parts[i].MimeType = firstNonEmpty(parts[i].MimeType, attachment.MimeType)
+						if parts[i].Size == 0 {
+							parts[i].Size = attachment.Size
+						}
+						parts[i].PreviewUrl = firstNonEmpty(parts[i].PreviewUrl, attachment.PreviewUrl)
+						parts[i].DownloadUrl = firstNonEmpty(parts[i].DownloadUrl, attachment.DownloadUrl)
+						if parts[i].Width == 0 {
+							parts[i].Width = attachment.Width
+						}
+						if parts[i].Height == 0 {
+							parts[i].Height = attachment.Height
+						}
+					}
+				}
+			}
+			return parts
+		}
+	}
+	if strings.TrimSpace(content) == "" {
+		return []MessagePart{}
+	}
+	return []MessagePart{{Type: "text", Text: content}}
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func (s *Service) GetFirstUserMessage(convId string) (string, error) {

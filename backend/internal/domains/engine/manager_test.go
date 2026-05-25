@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"dotblue/internal/domains/agent"
+	"dotblue/internal/domains/model"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -38,19 +40,11 @@ func (s *stubRuntimeAgentReader) GetById(id string) (*runtimeAgentInfo, error) {
 
 type stubRuntimeSettingsReader struct {
 	getPlatformConfigFunc func() (*runtimePlatformConfig, error)
-	getProviderConfigFunc func() (*ProviderConfig, error)
 }
 
 func (s *stubRuntimeSettingsReader) GetPlatformConfig() (*runtimePlatformConfig, error) {
 	if s.getPlatformConfigFunc != nil {
 		return s.getPlatformConfigFunc()
-	}
-	return nil, nil
-}
-
-func (s *stubRuntimeSettingsReader) GetProviderConfig() (*ProviderConfig, error) {
-	if s.getProviderConfigFunc != nil {
-		return s.getProviderConfigFunc()
 	}
 	return nil, nil
 }
@@ -112,32 +106,54 @@ func TestRegistrySupportsInjection(t *testing.T) {
 
 func TestDockerRuntimeResolveRuntimePlanUsesInjectedDependencies(t *testing.T) {
 	Convey("DockerRuntime 在进入真实 Docker 之前通过本地接口解析运行计划", t, func() {
+		originalLoadPlatformModelByID := loadPlatformModelByID
+		originalLoadDefaultPlatformLLMModel := loadDefaultPlatformLLMModel
+		loadPlatformModelByID = func(id string) (*model.LLMModel, error) {
+			So(id, ShouldEqual, "platform-default")
+			return &model.LLMModel{
+				Id:    id,
+				Scope: model.ScopePlatform,
+				Type:  "openai",
+				Model: "gpt-test",
+			}, nil
+		}
+		loadDefaultPlatformLLMModel = func() (*model.LLMModel, error) {
+			return &model.LLMModel{
+				Id:    "platform-default",
+				Scope: model.ScopePlatform,
+			}, nil
+		}
+		defer func() {
+			loadPlatformModelByID = originalLoadPlatformModelByID
+			loadDefaultPlatformLLMModel = originalLoadDefaultPlatformLLMModel
+		}()
+
 		runtime := &DockerRuntime{
 			agents: &stubRuntimeAgentReader{
 				getByIdFunc: func(id string) (*runtimeAgentInfo, error) {
 					So(id, ShouldEqual, "agent-1")
 					return &runtimeAgentInfo{
 						ID:           id,
+						GroupId:      "group-1",
 						SystemPrompt: "helpful",
 						EngineAPIKey: "secret-key",
 						EngineType:   "hermes",
+						ModelScope:   agent.ModelScopePlatform,
+						ModelId:      "platform-default",
 					}, nil
 				},
 			},
 			settings: &stubRuntimeSettingsReader{
 				getPlatformConfigFunc: func() (*runtimePlatformConfig, error) {
 					return &runtimePlatformConfig{
-						DataBasePath: "/host-data",
-						DataMountPath: "/app/runtime-data",
-						ContainerPort: 19090,
-						RuntimeMode: "container",
-						EndpointMode: "docker_dns",
+						DataBasePath:   "/host-data",
+						DataMountPath:  "/app/runtime-data",
+						ContainerPort:  19090,
+						RuntimeMode:    "container",
+						EndpointMode:   "docker_dns",
 						DockerEndpoint: "unix:///var/run/docker.sock",
-						DockerNetwork: "dotblue_default",
+						DockerNetwork:  "dotblue_default",
 					}, nil
-				},
-				getProviderConfigFunc: func() (*ProviderConfig, error) {
-					return &ProviderConfig{Type: "openai", Model: "gpt-test"}, nil
 				},
 			},
 			registry: &stubRuntimeRegistry{
@@ -191,7 +207,7 @@ func TestDockerRuntimeResolveRuntimePlanUsesInjectedDependencies(t *testing.T) {
 				getPlatformConfigFunc: func() (*runtimePlatformConfig, error) {
 					return &runtimePlatformConfig{
 						DataBasePath: "/host-data",
-						RuntimeMode: "container",
+						RuntimeMode:  "container",
 						EndpointMode: "docker_dns",
 					}, nil
 				},
@@ -223,7 +239,7 @@ func TestResolveEndpointMode(t *testing.T) {
 func TestResolveWorkspaceBasePath(t *testing.T) {
 	Convey("resolveWorkspaceBasePath 优先使用 dataMountPath", t, func() {
 		So(resolveWorkspaceBasePath(&runtimePlatformConfig{
-			DataBasePath: "/host-data",
+			DataBasePath:  "/host-data",
 			DataMountPath: "/app/runtime-data",
 		}), ShouldEqual, "/app/runtime-data")
 		So(resolveWorkspaceBasePath(&runtimePlatformConfig{

@@ -71,12 +71,18 @@ func (f *fakeReqRoute) Set(ctx context.Context, requestID string, fields map[str
 	return nil
 }
 
+type fakeLimiter struct{}
+
+func (fakeLimiter) CheckLimit(input LimitCheckInput) error {
+	return nil
+}
+
 func TestDispatchWritesStateRouteAndQueue(t *testing.T) {
 	assigner := &fakeSessionAssigner{workerID: "worker-1", fenceToken: 7}
 	queue := &fakeQueue{}
 	state := &fakeReqState{}
 	route := &fakeReqRoute{}
-	svc := NewService(assigner, queue, state, route, time.Hour)
+	svc := NewService(assigner, queue, state, route, time.Hour, fakeLimiter{})
 
 	res, err := svc.Dispatch(context.Background(), DispatchRequest{
 		RequestID:        "req-1",

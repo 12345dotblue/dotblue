@@ -2,9 +2,16 @@ package agent
 
 import (
 	"errors"
+	"strings"
 	"time"
 
+	"dotblue/internal/domains/model"
 	"github.com/google/uuid"
+)
+
+var (
+	loadModelByID            = model.GetByID
+	loadDefaultPlatformModel = model.GetDefaultPlatformModel
 )
 
 const defaultEngineType = "hermes"
@@ -47,9 +54,16 @@ func (s *Service) BelongsToUser(id, userId, enterpriseId string) (bool, error) {
 	return s.repo.BelongsToUser(id, userId, enterpriseId)
 }
 
-func (s *Service) Create(userId, groupId, agentName, systemPrompt string) (*Agent, error) {
+func (s *Service) Create(userId, groupId, agentName, systemPrompt, modelScope, modelId string) (*Agent, error) {
 	if s == nil || s.repo == nil {
 		return nil, errors.New("agent repository is not configured")
+	}
+	modelScope, modelId, err := validateModelSelection(modelScope, modelId)
+	if err != nil {
+		return nil, err
+	}
+	if err := ensureModelSelectionExists(groupId, modelScope, modelId); err != nil {
+		return nil, err
 	}
 
 	agent := &Agent{
@@ -58,6 +72,8 @@ func (s *Service) Create(userId, groupId, agentName, systemPrompt string) (*Agen
 		GroupId:      groupId,
 		AgentName:    agentName,
 		SystemPrompt: systemPrompt,
+		ModelScope:   modelScope,
+		ModelId:      modelId,
 		EngineAPIKey: s.apiKeyGenerator(),
 		EngineType:   defaultEngineType,
 	}
@@ -75,11 +91,25 @@ func (s *Service) Create(userId, groupId, agentName, systemPrompt string) (*Agen
 	return agent, nil
 }
 
-func (s *Service) Update(id, agentName, systemPrompt string) error {
+func (s *Service) Update(id, agentName, systemPrompt, modelScope, modelId string) error {
 	if s == nil || s.repo == nil {
 		return errors.New("agent repository is not configured")
 	}
-	return s.repo.Update(id, agentName, systemPrompt, s.now())
+	modelScope, modelId, err := validateModelSelection(modelScope, modelId)
+	if err != nil {
+		return err
+	}
+	existing, err := s.repo.GetById(id)
+	if err != nil {
+		return err
+	}
+	if existing == nil {
+		return errors.New("agent not found")
+	}
+	if err := ensureModelSelectionExists(existing.GroupId, modelScope, modelId); err != nil {
+		return err
+	}
+	return s.repo.Update(id, agentName, systemPrompt, modelScope, modelId, s.now())
 }
 
 func (s *Service) Delete(id string) error {
@@ -87,4 +117,46 @@ func (s *Service) Delete(id string) error {
 		return errors.New("agent repository is not configured")
 	}
 	return s.repo.Delete(id)
+}
+
+func validateModelSelection(modelScope, modelId string) (string, string, error) {
+	switch strings.TrimSpace(modelScope) {
+	case ModelScopePlatform:
+		modelId = strings.TrimSpace(modelId)
+		if modelId == "" {
+			return "", "", errors.New("platform model id is required")
+		}
+		return ModelScopePlatform, modelId, nil
+	case ModelScopeEnterprise:
+		modelId = strings.TrimSpace(modelId)
+		if modelId == "" {
+			return "", "", errors.New("enterprise model id is required")
+		}
+		return ModelScopeEnterprise, modelId, nil
+	default:
+		return "", "", errors.New("model scope is required")
+	}
+}
+
+func ensureModelSelectionExists(enterpriseId, modelScope, modelId string) error {
+	item, err := loadModelByID(modelId)
+	if err != nil {
+		return err
+	}
+	if item == nil {
+		if modelScope == ModelScopePlatform {
+			return errors.New("platform model not found")
+		}
+		return errors.New("enterprise model not found")
+	}
+	if modelScope == ModelScopeEnterprise {
+		if strings.TrimSpace(item.Scope) != model.ScopeEnterprise || strings.TrimSpace(item.EnterpriseId) != strings.TrimSpace(enterpriseId) {
+			return errors.New("enterprise model not found")
+		}
+		return nil
+	}
+	if strings.TrimSpace(item.Scope) != model.ScopePlatform {
+		return errors.New("platform model not found")
+	}
+	return nil
 }

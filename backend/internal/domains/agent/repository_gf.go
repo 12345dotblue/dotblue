@@ -53,17 +53,21 @@ func (r *GFRepository) Create(agent *Agent) error {
 		"group_id":       agent.GroupId,
 		"agent_name":     agent.AgentName,
 		"system_prompt":  agent.SystemPrompt,
+		"model_scope":    agent.ModelScope,
+		"model_id":       agent.ModelId,
 		"hermes_api_key": agent.EngineAPIKey,
 		"engine_type":    agent.EngineType,
 	}).Insert()
 	return err
 }
 
-func (r *GFRepository) Update(id, agentName, systemPrompt string, updatedAt time.Time) error {
+func (r *GFRepository) Update(id, agentName, systemPrompt, modelScope, modelId string, updatedAt time.Time) error {
 	_, err := g.DB().Model("agents").
 		Data(g.Map{
 			"agent_name":    agentName,
 			"system_prompt": systemPrompt,
+			"model_scope":   modelScope,
+			"model_id":      modelId,
 			"updated_at":    updatedAt,
 		}).
 		Where("id = ?", id).

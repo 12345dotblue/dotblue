@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"dotblue/internal/domains/identity"
+	"dotblue/internal/domains/model"
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
 )
@@ -11,11 +12,79 @@ import (
 type createReq struct {
 	AgentName    string `json:"agentName" v:"required"`
 	SystemPrompt string `json:"systemPrompt" v:"required"`
+	ModelScope   string `json:"modelScope" v:"required"`
+	ModelId      string `json:"modelId"`
 }
 
 type updateReq struct {
 	AgentName    string `json:"agentName" v:"required"`
 	SystemPrompt string `json:"systemPrompt" v:"required"`
+	ModelScope   string `json:"modelScope" v:"required"`
+	ModelId      string `json:"modelId"`
+}
+
+type modelOption struct {
+	Label      string `json:"label"`
+	Value      string `json:"value"`
+	ModelScope string `json:"modelScope"`
+	ModelId    string `json:"modelId,omitempty"`
+	ModelName  string `json:"modelName,omitempty"`
+}
+
+type modelOptionGroup struct {
+	Label   string        `json:"label"`
+	Options []modelOption `json:"options"`
+}
+
+// ModelOptionsHandler returns grouped model options for agent creation.
+// GET /api/agents/model-options
+func ModelOptionsHandler(r *ghttp.Request) {
+	enterpriseId := identity.GetCurrentEnterpriseId(r)
+	result := make([]modelOptionGroup, 0, 2)
+
+	enterpriseModels, err := model.ListEnterpriseModels(enterpriseId)
+	if err != nil {
+		g.Log().Warningf(r.Context(), "Failed to list enterprise llm models: %v", err)
+	} else if len(enterpriseModels) > 0 {
+		options := make([]modelOption, 0, len(enterpriseModels))
+		for i := range enterpriseModels {
+			item := enterpriseModels[i]
+			options = append(options, modelOption{
+				Label:      item.DisplayName,
+				Value:      ModelScopeEnterprise + ":" + item.Id,
+				ModelScope: ModelScopeEnterprise,
+				ModelId:    item.Id,
+				ModelName:  item.Model,
+			})
+		}
+		result = append(result, modelOptionGroup{
+			Label:   "企业模型",
+			Options: options,
+		})
+	}
+
+	platformModels, err := model.ListPlatformModels()
+	if err != nil {
+		g.Log().Warningf(r.Context(), "Failed to list platform llm models: %v", err)
+	} else if len(platformModels) > 0 {
+		options := make([]modelOption, 0, len(platformModels))
+		for i := range platformModels {
+			item := platformModels[i]
+			options = append(options, modelOption{
+				Label:      item.DisplayName,
+				Value:      ModelScopePlatform + ":" + item.Id,
+				ModelScope: ModelScopePlatform,
+				ModelId:    item.Id,
+				ModelName:  item.Model,
+			})
+		}
+		result = append(result, modelOptionGroup{
+			Label:   "平台模型",
+			Options: options,
+		})
+	}
+
+	r.Response.WriteJson(result)
 }
 
 // ListHandler returns all agents for the current user.
@@ -58,10 +127,10 @@ func CreateHandler(r *ghttp.Request) {
 		return
 	}
 
-	agent, err := defaultService.Create(userId, enterpriseId, req.AgentName, req.SystemPrompt)
+	agent, err := defaultService.Create(userId, enterpriseId, req.AgentName, req.SystemPrompt, req.ModelScope, req.ModelId)
 	if err != nil {
 		g.Log().Errorf(r.Context(), "Failed to create agent: %v", err)
-		r.Response.WriteStatus(http.StatusInternalServerError, "Failed to create agent")
+		r.Response.WriteStatus(http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -117,9 +186,9 @@ func UpdateHandler(r *ghttp.Request) {
 		return
 	}
 
-	if err := defaultService.Update(agentId, req.AgentName, req.SystemPrompt); err != nil {
+	if err := defaultService.Update(agentId, req.AgentName, req.SystemPrompt, req.ModelScope, req.ModelId); err != nil {
 		g.Log().Errorf(r.Context(), "Failed to update agent: %v", err)
-		r.Response.WriteStatus(http.StatusInternalServerError, "Failed to update agent")
+		r.Response.WriteStatus(http.StatusBadRequest, err.Error())
 		return
 	}
 

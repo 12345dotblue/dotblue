@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"dotblue/internal/domains/model"
 	"dotblue/internal/domains/settings"
 	"github.com/casdoor/casdoor-go-sdk/casdoorsdk"
 	. "github.com/smartystreets/goconvey/convey"
@@ -111,7 +112,8 @@ func (s *stubSetupClient) UpdateUser(user *casdoorsdk.User) (bool, error) {
 func TestInstallExecutorRun(t *testing.T) {
 	Convey("Run 通过可注入边界完成 Casdoor 初始化与本地设置写入", t, func() {
 		var savedPlatform *settings.PlatformConfig
-		var savedProvider *settings.ProviderConfig
+		var savedProvider *model.PlatformModelInput
+		savedProviderDisplayName := ""
 		var addedOrg *casdoorsdk.Organization
 		var addedApp *casdoorsdk.Application
 		var addedGroup *casdoorsdk.Group
@@ -124,12 +126,15 @@ func TestInstallExecutorRun(t *testing.T) {
 					savedPlatform = cfg
 					return nil
 				},
-				updateProviderFunc: func(cfg *settings.ProviderConfig) error {
-					savedProvider = cfg
-					return nil
-				},
 				markInitializedFunc: func() error {
 					markedInitialized = true
+					return nil
+				},
+			},
+			models: &stubModelDomain{
+				upsertPlatformDefaultFunc: func(cfg *model.PlatformModelInput, displayName string) error {
+					savedProvider = cfg
+					savedProviderDisplayName = displayName
 					return nil
 				},
 			},
@@ -182,7 +187,7 @@ func TestInstallExecutorRun(t *testing.T) {
 				},
 			},
 			Platform: &settings.PlatformConfig{DataBasePath: "/data/dotblue"},
-			Provider: &settings.ProviderConfig{Type: "openai"},
+			Provider: &model.PlatformModelInput{Type: "openai"},
 		})
 
 		So(err, ShouldBeNil)
@@ -190,6 +195,7 @@ func TestInstallExecutorRun(t *testing.T) {
 		So(savedPlatform.DataBasePath, ShouldEqual, "/data/dotblue")
 		So(savedProvider, ShouldNotBeNil)
 		So(savedProvider.Type, ShouldEqual, "openai")
+		So(savedProviderDisplayName, ShouldEqual, "平台默认模型")
 		So(markedInitialized, ShouldBeTrue)
 
 		So(addedOrg, ShouldNotBeNil)
@@ -225,6 +231,7 @@ func TestInstallExecutorRunWithoutCasdoor(t *testing.T) {
 					return nil
 				},
 			},
+			models: &stubModelDomain{},
 			newClient: func(ctx context.Context, organizationName string, applicationName string) (setupClient, error) {
 				clientCalled = true
 				return nil, nil

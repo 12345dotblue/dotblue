@@ -15,6 +15,7 @@ import (
 	_ "github.com/gogf/gf/contrib/drivers/pgsql/v2"
 
 	"dotblue/internal/domains/engine"
+	"dotblue/internal/domains/metering"
 )
 
 func TestExecuteInboundTurnIntegration(t *testing.T) {
@@ -51,6 +52,10 @@ func TestExecuteInboundTurnIntegration(t *testing.T) {
 		AgentID:        "11111111-1111-7111-8111-111111111132",
 		AgentName:      "integration-agent",
 		BindingID:      "11111111-1111-7111-8111-111111111133",
+		UserID:         "integration-user",
+		ModelID:        "integration-platform-model",
+		ModelName:      "Integration Platform Model",
+		PriceID:        "integration-platform-price",
 		Priority:       10,
 	}
 
@@ -126,6 +131,44 @@ func TestExecuteInboundTurnIntegration(t *testing.T) {
 	if !strings.Contains(deliveryRow.RequestJSON, "integration assistant reply") {
 		t.Fatalf("delivery request_json = %q, want assistant content", deliveryRow.RequestJSON)
 	}
+
+	agentOverview, err := metering.GetOverview(metering.ScopeAgent, fixture.AgentID)
+	if err != nil {
+		t.Fatalf("load agent overview failed: %v", err)
+	}
+	if agentOverview == nil {
+		t.Fatal("agent overview is nil")
+	}
+	if agentOverview.TodayRequests <= 0 || agentOverview.TodayTokens <= 0 || agentOverview.TodayCharge <= 0 {
+		t.Fatalf("agent overview = %+v, want positive usage statistics", agentOverview)
+	}
+
+	agentTrends, err := metering.GetTrends(metering.ScopeAgent, fixture.AgentID, 7)
+	if err != nil {
+		t.Fatalf("load agent trends failed: %v", err)
+	}
+	if len(agentTrends) == 0 {
+		t.Fatal("agent trends is empty, want at least one trend point")
+	}
+
+	enterpriseOverview, err := metering.GetOverview(metering.ScopeEnterprise, enterpriseID)
+	if err != nil {
+		t.Fatalf("load enterprise overview failed: %v", err)
+	}
+	if enterpriseOverview == nil {
+		t.Fatal("enterprise overview is nil")
+	}
+	if enterpriseOverview.TodayRequests <= 0 || enterpriseOverview.TodayTokens <= 0 {
+		t.Fatalf("enterprise overview = %+v, want positive usage statistics", enterpriseOverview)
+	}
+
+	enterpriseTrends, err := metering.GetTrends(metering.ScopeEnterprise, enterpriseID, 7)
+	if err != nil {
+		t.Fatalf("load enterprise trends failed: %v", err)
+	}
+	if len(enterpriseTrends) == 0 {
+		t.Fatal("enterprise trends is empty, want at least one trend point")
+	}
 }
 
 type executionTestRuntime struct{}
@@ -151,7 +194,9 @@ func (executionTestEngine) ContainerSpec(agentID, volPath, containerPort string)
 }
 
 func (executionTestEngine) ProxyRequest(ctx context.Context, endpoint *engine.AgentEndpoint, messages []interface{}, convID string) (*http.Response, error) {
-	body := "data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"integration thinking\"}}]}\n\n" +
+	body := "event: usage\n" +
+		"data: {\"usage\":{\"prompt_tokens\":11,\"completion_tokens\":7,\"total_tokens\":18}}\n\n" +
+		"data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"integration thinking\"}}]}\n\n" +
 		"data: {\"choices\":[{\"delta\":{\"content\":\"integration assistant reply\"}}]}\n\n" +
 		"data: [DONE]\n\n"
 	return &http.Response{

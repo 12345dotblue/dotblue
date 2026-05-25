@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"dotblue/internal/domains/model"
 	"dotblue/internal/domains/settings"
 )
 
@@ -12,10 +13,14 @@ type settingsDomain interface {
 	IsInitialized() bool
 	MarkInitialized() error
 	UpdatePlatformConfig(cfg *settings.PlatformConfig) error
-	UpdateProviderConfig(cfg *settings.ProviderConfig) error
+}
+
+type modelDomain interface {
+	UpsertPlatformDefaultModel(cfg *model.PlatformModelInput, displayName string) error
 }
 
 type defaultSettingsDomain struct{}
+type defaultModelDomain struct{}
 
 func (defaultSettingsDomain) IsInitialized() bool {
 	return settings.IsInitialized()
@@ -29,12 +34,14 @@ func (defaultSettingsDomain) UpdatePlatformConfig(cfg *settings.PlatformConfig) 
 	return settings.UpdatePlatformConfig(cfg)
 }
 
-func (defaultSettingsDomain) UpdateProviderConfig(cfg *settings.ProviderConfig) error {
-	return settings.UpdateProviderConfig(cfg)
+func (defaultModelDomain) UpsertPlatformDefaultModel(cfg *model.PlatformModelInput, displayName string) error {
+	_, err := model.UpsertDefaultPlatformModel(cfg, displayName)
+	return err
 }
 
 type Service struct {
 	settings         settingsDomain
+	models           modelDomain
 	buildInstallPlan func(ctx context.Context, req *InstallReq) (*installPlan, error)
 	runInstallPlan   func(ctx context.Context, plan *installPlan) error
 }
@@ -42,6 +49,7 @@ type Service struct {
 func NewService() *Service {
 	return &Service{
 		settings:         defaultSettingsDomain{},
+		models:           defaultModelDomain{},
 		buildInstallPlan: buildInstallPlan,
 		runInstallPlan:   runInstallPlanImpl,
 	}
@@ -91,7 +99,7 @@ func (s *Service) ApplyLocalSettings(plan *installPlan) error {
 	if s == nil {
 		return fmt.Errorf("setup service is not configured")
 	}
-	return applyLocalSettingsWith(s.settings, plan)
+	return applyLocalSettingsWith(s.settings, s.models, plan)
 }
 
 func (s *Service) MarkInitialized() error {
@@ -101,7 +109,7 @@ func (s *Service) MarkInitialized() error {
 	return markInitializedWith(s.settings)
 }
 
-func applyLocalSettingsWith(domain settingsDomain, plan *installPlan) error {
+func applyLocalSettingsWith(domain settingsDomain, models modelDomain, plan *installPlan) error {
 	if domain == nil {
 		return fmt.Errorf("setup settings dependency is not configured")
 	}
@@ -114,8 +122,11 @@ func applyLocalSettingsWith(domain settingsDomain, plan *installPlan) error {
 		}
 	}
 	if plan.Provider != nil {
-		if err := domain.UpdateProviderConfig(plan.Provider); err != nil {
-			return fmt.Errorf("update provider settings: %w", err)
+		if models == nil {
+			return fmt.Errorf("setup model dependency is not configured")
+		}
+		if err := models.UpsertPlatformDefaultModel(plan.Provider, "平台默认模型"); err != nil {
+			return fmt.Errorf("upsert platform default model: %w", err)
 		}
 	}
 	return nil

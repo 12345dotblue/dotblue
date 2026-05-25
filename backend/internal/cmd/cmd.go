@@ -12,8 +12,11 @@ import (
 	"dotblue/internal/domains/conversation"
 	"dotblue/internal/domains/engine"
 	"dotblue/internal/domains/enterprise"
+	"dotblue/internal/domains/file"
 	"dotblue/internal/domains/identity"
 	"dotblue/internal/domains/im"
+	"dotblue/internal/domains/metering"
+	"dotblue/internal/domains/model"
 	"dotblue/internal/domains/setup"
 	"dotblue/internal/infrastructure/dbschema"
 )
@@ -83,6 +86,21 @@ var (
 				group.Middleware(identity.AdminMiddleware)
 				group.GET("/admin/settings", engine.GetSettingsHandler)
 				group.POST("/admin/settings", engine.SettingsHandler)
+				group.GET("/admin/platform/llm-models", model.ListPlatformModelsHandler)
+				group.POST("/admin/platform/llm-models", model.CreatePlatformModelHandler)
+				group.PUT("/admin/platform/llm-models/{id}", model.UpdatePlatformModelHandler)
+				group.DELETE("/admin/platform/llm-models/{id}", model.DeletePlatformModelHandler)
+				group.GET("/admin/platform/usage/overview", metering.PlatformUsageOverviewHandler)
+				group.GET("/admin/platform/usage/trends", metering.PlatformUsageTrendsHandler)
+				group.GET("/admin/platform/usage/events", metering.PlatformUsageEventsHandler)
+				group.GET("/admin/platform/model-prices", metering.ListPlatformPricesHandler)
+				group.POST("/admin/platform/model-prices", metering.CreatePlatformPriceHandler)
+				group.PUT("/admin/platform/model-prices/{id}", metering.UpdatePlatformPriceHandler)
+				group.DELETE("/admin/platform/model-prices/{id}", metering.DeletePlatformPriceHandler)
+				group.GET("/admin/platform/usage-limit-policies", metering.ListPlatformPoliciesHandler)
+				group.POST("/admin/platform/usage-limit-policies", metering.CreatePlatformPolicyHandler)
+				group.PUT("/admin/platform/usage-limit-policies/{id}", metering.UpdatePlatformPolicyHandler)
+				group.DELETE("/admin/platform/usage-limit-policies/{id}", metering.DeletePlatformPolicyHandler)
 			})
 
 			// 企业管理员路由
@@ -102,6 +120,21 @@ var (
 				group.PUT("/admin/members/{userId}/org-unit", enterprise.UpdateMemberOrgUnitHandler)
 				group.GET("/admin/invitations", enterprise.ListInvitationsHandler)
 				group.POST("/admin/invitations", enterprise.CreateInvitationHandler)
+				group.GET("/admin/llm-models", model.ListEnterpriseModelsHandler)
+				group.POST("/admin/llm-models", model.CreateEnterpriseModelHandler)
+				group.PUT("/admin/llm-models/{id}", model.UpdateEnterpriseModelHandler)
+				group.DELETE("/admin/llm-models/{id}", model.DeleteEnterpriseModelHandler)
+				group.GET("/admin/usage/overview", metering.EnterpriseUsageOverviewHandler)
+				group.GET("/admin/usage/trends", metering.EnterpriseUsageTrendsHandler)
+				group.GET("/admin/usage/events", metering.EnterpriseUsageEventsHandler)
+				group.GET("/admin/llm-model-prices", metering.ListEnterprisePricesHandler)
+				group.POST("/admin/llm-model-prices", metering.CreateEnterprisePriceHandler)
+				group.PUT("/admin/llm-model-prices/{id}", metering.UpdateEnterprisePriceHandler)
+				group.DELETE("/admin/llm-model-prices/{id}", metering.DeleteEnterprisePriceHandler)
+				group.GET("/admin/usage-limit-policies", metering.ListEnterprisePoliciesHandler)
+				group.POST("/admin/usage-limit-policies", metering.CreateEnterprisePolicyHandler)
+				group.PUT("/admin/usage-limit-policies/{id}", metering.UpdateEnterprisePolicyHandler)
+				group.DELETE("/admin/usage-limit-policies/{id}", metering.DeleteEnterprisePolicyHandler)
 				group.GET("/admin/im/connections", im.ListConnectionsHandler)
 				group.POST("/admin/im/connections", im.CreateConnectionHandler)
 				group.GET("/admin/im/connections/{id}", im.GetConnectionHandler)
@@ -128,8 +161,11 @@ var (
 				group.POST("/enterprises/switch", enterprise.SwitchEnterpriseHandler)
 				// Agent CRUD
 				group.GET("/agents", agent.ListHandler)
+				group.GET("/agents/model-options", agent.ModelOptionsHandler)
 				group.POST("/agents", agent.CreateHandler)
 				group.GET("/agents/{id}", agent.GetHandler)
+				group.GET("/agents/{id}/usage/overview", metering.AgentUsageOverviewHandler)
+				group.GET("/agents/{id}/usage/trends", metering.AgentUsageTrendsHandler)
 				group.PUT("/agents/{id}", agent.UpdateHandler)
 				group.DELETE("/agents/{id}", agent.DeleteHandler)
 				// Conversations
@@ -139,9 +175,13 @@ var (
 				group.PUT("/conversations/{id}", conversation.UpdateHandler)
 				group.DELETE("/conversations/{id}", conversation.DeleteHandler)
 				group.GET("/conversations/{id}/messages", conversation.ListMessagesHandler)
+				group.POST("/files", file.UploadHandler)
+				group.GET("/files/{id}", file.GetHandler)
+				group.GET("/files/{id}/preview", file.PreviewHandler)
+				group.GET("/files/{id}/download", file.DownloadHandler)
 				// Chat
 				group.GET("/chat", chat.Handler)
-				group.POST("/chat/completions", im.WebChatCompletionsHandler)
+				group.POST("/chat/completions", chat.CompletionsHandler)
 			})
 
 			s.Group("/", func(group *ghttp.RouterGroup) {

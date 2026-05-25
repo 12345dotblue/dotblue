@@ -338,3 +338,63 @@ func (r *GFRepository) UpdateInvitationAcceptance(id, acceptedBy, status string,
 		Update()
 	return err
 }
+
+func (r *GFRepository) ListLLMModels(enterpriseId string) ([]LLMModel, error) {
+	var list []LLMModel
+	err := g.DB().Model("enterprise_llm_models").
+		Where("enterprise_id = ?", enterpriseId).
+		Order("created_at DESC").
+		Scan(&list)
+	return list, err
+}
+
+func (r *GFRepository) GetLLMModelById(enterpriseId, id string) (*LLMModel, error) {
+	var item LLMModel
+	if err := g.DB().Model("enterprise_llm_models").
+		Where("enterprise_id = ? AND id = ?", enterpriseId, id).
+		Limit(1).
+		Scan(&item); err != nil {
+		return nil, err
+	}
+	if item.Id == "" {
+		return nil, nil
+	}
+	return &item, nil
+}
+
+func (r *GFRepository) InsertLLMModel(item *LLMModel) error {
+	_, err := g.DB().Model("enterprise_llm_models").Ctx(context.Background()).Data(g.Map{
+		"id":            item.Id,
+		"enterprise_id": item.EnterpriseId,
+		"display_name":  item.DisplayName,
+		"provider_type": item.Type,
+		"api_base":      item.ApiBase,
+		"api_key":       item.ApiKey,
+		"model_name":    item.Model,
+		"created_at":    item.CreatedAt,
+		"updated_at":    item.UpdatedAt,
+	}).Insert()
+	return err
+}
+
+func (r *GFRepository) UpdateLLMModel(item *LLMModel) error {
+	_, err := g.DB().Model("enterprise_llm_models").
+		Data(g.Map{
+			"display_name":  item.DisplayName,
+			"provider_type": item.Type,
+			"api_base":      item.ApiBase,
+			"api_key":       item.ApiKey,
+			"model_name":    item.Model,
+			"updated_at":    item.UpdatedAt,
+		}).
+		Where("enterprise_id = ? AND id = ?", item.EnterpriseId, item.Id).
+		Update()
+	return err
+}
+
+func (r *GFRepository) DeleteLLMModel(enterpriseId, id string) error {
+	_, err := g.DB().Model("enterprise_llm_models").
+		Where("enterprise_id = ? AND id = ?", enterpriseId, id).
+		Delete()
+	return err
+}

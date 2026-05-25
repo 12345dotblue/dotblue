@@ -9,6 +9,8 @@ import (
 	"dotblue/internal/domains/agent"
 	"dotblue/internal/domains/conversation"
 	"dotblue/internal/domains/engine"
+	"dotblue/internal/domains/metering"
+	"dotblue/internal/domains/model"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -32,13 +34,14 @@ func (s *stubAgentDomain) GetById(id string) (*agent.Agent, error) {
 }
 
 type stubConversationDomain struct {
-	belongsToUserFunc func(id, userID, enterpriseID string) (bool, error)
-	createFunc        func(userID, enterpriseID, agentID, title string) (*conversation.Conversation, error)
-	getByIdFunc       func(id string) (*conversation.Conversation, error)
-	saveMessageFunc   func(convID, role, content, thinking, toolCallsJSON, status string) (*conversation.Message, error)
-	touchUpdatedFunc  func(id string) error
-	autoTitleFunc     func(convID string)
-	listMessagesFunc  func(convID, before string, limit int) ([]*conversation.MessagePublic, error)
+	belongsToUserFunc         func(id, userID, enterpriseID string) (bool, error)
+	createFunc                func(userID, enterpriseID, agentID, title string) (*conversation.Conversation, error)
+	getByIdFunc               func(id string) (*conversation.Conversation, error)
+	saveMessageFunc           func(convID, role, content, thinking, toolCallsJSON, status string) (*conversation.Message, error)
+	saveStructuredMessageFunc func(message *conversation.Message) (*conversation.Message, error)
+	touchUpdatedFunc          func(id string) error
+	autoTitleFunc             func(convID string)
+	listMessagesFunc          func(convID, before string, limit int) ([]*conversation.MessagePublic, error)
 }
 
 func (s *stubConversationDomain) BelongsToUser(id, userID, enterpriseID string) (bool, error) {
@@ -65,6 +68,13 @@ func (s *stubConversationDomain) GetById(id string) (*conversation.Conversation,
 func (s *stubConversationDomain) SaveMessage(convID, role, content, thinking, toolCallsJSON, status string) (*conversation.Message, error) {
 	if s.saveMessageFunc != nil {
 		return s.saveMessageFunc(convID, role, content, thinking, toolCallsJSON, status)
+	}
+	return nil, nil
+}
+
+func (s *stubConversationDomain) SaveStructuredMessage(message *conversation.Message) (*conversation.Message, error) {
+	if s.saveStructuredMessageFunc != nil {
+		return s.saveStructuredMessageFunc(message)
 	}
 	return nil, nil
 }
@@ -100,12 +110,47 @@ func (s *stubRuntimeDomain) EnsureRunning(ctx context.Context, orgID, userID, ag
 	return nil, nil
 }
 
+type stubMeteringDomain struct {
+	checkLimitFunc      func(input metering.CheckLimitInput) error
+	startInvocationFunc func(input metering.StartInvocationInput) (*metering.UsageEvent, error)
+	completeFunc        func(input metering.CompleteInvocationInput) (*metering.UsageEvent, error)
+	failFunc            func(input metering.FailInvocationInput) error
+}
+
+func (s *stubMeteringDomain) CheckLimit(input metering.CheckLimitInput) error {
+	if s.checkLimitFunc != nil {
+		return s.checkLimitFunc(input)
+	}
+	return nil
+}
+
+func (s *stubMeteringDomain) StartInvocation(input metering.StartInvocationInput) (*metering.UsageEvent, error) {
+	if s.startInvocationFunc != nil {
+		return s.startInvocationFunc(input)
+	}
+	return nil, nil
+}
+
+func (s *stubMeteringDomain) CompleteInvocation(input metering.CompleteInvocationInput) (*metering.UsageEvent, error) {
+	if s.completeFunc != nil {
+		return s.completeFunc(input)
+	}
+	return nil, nil
+}
+
+func (s *stubMeteringDomain) FailInvocation(input metering.FailInvocationInput) error {
+	if s.failFunc != nil {
+		return s.failFunc(input)
+	}
+	return nil
+}
+
 func TestCollectEngineStreamParsesSSE(t *testing.T) {
 	body := "data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"thinking\"}}]}\n\n" +
 		"data: {\"choices\":[{\"delta\":{\"content\":\"assistant reply\"}}]}\n\n" +
 		"data: [DONE]\n\n"
 
-	content, thinking, toolCalls, err := collectEngineStream(strings.NewReader(body))
+	content, thinking, toolCalls, usage, err := collectEngineStream(strings.NewReader(body))
 	if err != nil {
 		t.Fatalf("collectEngineStream() error = %v", err)
 	}
@@ -118,12 +163,15 @@ func TestCollectEngineStreamParsesSSE(t *testing.T) {
 	if len(toolCalls) != 0 {
 		t.Fatalf("toolCalls len = %d, want 0", len(toolCalls))
 	}
+	if usage != nil {
+		t.Fatalf("usage = %+v, want nil", usage)
+	}
 }
 
 func TestCollectEngineStreamFallsBackToJSONResponse(t *testing.T) {
 	body := `{"id":"chatcmpl-test","object":"chat.completion","choices":[{"index":0,"message":{"role":"assistant","content":"assistant reply"}}]}`
 
-	content, thinking, toolCalls, err := collectEngineStream(strings.NewReader(body))
+	content, thinking, toolCalls, usage, err := collectEngineStream(strings.NewReader(body))
 	if err != nil {
 		t.Fatalf("collectEngineStream() error = %v", err)
 	}
@@ -135,6 +183,38 @@ func TestCollectEngineStreamFallsBackToJSONResponse(t *testing.T) {
 	}
 	if len(toolCalls) != 0 {
 		t.Fatalf("toolCalls len = %d, want 0", len(toolCalls))
+	}
+	if usage != nil {
+		t.Fatalf("usage = %+v, want nil", usage)
+	}
+}
+
+func TestCollectEngineStreamParsesReportedUsageEvent(t *testing.T) {
+	body := "event: usage\n" +
+		"data: {\"usage\":{\"prompt_tokens\":120,\"completion_tokens\":45,\"total_tokens\":165}}\n\n" +
+		"data: [DONE]\n\n"
+
+	_, _, _, usage, err := collectEngineStream(strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("collectEngineStream() error = %v", err)
+	}
+	if usage == nil {
+		t.Fatalf("usage = nil, want value")
+	}
+	if usage.Source != "reported" || usage.PromptTokens != 120 || usage.CompletionTokens != 45 || usage.TotalTokens != 165 {
+		t.Fatalf("usage = %+v", usage)
+	}
+}
+
+func TestCollectEngineStreamParsesJSONFallbackUsage(t *testing.T) {
+	body := `{"id":"chatcmpl-test","object":"chat.completion","choices":[{"index":0,"message":{"role":"assistant","content":"assistant reply"}}],"usage":{"prompt_tokens":88,"completion_tokens":12,"total_tokens":100}}`
+
+	_, _, _, usage, err := collectEngineStream(strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("collectEngineStream() error = %v", err)
+	}
+	if usage == nil || usage.TotalTokens != 100 {
+		t.Fatalf("usage = %+v, want totalTokens 100", usage)
 	}
 }
 
@@ -158,10 +238,13 @@ func TestServicePrepareTurnUsesInjectedDomains(t *testing.T) {
 					So(agentID, ShouldEqual, "agent-1")
 					return &conversation.Conversation{Id: "conv-1"}, nil
 				},
-				saveMessageFunc: func(convID, role, content, thinking, toolCallsJSON, status string) (*conversation.Message, error) {
-					So(convID, ShouldEqual, "conv-1")
-					So(role, ShouldEqual, "user")
-					So(content, ShouldEqual, "hello")
+				saveStructuredMessageFunc: func(message *conversation.Message) (*conversation.Message, error) {
+					So(message.ConversationId, ShouldEqual, "conv-1")
+					So(message.Role, ShouldEqual, "user")
+					So(message.Content, ShouldEqual, "hello")
+					So(message.Parts, ShouldHaveLength, 1)
+					So(message.Parts[0].Type, ShouldEqual, "text")
+					So(message.Parts[0].Text, ShouldEqual, "hello")
 					return &conversation.Message{Id: "msg-1"}, nil
 				},
 				touchUpdatedFunc: func(id string) error {
@@ -212,10 +295,10 @@ func TestServicePersistAssistantTurnUsesConversationBoundary(t *testing.T) {
 		var savedToolCallsJSON string
 		service := &Service{
 			conversations: &stubConversationDomain{
-				saveMessageFunc: func(convID, role, content, thinking, toolCallsJSON, status string) (*conversation.Message, error) {
-					savedToolCallsJSON = toolCallsJSON
-					So(role, ShouldEqual, "assistant")
-					So(status, ShouldEqual, "done")
+				saveStructuredMessageFunc: func(message *conversation.Message) (*conversation.Message, error) {
+					So(message.Role, ShouldEqual, "assistant")
+					So(message.Status, ShouldEqual, "done")
+					savedToolCallsJSON = message.ToolCalls
 					return &conversation.Message{Id: "assistant-msg-1"}, nil
 				},
 				touchUpdatedFunc: func(id string) error {
@@ -237,7 +320,7 @@ func TestServicePersistAssistantTurnUsesConversationBoundary(t *testing.T) {
 	Convey("PersistAssistantTurnWithMessageID 透传 conversation 边界错误", t, func() {
 		service := &Service{
 			conversations: &stubConversationDomain{
-				saveMessageFunc: func(convID, role, content, thinking, toolCallsJSON, status string) (*conversation.Message, error) {
+				saveStructuredMessageFunc: func(message *conversation.Message) (*conversation.Message, error) {
 					return nil, errors.New("save failed")
 				},
 			},
@@ -248,6 +331,48 @@ func TestServicePersistAssistantTurnUsesConversationBoundary(t *testing.T) {
 		So(err, ShouldNotBeNil)
 		So(err.Error(), ShouldEqual, "save failed")
 	})
+}
+
+func TestStartMeteringInvocationFallsBackToDefaultPlatformModel(t *testing.T) {
+	original := loadDefaultPlatformModel
+	loadDefaultPlatformModel = func() (*model.LLMModel, error) {
+		return &model.LLMModel{Id: "platform-default"}, nil
+	}
+	defer func() {
+		loadDefaultPlatformModel = original
+	}()
+
+	var captured metering.StartInvocationInput
+	service := &Service{
+		metering: &stubMeteringDomain{
+			startInvocationFunc: func(input metering.StartInvocationInput) (*metering.UsageEvent, error) {
+				captured = input
+				return &metering.UsageEvent{InvocationId: "inv-1"}, nil
+			},
+		},
+	}
+
+	event, err := service.startMeteringInvocation(&PreparedTurn{
+		RequestID:       "req-1",
+		ConversationID:  "conv-1",
+		UserID:          "user-1",
+		EnterpriseID:    "ent-1",
+		SourceType:      "web",
+		Agent:           &agent.Agent{Id: "agent-1"},
+	}, "")
+
+	if err != nil {
+		t.Fatalf("startMeteringInvocation() error = %v", err)
+	}
+	if event == nil || event.InvocationId != "inv-1" {
+		t.Fatalf("event = %+v, want invocation inv-1", event)
+	}
+	if captured.ModelId != "platform-default" {
+		t.Fatalf("captured.ModelId = %q, want platform-default", captured.ModelId)
+	}
+	if captured.ModelScope != agent.ModelScopePlatform {
+		t.Fatalf("captured.ModelScope = %q, want %q", captured.ModelScope, agent.ModelScopePlatform)
+	}
 }
 
 func TestServiceConversationTitleUsesConversationBoundary(t *testing.T) {

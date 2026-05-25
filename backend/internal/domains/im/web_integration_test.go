@@ -27,6 +27,10 @@ func TestExecuteWebChatTurnIntegration(t *testing.T) {
 		AgentID:        "11111111-1111-7111-8111-111111111142",
 		AgentName:      "integration-web-agent",
 		BindingID:      "11111111-1111-7111-8111-111111111143",
+		UserID:         "integration-user",
+		ModelID:        "integration-web-platform-model",
+		ModelName:      "Integration Web Platform Model",
+		PriceID:        "integration-web-platform-price",
 		Priority:       100,
 	}
 
@@ -39,7 +43,7 @@ func TestExecuteWebChatTurnIntegration(t *testing.T) {
 
 	seedWebChatFixture(t, ctx, enterpriseID, fixture)
 
-	conv, err := conversation.Create("integration-user", enterpriseID, fixture.AgentID, "")
+	conv, err := conversation.Create(fixture.UserID, enterpriseID, fixture.AgentID, "")
 	if err != nil {
 		t.Fatalf("create conversation failed: %v", err)
 	}
@@ -52,7 +56,7 @@ func TestExecuteWebChatTurnIntegration(t *testing.T) {
 		}
 	})
 
-	conn, routed, err := executeWebChatTurn(ctx, enterpriseID, "integration-user", fixture.AgentID, conv.Id, "hello from web chat integration")
+	conn, routed, _, err := executeWebChatTurn(ctx, enterpriseID, fixture.UserID, fixture.AgentID, conv.Id, "hello from web chat integration")
 	if err != nil {
 		t.Fatalf("executeWebChatTurn() failed: %v", err)
 	}
@@ -120,26 +124,34 @@ func TestExecuteWebChatTurnAutoCreatesWebChannelIntegration(t *testing.T) {
 	fixture := routingFixture{
 		AgentID:   "11111111-1111-7111-8111-111111111144",
 		AgentName: "integration-web-agent-autocreate",
+		UserID:    "integration-user",
+		ModelID:   "integration-web-autocreate-model",
+		ModelName: "Integration Web Autocreate Model",
+		PriceID:   "integration-web-autocreate-price",
 	}
 
-	cleanupAutoCreatedWebChatRows(t, ctx, fixture.AgentID)
+	cleanupAutoCreatedWebChatRows(t, ctx, fixture)
 	t.Cleanup(func() {
-		cleanupAutoCreatedWebChatRows(t, ctx, fixture.AgentID)
+		cleanupAutoCreatedWebChatRows(t, ctx, fixture)
 	})
+
+	seedWebChatAgentModel(t, ctx, fixture)
 
 	if _, err := g.DB().Model("agents").Ctx(ctx).Data(g.Map{
 		"id":             fixture.AgentID,
-		"user_id":        "integration-user",
+		"user_id":        fixture.UserID,
 		"group_id":       enterpriseID,
 		"agent_name":     fixture.AgentName,
 		"system_prompt":  "integration prompt",
+		"model_scope":    "platform",
+		"model_id":       fixture.ModelID,
 		"hermes_api_key": "dotblue-integration-key",
 		"engine_type":    "hermes",
 	}).Insert(); err != nil {
 		t.Fatalf("insert agent failed: %v", err)
 	}
 
-	conv, err := conversation.Create("integration-user", enterpriseID, fixture.AgentID, "")
+	conv, err := conversation.Create(fixture.UserID, enterpriseID, fixture.AgentID, "")
 	if err != nil {
 		t.Fatalf("create conversation failed: %v", err)
 	}
@@ -152,7 +164,7 @@ func TestExecuteWebChatTurnAutoCreatesWebChannelIntegration(t *testing.T) {
 		}
 	})
 
-	conn, routed, err := executeWebChatTurn(ctx, enterpriseID, "integration-user", fixture.AgentID, conv.Id, "hello auto-created web chat integration")
+	conn, routed, _, err := executeWebChatTurn(ctx, enterpriseID, fixture.UserID, fixture.AgentID, conv.Id, "hello auto-created web chat integration")
 	if err != nil {
 		t.Fatalf("executeWebChatTurn() failed: %v", err)
 	}
@@ -242,26 +254,34 @@ func TestExecuteWebChatTurnReusesExistingSessionIntegration(t *testing.T) {
 	fixture := routingFixture{
 		AgentID:   "11111111-1111-7111-8111-111111111145",
 		AgentName: "integration-web-agent-reuse",
+		UserID:    "integration-user",
+		ModelID:   "integration-web-reuse-model",
+		ModelName: "Integration Web Reuse Model",
+		PriceID:   "integration-web-reuse-price",
 	}
 
-	cleanupAutoCreatedWebChatRows(t, ctx, fixture.AgentID)
+	cleanupAutoCreatedWebChatRows(t, ctx, fixture)
 	t.Cleanup(func() {
-		cleanupAutoCreatedWebChatRows(t, ctx, fixture.AgentID)
+		cleanupAutoCreatedWebChatRows(t, ctx, fixture)
 	})
+
+	seedWebChatAgentModel(t, ctx, fixture)
 
 	if _, err := g.DB().Model("agents").Ctx(ctx).Data(g.Map{
 		"id":             fixture.AgentID,
-		"user_id":        "integration-user",
+		"user_id":        fixture.UserID,
 		"group_id":       enterpriseID,
 		"agent_name":     fixture.AgentName,
 		"system_prompt":  "integration prompt",
+		"model_scope":    "platform",
+		"model_id":       fixture.ModelID,
 		"hermes_api_key": "dotblue-integration-key",
 		"engine_type":    "hermes",
 	}).Insert(); err != nil {
 		t.Fatalf("insert agent failed: %v", err)
 	}
 
-	conv, err := conversation.Create("integration-user", enterpriseID, fixture.AgentID, "")
+	conv, err := conversation.Create(fixture.UserID, enterpriseID, fixture.AgentID, "")
 	if err != nil {
 		t.Fatalf("create conversation failed: %v", err)
 	}
@@ -274,11 +294,11 @@ func TestExecuteWebChatTurnReusesExistingSessionIntegration(t *testing.T) {
 		}
 	})
 
-	firstConn, firstRouted, err := executeWebChatTurn(ctx, enterpriseID, "integration-user", fixture.AgentID, conv.Id, "hello from first web turn")
+	firstConn, firstRouted, _, err := executeWebChatTurn(ctx, enterpriseID, fixture.UserID, fixture.AgentID, conv.Id, "hello from first web turn")
 	if err != nil {
 		t.Fatalf("first executeWebChatTurn() failed: %v", err)
 	}
-	secondConn, secondRouted, err := executeWebChatTurn(ctx, enterpriseID, "integration-user", fixture.AgentID, conv.Id, "hello from second web turn")
+	secondConn, secondRouted, _, err := executeWebChatTurn(ctx, enterpriseID, fixture.UserID, fixture.AgentID, conv.Id, "hello from second web turn")
 	if err != nil {
 		t.Fatalf("second executeWebChatTurn() failed: %v", err)
 	}
@@ -327,6 +347,8 @@ func TestExecuteWebChatTurnReusesExistingSessionIntegration(t *testing.T) {
 func seedWebChatFixture(t *testing.T, ctx context.Context, enterpriseID string, fixture routingFixture) {
 	t.Helper()
 
+	seedWebChatAgentModel(t, ctx, fixture)
+
 	if _, err := g.DB().Model("im_connections").Ctx(ctx).Data(g.Map{
 		"id":              fixture.ConnectionID,
 		"enterprise_id":   enterpriseID,
@@ -345,10 +367,12 @@ func seedWebChatFixture(t *testing.T, ctx context.Context, enterpriseID string, 
 
 	if _, err := g.DB().Model("agents").Ctx(ctx).Data(g.Map{
 		"id":             fixture.AgentID,
-		"user_id":        "integration-user",
+		"user_id":        fixture.UserID,
 		"group_id":       enterpriseID,
 		"agent_name":     fixture.AgentName,
 		"system_prompt":  "integration prompt",
+		"model_scope":    "platform",
+		"model_id":       fixture.ModelID,
 		"hermes_api_key": "dotblue-integration-key",
 		"engine_type":    "hermes",
 	}).Insert(); err != nil {
@@ -379,21 +403,33 @@ func cleanupWebChatIntegrationRows(t *testing.T, ctx context.Context, fixture ro
 	if _, err := g.DB().Model("external_sessions").Ctx(ctx).Where("connection_id = ?", fixture.ConnectionID).Delete(); err != nil {
 		t.Fatalf("cleanup external_sessions failed: %v", err)
 	}
+	if _, err := g.DB().Model("llm_usage_events").Ctx(ctx).Where("agent_id = ?", fixture.AgentID).Delete(); err != nil {
+		t.Fatalf("cleanup llm_usage_events failed: %v", err)
+	}
+	if _, err := g.DB().Model("llm_usage_daily_aggregates").Ctx(ctx).Where("scope_type = ? AND scope_id = ?", "agent", fixture.AgentID).Delete(); err != nil {
+		t.Fatalf("cleanup agent llm_usage_daily_aggregates failed: %v", err)
+	}
+	if fixture.UserID != "" {
+		if _, err := g.DB().Model("llm_usage_daily_aggregates").Ctx(ctx).Where("scope_type = ? AND scope_id = ?", "user", fixture.UserID).Delete(); err != nil {
+			t.Fatalf("cleanup user llm_usage_daily_aggregates failed: %v", err)
+		}
+	}
 	if _, err := g.DB().Model("agent_channel_bindings").Ctx(ctx).Where("id = ?", fixture.BindingID).Delete(); err != nil {
 		t.Fatalf("cleanup agent_channel_bindings failed: %v", err)
 	}
 	if _, err := g.DB().Model("agents").Ctx(ctx).Where("id = ?", fixture.AgentID).Delete(); err != nil {
 		t.Fatalf("cleanup agents failed: %v", err)
 	}
+	cleanupWebChatAgentModel(t, ctx, fixture)
 	if _, err := g.DB().Model("im_connections").Ctx(ctx).Where("id = ?", fixture.ConnectionID).Delete(); err != nil {
 		t.Fatalf("cleanup im_connections failed: %v", err)
 	}
 }
 
-func cleanupAutoCreatedWebChatRows(t *testing.T, ctx context.Context, agentID string) {
+func cleanupAutoCreatedWebChatRows(t *testing.T, ctx context.Context, fixture routingFixture) {
 	t.Helper()
 
-	connectionName := buildWebChatConnectionName(agentID)
+	connectionName := buildWebChatConnectionName(fixture.AgentID)
 
 	rows, err := defaultConnectionService.ListConnections(ctx, requireIntegrationEnterpriseID(t, ctx), ConnectionListFilters{
 		Platform: PlatformWeb,
@@ -404,7 +440,7 @@ func cleanupAutoCreatedWebChatRows(t *testing.T, ctx context.Context, agentID st
 
 	connectionIDs := make([]string, 0, 1)
 	for _, row := range rows {
-		if strings.TrimSpace(row.Name) == connectionName || str(row.Config["agentId"]) == agentID {
+		if strings.TrimSpace(row.Name) == connectionName || str(row.Config["agentId"]) == fixture.AgentID {
 			connectionIDs = append(connectionIDs, row.ID)
 		}
 	}
@@ -424,7 +460,66 @@ func cleanupAutoCreatedWebChatRows(t *testing.T, ctx context.Context, agentID st
 		}
 	}
 
-	if _, err := g.DB().Model("agents").Ctx(ctx).Where("id = ?", agentID).Delete(); err != nil {
+	if _, err := g.DB().Model("llm_usage_events").Ctx(ctx).Where("agent_id = ?", fixture.AgentID).Delete(); err != nil {
+		t.Fatalf("cleanup llm_usage_events failed: %v", err)
+	}
+	if _, err := g.DB().Model("llm_usage_daily_aggregates").Ctx(ctx).Where("scope_type = ? AND scope_id = ?", "agent", fixture.AgentID).Delete(); err != nil {
+		t.Fatalf("cleanup agent llm_usage_daily_aggregates failed: %v", err)
+	}
+	if fixture.UserID != "" {
+		if _, err := g.DB().Model("llm_usage_daily_aggregates").Ctx(ctx).Where("scope_type = ? AND scope_id = ?", "user", fixture.UserID).Delete(); err != nil {
+			t.Fatalf("cleanup user llm_usage_daily_aggregates failed: %v", err)
+		}
+	}
+	if _, err := g.DB().Model("agents").Ctx(ctx).Where("id = ?", fixture.AgentID).Delete(); err != nil {
 		t.Fatalf("cleanup agents failed: %v", err)
+	}
+	cleanupWebChatAgentModel(t, ctx, fixture)
+}
+
+func seedWebChatAgentModel(t *testing.T, ctx context.Context, fixture routingFixture) {
+	t.Helper()
+
+	if _, err := g.DB().Model("llm_models").Ctx(ctx).Data(g.Map{
+		"id":            fixture.ModelID,
+		"scope":         "platform",
+		"enterprise_id": "",
+		"display_name":  fixture.ModelName,
+		"provider_type": "openai",
+		"api_base":      "https://ark.cn-beijing.volces.com/api/v3",
+		"api_key":       "integration-test-key",
+		"model_name":    "doubao-seed-2-0-mini-260428",
+		"is_default":    false,
+	}).Insert(); err != nil {
+		t.Fatalf("insert llm model failed: %v", err)
+	}
+
+	if _, err := g.DB().Model("llm_model_prices").Ctx(ctx).Data(g.Map{
+		"id":                       fixture.PriceID,
+		"model_id":                 fixture.ModelID,
+		"scope_type":               "platform",
+		"scope_id":                 "",
+		"currency":                 "USD",
+		"cost_input_unit_price":    1,
+		"cost_output_unit_price":   2,
+		"charge_input_unit_price":  3,
+		"charge_output_unit_price": 4,
+	}).Insert(); err != nil {
+		t.Fatalf("insert llm model price failed: %v", err)
+	}
+}
+
+func cleanupWebChatAgentModel(t *testing.T, ctx context.Context, fixture routingFixture) {
+	t.Helper()
+
+	if fixture.PriceID != "" {
+		if _, err := g.DB().Model("llm_model_prices").Ctx(ctx).Where("id = ?", fixture.PriceID).Delete(); err != nil {
+			t.Fatalf("cleanup llm_model_prices failed: %v", err)
+		}
+	}
+	if fixture.ModelID != "" {
+		if _, err := g.DB().Model("llm_models").Ctx(ctx).Where("id = ?", fixture.ModelID).Delete(); err != nil {
+			t.Fatalf("cleanup llm_models failed: %v", err)
+		}
 	}
 }

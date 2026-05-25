@@ -38,4 +38,9 @@ type Repository interface {
 	InsertInvitation(invitation *Invitation) error
 	GetInvitationByCode(code string) (*Invitation, error)
 	UpdateInvitationAcceptance(id, acceptedBy, status string, usedCount int, updatedAt time.Time) error
+	ListLLMModels(enterpriseId string) ([]LLMModel, error)
+	GetLLMModelById(enterpriseId, id string) (*LLMModel, error)
+	InsertLLMModel(item *LLMModel) error
+	UpdateLLMModel(item *LLMModel) error
+	DeleteLLMModel(enterpriseId, id string) error
 }

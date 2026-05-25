@@ -11,7 +11,7 @@ import (
 )
 
 type sessionAdapter struct {
-	svc    *session.Service
+	svc     *session.Service
 	metaTTL time.Duration
 }
 
@@ -42,6 +42,7 @@ func (a *chatAdapter) Execute(ctx context.Context, task dataplane.TurnTask) (*Ch
 	if err != nil {
 		return nil, err
 	}
+	prepared.RequestID = task.RequestID
 	executed, err := chat.ExecutePreparedTurn(ctx, prepared)
 	if err != nil {
 		return nil, err
@@ -87,4 +88,3 @@ func Default(ctx context.Context) (*Worker, error) {
 		&chatAdapter{},
 	), nil
 }
-

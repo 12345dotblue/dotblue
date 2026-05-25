@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"dotblue/internal/domains/model"
 	"dotblue/internal/domains/settings"
 	. "github.com/smartystreets/goconvey/convey"
 )
@@ -13,7 +14,10 @@ type stubSettingsDomain struct {
 	isInitializedFunc   func() bool
 	markInitializedFunc func() error
 	updatePlatformFunc  func(cfg *settings.PlatformConfig) error
-	updateProviderFunc  func(cfg *settings.ProviderConfig) error
+}
+
+type stubModelDomain struct {
+	upsertPlatformDefaultFunc func(cfg *model.PlatformModelInput, displayName string) error
 }
 
 func (s *stubSettingsDomain) IsInitialized() bool {
@@ -37,9 +41,9 @@ func (s *stubSettingsDomain) UpdatePlatformConfig(cfg *settings.PlatformConfig) 
 	return nil
 }
 
-func (s *stubSettingsDomain) UpdateProviderConfig(cfg *settings.ProviderConfig) error {
-	if s.updateProviderFunc != nil {
-		return s.updateProviderFunc(cfg)
+func (s *stubModelDomain) UpsertPlatformDefaultModel(cfg *model.PlatformModelInput, displayName string) error {
+	if s.upsertPlatformDefaultFunc != nil {
+		return s.upsertPlatformDefaultFunc(cfg, displayName)
 	}
 	return nil
 }
@@ -49,6 +53,7 @@ func TestSetupServiceRunInstall(t *testing.T) {
 		var executedPlan *installPlan
 		service := &Service{
 			settings: &stubSettingsDomain{},
+			models:   &stubModelDomain{},
 			buildInstallPlan: func(ctx context.Context, req *InstallReq) (*installPlan, error) {
 				So(req.AdminUsername, ShouldEqual, "admin")
 				return &installPlan{AdminUsername: "admin"}, nil
@@ -74,6 +79,7 @@ func TestSetupServiceTryAutoInstall(t *testing.T) {
 			settings: &stubSettingsDomain{
 				isInitializedFunc: func() bool { return true },
 			},
+			models: &stubModelDomain{},
 			buildInstallPlan: func(ctx context.Context, req *InstallReq) (*installPlan, error) {
 				called = true
 				return nil, nil
@@ -89,6 +95,7 @@ func TestSetupServiceTryAutoInstall(t *testing.T) {
 	Convey("TryAutoInstall 在缺少 init data 时不报错", t, func() {
 		service := &Service{
 			settings: &stubSettingsDomain{},
+			models:   &stubModelDomain{},
 			buildInstallPlan: func(ctx context.Context, req *InstallReq) (*installPlan, error) {
 				return nil, ErrInitDataNotFound
 			},
@@ -103,6 +110,7 @@ func TestSetupServiceTryAutoInstall(t *testing.T) {
 		runCalled := false
 		service := &Service{
 			settings: &stubSettingsDomain{},
+			models:   &stubModelDomain{},
 			buildInstallPlan: func(ctx context.Context, req *InstallReq) (*installPlan, error) {
 				return &installPlan{SourcePath: "manifest/config/init_data.json"}, nil
 			},
@@ -130,9 +138,12 @@ func TestSetupServiceApplyLocalSettings(t *testing.T) {
 					So(cfg.DataBasePath, ShouldEqual, "/data")
 					return nil
 				},
-				updateProviderFunc: func(cfg *settings.ProviderConfig) error {
+			},
+			models: &stubModelDomain{
+				upsertPlatformDefaultFunc: func(cfg *model.PlatformModelInput, displayName string) error {
 					providerSaved = true
 					So(cfg.Type, ShouldEqual, "openai")
+					So(displayName, ShouldEqual, "平台默认模型")
 					return nil
 				},
 			},
@@ -140,7 +151,7 @@ func TestSetupServiceApplyLocalSettings(t *testing.T) {
 
 		err := service.ApplyLocalSettings(&installPlan{
 			Platform: &settings.PlatformConfig{DataBasePath: "/data"},
-			Provider: &settings.ProviderConfig{Type: "openai"},
+			Provider: &model.PlatformModelInput{Type: "openai"},
 		})
 
 		So(err, ShouldBeNil)
@@ -155,6 +166,7 @@ func TestSetupServiceApplyLocalSettings(t *testing.T) {
 					return errors.New("save failed")
 				},
 			},
+			models: &stubModelDomain{},
 		}
 
 		err := service.ApplyLocalSettings(&installPlan{

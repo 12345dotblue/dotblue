@@ -227,6 +227,7 @@ func (s *Service) ExecuteInboundTurn(ctx context.Context, conn Connection, route
 		g.Log().Errorf(ctx, "im.turn.prepare.error conv=%s agent=%s err=%v", routed.ConversationID, routed.Binding.AgentID, err)
 		return err
 	}
+	prepared.SourceType = "im"
 	g.Log().Debugf(ctx, "im.turn.prepared conv=%s history=%d endpoint=%s", routed.ConversationID, len(prepared.History), prepared.Endpoint.URL)
 	fmt.Printf("TRACE im.turn.prepared conv=%s history=%d endpoint=%s\n", routed.ConversationID, len(prepared.History), prepared.Endpoint.URL)
 

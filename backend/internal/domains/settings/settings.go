@@ -7,16 +7,17 @@ import (
 
 // PlatformConfig holds core platform settings (stored as JSONB).
 type PlatformConfig struct {
-	DataBasePath  string `json:"dataBasePath"`
-	DataMountPath string `json:"dataMountPath,omitempty"`
-	ContainerPort int    `json:"containerPort"`
-	RuntimeMode   string `json:"runtimeMode,omitempty"`
-	EndpointMode  string `json:"endpointMode,omitempty"`
+	DataBasePath   string `json:"dataBasePath"`
+	DataMountPath  string `json:"dataMountPath,omitempty"`
+	ContainerPort  int    `json:"containerPort"`
+	RuntimeMode    string `json:"runtimeMode,omitempty"`
+	EndpointMode   string `json:"endpointMode,omitempty"`
 	DockerEndpoint string `json:"dockerEndpoint,omitempty"`
-	DockerNetwork string `json:"dockerNetwork,omitempty"`
+	DockerNetwork  string `json:"dockerNetwork,omitempty"`
 }
 
-// ProviderConfig holds the LLM provider configuration (stored as JSONB).
+// ProviderConfig holds the legacy LLM provider configuration (stored as JSONB).
+// Deprecated: new model management should use the model domain instead of sys_settings.provider.
 type ProviderConfig struct {
 	Type    string `json:"type"`
 	ApiBase string `json:"apiBase"`
@@ -52,7 +53,8 @@ func GetPlatformConfig() (*PlatformConfig, error) {
 	return defaultService.GetPlatformConfig()
 }
 
-// GetProviderConfig reads and unmarshals the provider JSONB field.
+// GetProviderConfig reads and unmarshals the legacy provider JSONB field.
+// Deprecated: only compatibility and migration paths should read sys_settings.provider.
 func GetProviderConfig() (*ProviderConfig, error) {
 	return defaultService.GetProviderConfig()
 }
@@ -62,8 +64,9 @@ func UpdatePlatformConfig(cfg *PlatformConfig) error {
 	return defaultService.UpdatePlatformConfig(cfg)
 }
 
-// UpdateProviderConfig updates the provider JSONB field.
+// UpdateProviderConfig updates the legacy provider JSONB field.
 // If the apiKey looks masked (contains "********"), the existing key is preserved.
+// Deprecated: new model management should persist platform models via the model domain.
 func UpdateProviderConfig(cfg *ProviderConfig) error {
 	return defaultService.UpdateProviderConfig(cfg)
 }

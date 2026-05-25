@@ -23,11 +23,41 @@ type ToolCallItem struct {
 	Status string `json:"status"`
 }
 
+type MessagePart struct {
+	Type        string `json:"type"`
+	Text        string `json:"text,omitempty"`
+	FileId      string `json:"fileId,omitempty"`
+	Name        string `json:"name,omitempty"`
+	MimeType    string `json:"mimeType,omitempty"`
+	Size        int64  `json:"size,omitempty"`
+	PreviewUrl  string `json:"previewUrl,omitempty"`
+	DownloadUrl string `json:"downloadUrl,omitempty"`
+	Width       int    `json:"width,omitempty"`
+	Height      int    `json:"height,omitempty"`
+}
+
+type AttachmentItem struct {
+	Id          string `json:"id"`
+	FileId      string `json:"fileId"`
+	Kind        string `json:"kind"`
+	Name        string `json:"name"`
+	MimeType    string `json:"mimeType"`
+	Size        int64  `json:"size"`
+	PreviewUrl  string `json:"previewUrl,omitempty"`
+	DownloadUrl string `json:"downloadUrl,omitempty"`
+	Width       int    `json:"width,omitempty"`
+	Height      int    `json:"height,omitempty"`
+	Status      string `json:"status,omitempty"`
+}
+
 type Message struct {
-	Id             string    `json:"id"`
-	ConversationId string    `json:"conversationId"`
-	Role           string    `json:"role"`
-	Content        string    `json:"content"`
+	Id             string `json:"id"`
+	ConversationId string `json:"conversationId"`
+	Role           string `json:"role"`
+	Content        string `json:"content"`
+	PartsJSON      string `json:"-" orm:"parts_json"`
+	Parts          []MessagePart
+	Attachments    []AttachmentItem
 	Thinking       string    `json:"thinking,omitempty"`
 	ToolCalls      string    `json:"toolCalls,omitempty"`
 	Status         string    `json:"status"`
@@ -35,13 +65,15 @@ type Message struct {
 }
 
 type MessagePublic struct {
-	Id        string         `json:"id"`
-	Role      string         `json:"role"`
-	Content   string         `json:"content"`
-	Thinking  string         `json:"thinking,omitempty"`
-	ToolCalls []ToolCallItem `json:"toolCalls,omitempty"`
-	Status    string         `json:"status"`
-	CreatedAt time.Time      `json:"createdAt"`
+	Id          string           `json:"id"`
+	Role        string           `json:"role"`
+	Content     string           `json:"content"`
+	Parts       []MessagePart    `json:"parts,omitempty"`
+	Attachments []AttachmentItem `json:"attachments,omitempty"`
+	Thinking    string           `json:"thinking,omitempty"`
+	ToolCalls   []ToolCallItem   `json:"toolCalls,omitempty"`
+	Status      string           `json:"status"`
+	CreatedAt   time.Time        `json:"createdAt"`
 }
 
 type ConversationPublic struct {
@@ -96,6 +128,10 @@ func Delete(id string) error {
 
 func SaveMessage(convId, role, content, thinking, toolCallsJson, status string) (*Message, error) {
 	return defaultService.SaveMessage(convId, role, content, thinking, toolCallsJson, status)
+}
+
+func SaveStructuredMessage(message *Message) (*Message, error) {
+	return defaultService.SaveStructuredMessage(message)
 }
 
 func ListMessages(convId string, before string, limit int) ([]*MessagePublic, error) {

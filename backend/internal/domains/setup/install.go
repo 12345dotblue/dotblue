@@ -34,6 +34,7 @@ type runtimeCasdoorConfigLoader func(ctx context.Context) (*casdoorConfig, error
 
 type installExecutor struct {
 	settings          settingsDomain
+	models            modelDomain
 	newClient         setupClientFactory
 	loadRuntimeConfig runtimeCasdoorConfigLoader
 	nowString         func() string
@@ -42,6 +43,7 @@ type installExecutor struct {
 func newInstallExecutor() *installExecutor {
 	return &installExecutor{
 		settings: defaultSettingsDomain{},
+		models:   defaultModelDomain{},
 		newClient: func(ctx context.Context, organizationName string, applicationName string) (setupClient, error) {
 			return newSetupClient(ctx, organizationName, applicationName)
 		},
@@ -99,7 +101,7 @@ func (e *installExecutor) Run(ctx context.Context, plan *installPlan) error {
 			return err
 		}
 	}
-	if err := applyLocalSettingsWith(e.settings, plan); err != nil {
+	if err := applyLocalSettingsWith(e.settings, e.models, plan); err != nil {
 		return err
 	}
 	if err := markInitializedWith(e.settings); err != nil {
@@ -362,7 +364,7 @@ func (e *installExecutor) currentTimeString() string {
 }
 
 func applyLocalSettings(plan *installPlan) error {
-	return applyLocalSettingsWith(defaultSettingsDomain{}, plan)
+	return applyLocalSettingsWith(defaultSettingsDomain{}, defaultModelDomain{}, plan)
 }
 
 func nowString() string {

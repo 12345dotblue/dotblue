@@ -13,6 +13,7 @@ import (
 	"github.com/casdoor/casdoor-go-sdk/casdoorsdk"
 	"github.com/gogf/gf/v2/frame/g"
 
+	"dotblue/internal/domains/model"
 	"dotblue/internal/domains/settings"
 )
 
@@ -122,7 +123,7 @@ type installPlan struct {
 	AdminEmail       string
 	AdminPassword    string
 	Platform         *settings.PlatformConfig
-	Provider         *settings.ProviderConfig
+	Provider         *model.PlatformModelInput
 }
 
 func loadInitData(ctx context.Context) (*InitData, string, error) {
@@ -249,13 +250,13 @@ func buildPlanFromInitData(runtimeCfg *casdoorConfig, data *InitData, path strin
 		return nil, err
 	}
 
-	var provider *settings.ProviderConfig
+	var provider *model.PlatformModelInput
 	if data.Provider != nil {
 		apiKey, err := resolveSecret(data.Provider.ApiKey, data.Provider.ApiKeyEnv, "provider.apiKey")
 		if err != nil {
 			return nil, err
 		}
-		provider = &settings.ProviderConfig{
+		provider = &model.PlatformModelInput{
 			Type:    strings.TrimSpace(data.Provider.Type),
 			ApiBase: strings.TrimSpace(data.Provider.ApiBase),
 			ApiKey:  apiKey,

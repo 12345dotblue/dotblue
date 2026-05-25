@@ -40,6 +40,11 @@ type stubRepository struct {
 	insertInvitationFunc            func(invitation *Invitation) error
 	getInvitationByCodeFunc         func(code string) (*Invitation, error)
 	updateInvitationAcceptanceFunc  func(id, acceptedBy, status string, usedCount int, updatedAt time.Time) error
+	listLLMModelsFunc               func(enterpriseId string) ([]LLMModel, error)
+	getLLMModelByIdFunc             func(enterpriseId, id string) (*LLMModel, error)
+	insertLLMModelFunc              func(item *LLMModel) error
+	updateLLMModelFunc              func(item *LLMModel) error
+	deleteLLMModelFunc              func(enterpriseId, id string) error
 }
 
 func (s *stubRepository) CountMembershipsByUser(userId string) (int, error) {
@@ -255,6 +260,41 @@ func (s *stubRepository) GetInvitationByCode(code string) (*Invitation, error) {
 func (s *stubRepository) UpdateInvitationAcceptance(id, acceptedBy, status string, usedCount int, updatedAt time.Time) error {
 	if s.updateInvitationAcceptanceFunc != nil {
 		return s.updateInvitationAcceptanceFunc(id, acceptedBy, status, usedCount, updatedAt)
+	}
+	return nil
+}
+
+func (s *stubRepository) ListLLMModels(enterpriseId string) ([]LLMModel, error) {
+	if s.listLLMModelsFunc != nil {
+		return s.listLLMModelsFunc(enterpriseId)
+	}
+	return nil, nil
+}
+
+func (s *stubRepository) GetLLMModelById(enterpriseId, id string) (*LLMModel, error) {
+	if s.getLLMModelByIdFunc != nil {
+		return s.getLLMModelByIdFunc(enterpriseId, id)
+	}
+	return nil, nil
+}
+
+func (s *stubRepository) InsertLLMModel(item *LLMModel) error {
+	if s.insertLLMModelFunc != nil {
+		return s.insertLLMModelFunc(item)
+	}
+	return nil
+}
+
+func (s *stubRepository) UpdateLLMModel(item *LLMModel) error {
+	if s.updateLLMModelFunc != nil {
+		return s.updateLLMModelFunc(item)
+	}
+	return nil
+}
+
+func (s *stubRepository) DeleteLLMModel(enterpriseId, id string) error {
+	if s.deleteLLMModelFunc != nil {
+		return s.deleteLLMModelFunc(enterpriseId, id)
 	}
 	return nil
 }

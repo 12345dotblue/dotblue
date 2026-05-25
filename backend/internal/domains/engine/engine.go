@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-
-	"dotblue/internal/domains/settings"
 )
 
 // Engine handles the protocol for communicating with a specific agent engine.
@@ -37,8 +35,15 @@ type ContainerSpec struct {
 	DataDir     string // mount target inside container
 }
 
-// ProviderConfig is re-exported from settings for convenience.
-type ProviderConfig = settings.ProviderConfig
+// ProviderConfig is the runtime-facing provider payload consumed by engines.
+// It is intentionally owned by the engine domain to avoid coupling runtime code
+// to legacy settings compatibility structures.
+type ProviderConfig struct {
+	Type    string
+	ApiBase string
+	ApiKey  string
+	Model   string
+}
 
 // ErrPlatformConfigMissing is returned when platform core configuration is missing.
 var ErrPlatformConfigMissing = fmt.Errorf("platform core configuration is missing, please contact administrator")

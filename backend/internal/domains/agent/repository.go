@@ -8,6 +8,6 @@ type Repository interface {
 	ListByUserId(userId, enterpriseId string) ([]*Agent, error)
 	BelongsToUser(id, userId, enterpriseId string) (bool, error)
 	Create(agent *Agent) error
-	Update(id, agentName, systemPrompt string, updatedAt time.Time) error
+	Update(id, agentName, systemPrompt, modelScope, modelId string, updatedAt time.Time) error
 	Delete(id string) error
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"dotblue/internal/domains/dataplane"
+	"dotblue/internal/domains/metering"
 	"dotblue/internal/domains/session"
 	"github.com/gogf/gf/v2/frame/g"
 )
@@ -11,6 +12,8 @@ import (
 type sessionAdapter struct {
 	svc *session.Service
 }
+
+type meteringAdapter struct{}
 
 func (a *sessionAdapter) AcquireOwner(ctx context.Context, sessionKey string) (*Assignment, error) {
 	assign, err := a.svc.AcquireOwner(ctx, sessionKey)
@@ -23,6 +26,14 @@ func (a *sessionAdapter) AcquireOwner(ctx context.Context, sessionKey string) (*
 		FenceToken: assign.FenceToken,
 		LeaseTTL:   assign.LeaseTTL,
 	}, nil
+}
+
+func (meteringAdapter) CheckLimit(input LimitCheckInput) error {
+	return metering.CheckLimit(metering.CheckLimitInput{
+		EnterpriseId: input.EnterpriseID,
+		UserId:       input.UserID,
+		AgentId:      input.AgentID,
+	})
 }
 
 func Default(ctx context.Context) (*Service, error) {
@@ -40,5 +51,6 @@ func Default(ctx context.Context) (*Service, error) {
 		dataplane.NewRedisRequestStateStore(dp, dp.RunningTTL(), dp.FinalTTL()),
 		dataplane.NewRedisRequestRouteStore(dp),
 		dp.FinalTTL(),
+		meteringAdapter{},
 	), nil
 }

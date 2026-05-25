@@ -72,6 +72,101 @@ func postgresSchemaStatements() []statement {
 			sql:  `ALTER TABLE agents ADD COLUMN IF NOT EXISTS engine_type VARCHAR(64) DEFAULT 'hermes'`,
 		},
 		{
+			name: "ensure agents model_scope column",
+			sql:  `ALTER TABLE agents ADD COLUMN IF NOT EXISTS model_scope VARCHAR(32) DEFAULT ''`,
+		},
+		{
+			name: "ensure agents model_id column",
+			sql:  `ALTER TABLE agents ADD COLUMN IF NOT EXISTS model_id VARCHAR(128) DEFAULT ''`,
+		},
+		{
+			name: "create enterprise llm models table",
+			sql: `
+				CREATE TABLE IF NOT EXISTS enterprise_llm_models (
+					id             VARCHAR(128) PRIMARY KEY,
+					enterprise_id  VARCHAR(128) NOT NULL,
+					display_name   VARCHAR(256) NOT NULL,
+					provider_type  VARCHAR(64) NOT NULL,
+					api_base       TEXT DEFAULT '',
+					api_key        TEXT DEFAULT '',
+					model_name     VARCHAR(256) NOT NULL,
+					created_at     TIMESTAMPTZ DEFAULT NOW(),
+					updated_at     TIMESTAMPTZ DEFAULT NOW()
+				)
+			`,
+		},
+		{
+			name: "create enterprise llm models enterprise index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_enterprise_llm_models_enterprise ON enterprise_llm_models(enterprise_id, created_at DESC)`,
+		},
+		{
+			name: "create llm models table",
+			sql: `
+				CREATE TABLE IF NOT EXISTS llm_models (
+					id             VARCHAR(128) PRIMARY KEY,
+					scope          VARCHAR(32) NOT NULL,
+					enterprise_id  VARCHAR(128) DEFAULT '',
+					display_name   VARCHAR(256) NOT NULL,
+					provider_type  VARCHAR(64) NOT NULL,
+					api_base       TEXT DEFAULT '',
+					api_key        TEXT DEFAULT '',
+					model_name     VARCHAR(256) NOT NULL,
+					is_default     BOOLEAN DEFAULT FALSE,
+					created_at     TIMESTAMPTZ DEFAULT NOW(),
+					updated_at     TIMESTAMPTZ DEFAULT NOW()
+				)
+			`,
+		},
+		{
+			name: "create llm models scope enterprise index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_llm_models_scope_enterprise ON llm_models(scope, enterprise_id, created_at DESC)`,
+		},
+		{
+			name: "migrate enterprise llm models to unified table",
+			sql: `
+				INSERT INTO llm_models (
+					id, scope, enterprise_id, display_name, provider_type, api_base, api_key, model_name, is_default, created_at, updated_at
+				)
+				SELECT
+					id,
+					'enterprise',
+					enterprise_id,
+					display_name,
+					provider_type,
+					api_base,
+					api_key,
+					model_name,
+					FALSE,
+					created_at,
+					updated_at
+				FROM enterprise_llm_models e
+				WHERE NOT EXISTS (SELECT 1 FROM llm_models m WHERE m.id = e.id)
+			`,
+		},
+		{
+			name: "migrate sys provider to platform default model",
+			sql: `
+				INSERT INTO llm_models (
+					id, scope, enterprise_id, display_name, provider_type, api_base, api_key, model_name, is_default, created_at, updated_at
+				)
+				SELECT
+					'platform-default',
+					'platform',
+					'',
+					'平台默认模型',
+					COALESCE(provider->>'type', ''),
+					COALESCE(provider->>'apiBase', ''),
+					COALESCE(provider->>'apiKey', ''),
+					COALESCE(provider->>'model', ''),
+					TRUE,
+					NOW(),
+					NOW()
+				FROM sys_settings
+				WHERE COALESCE(provider->>'type', '') <> ''
+				  AND NOT EXISTS (SELECT 1 FROM llm_models m WHERE m.scope = 'platform')
+			`,
+		},
+		{
 			name: "create conversations table",
 			sql: `
 				CREATE TABLE IF NOT EXISTS conversations (
@@ -145,12 +240,195 @@ func postgresSchemaStatements() []statement {
 			sql:  `ALTER TABLE messages ADD COLUMN IF NOT EXISTS message_meta_json JSONB DEFAULT '{}'`,
 		},
 		{
+			name: "ensure messages parts_json column",
+			sql:  `ALTER TABLE messages ADD COLUMN IF NOT EXISTS parts_json JSONB DEFAULT '[]'::jsonb`,
+		},
+		{
 			name: "create messages conversation index",
 			sql:  `CREATE INDEX IF NOT EXISTS idx_messages_conv_id ON messages(conversation_id, id ASC)`,
 		},
 		{
 			name: "create messages source_message_id index",
 			sql:  `CREATE INDEX IF NOT EXISTS idx_messages_source_message_id ON messages(source_message_id)`,
+		},
+		{
+			name: "create chat_files table",
+			sql: `
+				CREATE TABLE IF NOT EXISTS chat_files (
+					id              UUID PRIMARY KEY DEFAULT uuidv7(),
+					user_id         VARCHAR(128) NOT NULL,
+					group_id        VARCHAR(128) NOT NULL,
+					conversation_id UUID NULL REFERENCES conversations(id) ON DELETE SET NULL,
+					storage_type    VARCHAR(32) NOT NULL DEFAULT 'local',
+					storage_key     TEXT NOT NULL,
+					origin_name     VARCHAR(512) NOT NULL,
+					mime_type       VARCHAR(128) NOT NULL,
+					size_bytes      BIGINT NOT NULL DEFAULT 0,
+					sha256          VARCHAR(128) NOT NULL DEFAULT '',
+					width           INTEGER NOT NULL DEFAULT 0,
+					height          INTEGER NOT NULL DEFAULT 0,
+					kind            VARCHAR(24) NOT NULL DEFAULT 'file',
+					status          VARCHAR(24) NOT NULL DEFAULT 'uploaded',
+					created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+				)
+			`,
+		},
+		{
+			name: "create chat_files user_created index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_chat_files_user_created ON chat_files(user_id, created_at DESC)`,
+		},
+		{
+			name: "create chat_files conversation index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_chat_files_conversation ON chat_files(conversation_id)`,
+		},
+		{
+			name: "create message_attachments table",
+			sql: `
+				CREATE TABLE IF NOT EXISTS message_attachments (
+					id                   UUID PRIMARY KEY DEFAULT uuidv7(),
+					message_id           UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+					file_id              UUID NOT NULL REFERENCES chat_files(id) ON DELETE CASCADE,
+					kind                 VARCHAR(24) NOT NULL,
+					sort_order           INTEGER NOT NULL DEFAULT 0,
+					attachment_meta_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+					created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+				)
+			`,
+		},
+		{
+			name: "create message_attachments message index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_message_attachments_message ON message_attachments(message_id, sort_order ASC)`,
+		},
+		{
+			name: "create message_attachments file index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_message_attachments_file ON message_attachments(file_id)`,
+		},
+		{
+			name: "create llm usage events table",
+			sql: `
+				CREATE TABLE IF NOT EXISTS llm_usage_events (
+					id                        VARCHAR(128) PRIMARY KEY,
+					invocation_id             VARCHAR(128) NOT NULL UNIQUE,
+					request_id                VARCHAR(128) DEFAULT '',
+					conversation_id           UUID NULL REFERENCES conversations(id) ON DELETE SET NULL,
+					message_id                UUID NULL REFERENCES messages(id) ON DELETE SET NULL,
+					agent_id                  UUID NULL REFERENCES agents(id) ON DELETE SET NULL,
+					enterprise_id             VARCHAR(128) DEFAULT '',
+					user_id                   VARCHAR(128) DEFAULT '',
+					source_type               VARCHAR(32) DEFAULT 'web',
+					source_connection_id      UUID NULL,
+					model_id                  VARCHAR(128) NOT NULL DEFAULT '',
+					model_scope               VARCHAR(32) DEFAULT '',
+					provider_type             VARCHAR(64) DEFAULT '',
+					model_name_snapshot       VARCHAR(256) DEFAULT '',
+					status                    VARCHAR(32) NOT NULL DEFAULT 'started',
+					usage_source              VARCHAR(32) DEFAULT 'estimated',
+					prompt_tokens             BIGINT DEFAULT 0,
+					completion_tokens         BIGINT DEFAULT 0,
+					reasoning_tokens          BIGINT DEFAULT 0,
+					cache_read_tokens         BIGINT DEFAULT 0,
+					cache_write_tokens        BIGINT DEFAULT 0,
+					total_tokens              BIGINT DEFAULT 0,
+					currency                  VARCHAR(16) DEFAULT 'USD',
+					cost_input_unit_price     NUMERIC(20, 8) DEFAULT 0,
+					cost_output_unit_price    NUMERIC(20, 8) DEFAULT 0,
+					charge_input_unit_price   NUMERIC(20, 8) DEFAULT 0,
+					charge_output_unit_price  NUMERIC(20, 8) DEFAULT 0,
+					cost_amount               NUMERIC(20, 8) DEFAULT 0,
+					charge_amount             NUMERIC(20, 8) DEFAULT 0,
+					raw_usage_json            JSONB DEFAULT '{}'::jsonb,
+					raw_response_meta_json    JSONB DEFAULT '{}'::jsonb,
+					error_code                VARCHAR(128) DEFAULT '',
+					created_at                TIMESTAMPTZ DEFAULT NOW(),
+					completed_at              TIMESTAMPTZ NULL
+				)
+			`,
+		},
+		{
+			name: "create llm usage events enterprise index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_llm_usage_events_enterprise_created ON llm_usage_events(enterprise_id, created_at DESC)`,
+		},
+		{
+			name: "create llm usage events agent index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_llm_usage_events_agent_created ON llm_usage_events(agent_id, created_at DESC)`,
+		},
+		{
+			name: "create llm usage events conversation index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_llm_usage_events_conversation_created ON llm_usage_events(conversation_id, created_at DESC)`,
+		},
+		{
+			name: "create llm usage events model index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_llm_usage_events_model_created ON llm_usage_events(model_id, created_at DESC)`,
+		},
+		{
+			name: "create llm usage daily aggregates table",
+			sql: `
+				CREATE TABLE IF NOT EXISTS llm_usage_daily_aggregates (
+					id              VARCHAR(128) PRIMARY KEY,
+					stat_date       VARCHAR(10) NOT NULL,
+					scope_type      VARCHAR(32) NOT NULL,
+					scope_id        VARCHAR(128) DEFAULT '',
+					source_type     VARCHAR(32) DEFAULT 'web',
+					request_count   BIGINT DEFAULT 0,
+					total_tokens    BIGINT DEFAULT 0,
+					cost_amount     NUMERIC(20, 8) DEFAULT 0,
+					charge_amount   NUMERIC(20, 8) DEFAULT 0,
+					created_at      TIMESTAMPTZ DEFAULT NOW(),
+					updated_at      TIMESTAMPTZ DEFAULT NOW()
+				)
+			`,
+		},
+		{
+			name: "create llm usage daily aggregates unique index",
+			sql:  `CREATE UNIQUE INDEX IF NOT EXISTS uk_llm_usage_daily_aggregates_scope_day_source ON llm_usage_daily_aggregates(stat_date, scope_type, scope_id, source_type)`,
+		},
+		{
+			name: "create llm usage daily aggregates scope index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_llm_usage_daily_aggregates_scope_day ON llm_usage_daily_aggregates(scope_type, scope_id, stat_date DESC)`,
+		},
+		{
+			name: "create llm model prices table",
+			sql: `
+				CREATE TABLE IF NOT EXISTS llm_model_prices (
+					id                        VARCHAR(128) PRIMARY KEY,
+					model_id                  VARCHAR(128) NOT NULL,
+					scope_type                VARCHAR(32) NOT NULL,
+					scope_id                  VARCHAR(128) DEFAULT '',
+					currency                  VARCHAR(16) DEFAULT 'USD',
+					cost_input_unit_price     NUMERIC(20, 8) DEFAULT 0,
+					cost_output_unit_price    NUMERIC(20, 8) DEFAULT 0,
+					charge_input_unit_price   NUMERIC(20, 8) DEFAULT 0,
+					charge_output_unit_price  NUMERIC(20, 8) DEFAULT 0,
+					created_at                TIMESTAMPTZ DEFAULT NOW(),
+					updated_at                TIMESTAMPTZ DEFAULT NOW()
+				)
+			`,
+		},
+		{
+			name: "create llm model prices scope index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_llm_model_prices_scope_model ON llm_model_prices(scope_type, scope_id, model_id, created_at DESC)`,
+		},
+		{
+			name: "create llm usage limit policies table",
+			sql: `
+				CREATE TABLE IF NOT EXISTS llm_usage_limit_policies (
+					id                    VARCHAR(128) PRIMARY KEY,
+					scope_type            VARCHAR(32) NOT NULL,
+					scope_id              VARCHAR(128) DEFAULT '',
+					enabled               BOOLEAN DEFAULT TRUE,
+					daily_token_limit     BIGINT DEFAULT 0,
+					monthly_token_limit   BIGINT DEFAULT 0,
+					daily_charge_limit    NUMERIC(20, 8) DEFAULT 0,
+					monthly_charge_limit  NUMERIC(20, 8) DEFAULT 0,
+					hard_limit            BOOLEAN DEFAULT TRUE,
+					created_at            TIMESTAMPTZ DEFAULT NOW(),
+					updated_at            TIMESTAMPTZ DEFAULT NOW()
+				)
+			`,
+		},
+		{
+			name: "create llm usage limit policies scope index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_llm_usage_limit_policies_scope ON llm_usage_limit_policies(scope_type, scope_id, created_at DESC)`,
 		},
 		{
 			name: "create users table",

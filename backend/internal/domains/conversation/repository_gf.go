@@ -1,8 +1,11 @@
 package conversation
 
 import (
+	"context"
+	"encoding/json"
 	"time"
 
+	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/frame/g"
 )
 
@@ -83,10 +86,22 @@ func (r *GFRepository) Delete(id string) error {
 }
 
 func (r *GFRepository) SaveMessage(message *Message) error {
+	partsJSON := "[]"
+	if len(message.Parts) > 0 {
+		if raw, err := json.Marshal(message.Parts); err == nil {
+			partsJSON = string(raw)
+		} else {
+			return err
+		}
+	} else if message.PartsJSON != "" {
+		partsJSON = message.PartsJSON
+	}
 	data := g.Map{
+		"id":              message.Id,
 		"conversation_id": message.ConversationId,
 		"role":            message.Role,
 		"content":         message.Content,
+		"parts_json":      partsJSON,
 		"status":          message.Status,
 	}
 	if message.Thinking != "" {
@@ -95,8 +110,23 @@ func (r *GFRepository) SaveMessage(message *Message) error {
 	if message.ToolCalls != "" {
 		data["tool_calls"] = message.ToolCalls
 	}
-	_, err := g.DB().Model("messages").Data(data).Insert()
-	return err
+	return g.DB().Transaction(context.Background(), func(ctx context.Context, tx gdb.TX) error {
+		if _, err := tx.Model("messages").Ctx(ctx).Data(data).Insert(); err != nil {
+			return err
+		}
+		for index, attachment := range message.Attachments {
+			if _, err := tx.Model("message_attachments").Ctx(ctx).Data(g.Map{
+				"message_id":           message.Id,
+				"file_id":              attachment.FileId,
+				"kind":                 attachment.Kind,
+				"sort_order":           index,
+				"attachment_meta_json": "{}",
+			}).Insert(); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func (r *GFRepository) GetLatestMessage(convId string) (*Message, error) {
@@ -137,6 +167,20 @@ func (r *GFRepository) ListMessages(convId, before string, limit int) ([]*Messag
 	if err := query.Scan(&messages); err != nil {
 		return nil, err
 	}
+	if len(messages) == 0 {
+		return messages, nil
+	}
+	messageIDs := make([]string, 0, len(messages))
+	for _, message := range messages {
+		messageIDs = append(messageIDs, message.Id)
+	}
+	attachmentsByMessageID, err := r.loadAttachments(messageIDs)
+	if err != nil {
+		return nil, err
+	}
+	for _, message := range messages {
+		message.Attachments = attachmentsByMessageID[message.Id]
+	}
 	return messages, nil
 }
 
@@ -151,4 +195,52 @@ func (r *GFRepository) GetFirstUserMessage(convId string) (string, error) {
 		return "", err
 	}
 	return message.Content, nil
+}
+
+func (r *GFRepository) loadAttachments(messageIDs []string) (map[string][]AttachmentItem, error) {
+	type attachmentRow struct {
+		MessageId string `orm:"message_id"`
+		AttachmentItem
+	}
+	var rows []attachmentRow
+	if err := g.DB().Model("message_attachments ma").
+		LeftJoin("chat_files cf", "cf.id = ma.file_id").
+		Fields(`
+			ma.message_id as message_id,
+			ma.id as id,
+			ma.file_id as file_id,
+			ma.kind as kind,
+			cf.origin_name as name,
+			cf.mime_type as mime_type,
+			cf.size_bytes as size,
+			cf.width as width,
+			cf.height as height,
+			cf.status as status
+		`).
+		WhereIn("ma.message_id", messageIDs).
+		Order("ma.sort_order ASC, ma.created_at ASC").
+		Scan(&rows); err != nil {
+		return nil, err
+	}
+	result := make(map[string][]AttachmentItem, len(messageIDs))
+	for _, row := range rows {
+		row.AttachmentItem.PreviewUrl = buildAttachmentPreviewURL(row.AttachmentItem)
+		row.AttachmentItem.DownloadUrl = buildAttachmentDownloadURL(row.AttachmentItem)
+		result[row.MessageId] = append(result[row.MessageId], row.AttachmentItem)
+	}
+	return result, nil
+}
+
+func buildAttachmentPreviewURL(item AttachmentItem) string {
+	if item.Kind != "image" || item.FileId == "" {
+		return ""
+	}
+	return "/api/files/" + item.FileId + "/preview"
+}
+
+func buildAttachmentDownloadURL(item AttachmentItem) string {
+	if item.FileId == "" {
+		return ""
+	}
+	return "/api/files/" + item.FileId + "/download"
 }

@@ -9,6 +9,16 @@ import (
 	"dotblue/internal/domains/dataplane"
 )
 
+type limitChecker interface {
+	CheckLimit(input LimitCheckInput) error
+}
+
+type LimitCheckInput struct {
+	EnterpriseID string
+	UserID       string
+	AgentID      string
+}
+
 type DispatchRequest struct {
 	RequestID        string
 	SessionKey       string
@@ -51,6 +61,7 @@ type Service struct {
 	reqState   dataplane.RequestStateStore
 	reqRoute   dataplane.RequestRouteStore
 	finalTTL   time.Duration
+	limiter    limitChecker
 }
 
 func NewService(
@@ -59,6 +70,7 @@ func NewService(
 	reqState dataplane.RequestStateStore,
 	reqRoute dataplane.RequestRouteStore,
 	finalTTL time.Duration,
+	limiter limitChecker,
 ) *Service {
 	return &Service{
 		sessionSvc: sessionSvc,
@@ -66,6 +78,7 @@ func NewService(
 		reqState:   reqState,
 		reqRoute:   reqRoute,
 		finalTTL:   finalTTL,
+		limiter:    limiter,
 	}
 }
 
@@ -78,6 +91,15 @@ func (s *Service) Dispatch(ctx context.Context, req DispatchRequest) (*DispatchR
 	req.AgentID = strings.TrimSpace(req.AgentID)
 	if req.RequestID == "" || req.SessionKey == "" || req.AgentID == "" {
 		return nil, errors.New("dispatch request is incomplete")
+	}
+	if s.limiter != nil {
+		if err := s.limiter.CheckLimit(LimitCheckInput{
+			EnterpriseID: req.EnterpriseID,
+			UserID:       req.UserID,
+			AgentID:      req.AgentID,
+		}); err != nil {
+			return nil, err
+		}
 	}
 	assign, err := s.sessionSvc.AcquireOwner(ctx, req.SessionKey)
 	if err != nil {

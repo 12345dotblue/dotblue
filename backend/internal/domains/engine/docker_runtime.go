@@ -19,14 +19,23 @@ import (
 	"github.com/gogf/gf/v2/frame/g"
 
 	"dotblue/internal/domains/agent"
+	"dotblue/internal/domains/model"
 	"dotblue/internal/domains/settings"
+)
+
+var (
+	loadPlatformModelByID       = model.GetByID
+	loadDefaultPlatformLLMModel = model.GetDefaultPlatformModel
 )
 
 type runtimeAgentInfo struct {
 	ID           string
+	GroupId      string
 	SystemPrompt string
 	EngineAPIKey string
 	EngineType   string
+	ModelScope   string
+	ModelId      string
 }
 
 type runtimePlatformConfig struct {
@@ -45,7 +54,6 @@ type runtimeAgentReader interface {
 
 type runtimeSettingsReader interface {
 	GetPlatformConfig() (*runtimePlatformConfig, error)
-	GetProviderConfig() (*ProviderConfig, error)
 }
 
 type runtimeEngineRegistry interface {
@@ -61,9 +69,12 @@ func (defaultRuntimeAgentReader) GetById(id string) (*runtimeAgentInfo, error) {
 	}
 	return &runtimeAgentInfo{
 		ID:           rec.Id,
+		GroupId:      rec.GroupId,
 		SystemPrompt: rec.SystemPrompt,
 		EngineAPIKey: rec.EngineAPIKey,
 		EngineType:   rec.EngineType,
+		ModelScope:   rec.ModelScope,
+		ModelId:      rec.ModelId,
 	}, nil
 }
 
@@ -83,10 +94,6 @@ func (defaultRuntimeSettingsReader) GetPlatformConfig() (*runtimePlatformConfig,
 		DockerEndpoint: cfg.DockerEndpoint,
 		DockerNetwork:  cfg.DockerNetwork,
 	}, nil
-}
-
-func (defaultRuntimeSettingsReader) GetProviderConfig() (*ProviderConfig, error) {
-	return settings.GetProviderConfig()
 }
 
 type defaultRuntimeEngineRegistry struct{}
@@ -247,16 +254,16 @@ func (d *DockerRuntime) resolveRuntimePlan(ctx context.Context, agentID string) 
 		return nil, err
 	}
 
-	providerConfig, err := d.settings.GetProviderConfig()
-	if err != nil {
-		g.Log().Warningf(ctx, "Failed to get provider config: %v", err)
-	}
-
 	runtimeMode := resolveRuntimeMode(platformConfig.RuntimeMode)
 	endpointMode := resolveEndpointMode(platformConfig.EndpointMode, runtimeMode)
 	dockerNetwork := strings.TrimSpace(platformConfig.DockerNetwork)
 	if endpointMode == endpointModeDockerDNS && dockerNetwork == "" {
 		return nil, fmt.Errorf("docker network is required when endpoint mode is %s", endpointModeDockerDNS)
+	}
+
+	providerConfig, err := d.resolveProviderConfig(agentRecord)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve provider config: %w", err)
 	}
 
 	return &runtimePlan{
@@ -272,6 +279,50 @@ func (d *DockerRuntime) resolveRuntimePlan(ctx context.Context, agentID string) 
 		endpointMode:   endpointMode,
 		dockerEndpoint: strings.TrimSpace(platformConfig.DockerEndpoint),
 		dockerNetwork:  dockerNetwork,
+	}, nil
+}
+
+func (d *DockerRuntime) resolveProviderConfig(agentRecord *runtimeAgentInfo) (*ProviderConfig, error) {
+	if agentRecord == nil {
+		return nil, nil
+	}
+
+	modelId := strings.TrimSpace(agentRecord.ModelId)
+	if modelId == "" {
+		if agentRecord.ModelScope == agent.ModelScopeEnterprise {
+			return nil, fmt.Errorf("model id is required")
+		}
+		platformDefault, err := loadDefaultPlatformLLMModel()
+		if err != nil {
+			return nil, err
+		}
+		if platformDefault == nil {
+			return nil, fmt.Errorf("platform model not configured")
+		}
+		modelId = platformDefault.Id
+	}
+
+	selected, err := loadPlatformModelByID(modelId)
+	if err != nil {
+		return nil, err
+	}
+	if selected == nil {
+		return nil, fmt.Errorf("model not found")
+	}
+	if selected.Scope == model.ScopeEnterprise && strings.TrimSpace(selected.EnterpriseId) != strings.TrimSpace(agentRecord.GroupId) {
+		return nil, fmt.Errorf("enterprise model not found")
+	}
+	if agentRecord.ModelScope == agent.ModelScopeEnterprise && selected.Scope != model.ScopeEnterprise {
+		return nil, fmt.Errorf("enterprise model not found")
+	}
+	if agentRecord.ModelScope == agent.ModelScopePlatform && selected.Scope != model.ScopePlatform {
+		return nil, fmt.Errorf("platform model not found")
+	}
+	return &ProviderConfig{
+		Type:    selected.Type,
+		ApiBase: selected.ApiBase,
+		ApiKey:  selected.ApiKey,
+		Model:   selected.Model,
 	}, nil
 }
 
