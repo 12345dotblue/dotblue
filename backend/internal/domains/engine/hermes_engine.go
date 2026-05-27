@@ -24,6 +24,8 @@ type HermesEngine struct{}
 
 func (h *HermesEngine) Name() string { return "hermes" }
 
+func (h *HermesEngine) DefaultPort() string { return HermesAPIPort }
+
 func (h *HermesEngine) PrepareVolume(_ context.Context, volPath string, agent *AgentConfig, pCfg *ProviderConfig) error {
 	if err := os.MkdirAll(volPath, 0755); err != nil {
 		return fmt.Errorf("failed to create volume directory: %w", err)

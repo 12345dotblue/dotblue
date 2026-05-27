@@ -6,15 +6,17 @@ import (
 	"time"
 
 	"dotblue/internal/domains/model"
+	"dotblue/internal/domains/settings"
 	"github.com/google/uuid"
 )
 
 var (
 	loadModelByID            = model.GetByID
 	loadDefaultPlatformModel = model.GetDefaultPlatformModel
+	loadPlatformConfig       = settings.GetPlatformConfig
 )
 
-const defaultEngineType = "hermes"
+const defaultEngineType = EngineTypeHermes
 
 // Service encapsulates agent business logic and depends on persistence abstractions.
 type Service struct {
@@ -54,11 +56,15 @@ func (s *Service) BelongsToUser(id, userId, enterpriseId string) (bool, error) {
 	return s.repo.BelongsToUser(id, userId, enterpriseId)
 }
 
-func (s *Service) Create(userId, groupId, agentName, systemPrompt, modelScope, modelId string) (*Agent, error) {
+func (s *Service) Create(userId, groupId, agentName, systemPrompt, modelScope, modelId, engineType string) (*Agent, error) {
 	if s == nil || s.repo == nil {
 		return nil, errors.New("agent repository is not configured")
 	}
 	modelScope, modelId, err := validateModelSelection(modelScope, modelId)
+	if err != nil {
+		return nil, err
+	}
+	engineType, err = validateEngineType(engineType)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +81,7 @@ func (s *Service) Create(userId, groupId, agentName, systemPrompt, modelScope, m
 		ModelScope:   modelScope,
 		ModelId:      modelId,
 		EngineAPIKey: s.apiKeyGenerator(),
-		EngineType:   defaultEngineType,
+		EngineType:   engineType,
 	}
 	if err := s.repo.Create(agent); err != nil {
 		return nil, err
@@ -91,11 +97,15 @@ func (s *Service) Create(userId, groupId, agentName, systemPrompt, modelScope, m
 	return agent, nil
 }
 
-func (s *Service) Update(id, agentName, systemPrompt, modelScope, modelId string) error {
+func (s *Service) Update(id, agentName, systemPrompt, modelScope, modelId, engineType string) error {
 	if s == nil || s.repo == nil {
 		return errors.New("agent repository is not configured")
 	}
 	modelScope, modelId, err := validateModelSelection(modelScope, modelId)
+	if err != nil {
+		return err
+	}
+	engineType, err = validateEngineType(engineType)
 	if err != nil {
 		return err
 	}
@@ -109,7 +119,7 @@ func (s *Service) Update(id, agentName, systemPrompt, modelScope, modelId string
 	if err := ensureModelSelectionExists(existing.GroupId, modelScope, modelId); err != nil {
 		return err
 	}
-	return s.repo.Update(id, agentName, systemPrompt, modelScope, modelId, s.now())
+	return s.repo.Update(id, agentName, systemPrompt, modelScope, modelId, engineType, s.now())
 }
 
 func (s *Service) Delete(id string) error {
@@ -135,6 +145,49 @@ func validateModelSelection(modelScope, modelId string) (string, string, error) 
 		return ModelScopeEnterprise, modelId, nil
 	default:
 		return "", "", errors.New("model scope is required")
+	}
+}
+
+func validateEngineType(engineType string) (string, error) {
+	cfg, err := loadPlatformConfig()
+	if err != nil {
+		return "", err
+	}
+
+	enabled := settings.EnabledRuntimeEngines(cfg)
+	if len(enabled) == 0 {
+		enabled = []settings.RuntimeEngineConfig{{EngineType: EngineTypeHermes, Enabled: true}}
+	}
+
+	normalized := strings.TrimSpace(strings.ToLower(engineType))
+	if normalized == "" {
+		if len(enabled) == 1 {
+			return enabled[0].EngineType, nil
+		}
+		return "", errors.New("engine type is required")
+	}
+
+	switch normalized {
+	case EngineTypeHermes, EngineTypeNanobot:
+		for _, item := range enabled {
+			if item.EngineType == normalized {
+				return normalized, nil
+			}
+		}
+		return "", errors.New("engine type is not enabled")
+	default:
+		return "", errors.New("engine type is invalid")
+	}
+}
+
+func normalizeEngineType(engineType string) string {
+	switch strings.TrimSpace(strings.ToLower(engineType)) {
+	case "", EngineTypeHermes:
+		return EngineTypeHermes
+	case EngineTypeNanobot:
+		return EngineTypeNanobot
+	default:
+		return strings.TrimSpace(strings.ToLower(engineType))
 	}
 }
 

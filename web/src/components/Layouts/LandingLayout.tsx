@@ -1,10 +1,11 @@
 import React from 'react';
-import { Layout, Button, Space, Typography, Row, Col, Divider, theme } from 'antd';
+import { Layout, Button, Space, Typography, Row, Col, Divider, Dropdown } from 'antd';
 import { AppstoreOutlined, GlobalOutlined, LogoutOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { casdoorService } from '../../domains/identity/CasdoorService';
 import { useAuthState } from '../../domains/identity/useAuthState';
+import { LANGUAGE_OPTIONS, resolveSupportedLanguage } from '../../i18n/config';
 
 const { Header, Content, Footer } = Layout;
 const { Title, Text, Paragraph } = Typography;
@@ -12,73 +13,162 @@ const { Title, Text, Paragraph } = Typography;
 const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  const { token } = theme.useToken();
   const isAuthenticated = useAuthState();
+  const currentLanguage = resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language);
+  const currentLanguageLabel = LANGUAGE_OPTIONS.find((item) => item.value === currentLanguage)?.shortLabel || 'EN';
 
   const changeLanguage = (lng: string) => {
     i18n.changeLanguage(lng);
   };
 
+  const scrollToSection = (sectionId: string) => {
+    if (window.location.pathname !== '/') {
+      window.location.href = `/#${sectionId}`;
+      return;
+    }
+
+    window.history.replaceState(null, '', `/#${sectionId}`);
+    document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  React.useEffect(() => {
+    if (window.location.pathname === '/' && window.location.hash) {
+      const targetId = window.location.hash.replace('#', '');
+      window.setTimeout(() => {
+        document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 120);
+    }
+  }, []);
+
   return (
     <Layout style={{ minHeight: '100vh', background: '#fff' }}>
       <Header style={{
-        background: 'rgba(255, 255, 255, 0.85)',
-        backdropFilter: 'blur(10px)',
+        background: 'rgba(255, 255, 255, 0.72)',
+        backdropFilter: 'blur(16px)',
         padding: '0 5%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
         position: 'sticky',
         top: 0,
         zIndex: 100,
-        borderBottom: '1px solid #f0f0f0',
-        height: 72,
+        borderBottom: '1px solid rgba(15, 23, 42, 0.05)',
+        height: 88,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
-          <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => navigate('/')}>
-            <div style={{ width: 32, height: 32, background: token.colorPrimary, borderRadius: 8, marginRight: 12 }} />
-            <Title level={4} style={{ margin: 0 }}>dotblue</Title>
+        <div
+          style={{
+            maxWidth: 1240,
+            margin: '12px auto',
+            height: 64,
+            padding: '0 18px 0 20px',
+            borderRadius: 20,
+            border: '1px solid rgba(15, 23, 42, 0.06)',
+            background: 'rgba(255, 255, 255, 0.86)',
+            boxShadow: '0 12px 32px rgba(15, 23, 42, 0.06)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 20,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 20, minWidth: 0 }}>
+            <div
+              style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', minWidth: 0 }}
+              onClick={() => navigate('/')}
+            >
+              <img
+                src="/brand/dotblue-logo.png"
+                alt="dotblue"
+                style={{ width: 118, height: 40, objectFit: 'contain', flexShrink: 0 }}
+              />
+              <div
+                style={{
+                  width: 1,
+                  height: 22,
+                  background: 'linear-gradient(180deg, rgba(22,119,255,0.04) 0%, rgba(22,119,255,0.24) 50%, rgba(22,119,255,0.04) 100%)',
+                  flexShrink: 0,
+                }}
+              />
+              <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: '#0f172a',
+                    lineHeight: 1.2,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {t('brand_header_badge')}
+                </Text>
+                <Text
+                  type="secondary"
+                  style={{
+                    fontSize: 11,
+                    lineHeight: 1.2,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {t('brand_header_subtitle')}
+                </Text>
+              </div>
+            </div>
+            <Space size={4} wrap className="landing-nav-group">
+              <Button className="landing-nav-button" type="text" onClick={() => scrollToSection('assistants')}>
+                {t('landing_nav_assistants')}
+              </Button>
+              <Button className="landing-nav-button" type="text" onClick={() => scrollToSection('highlights')}>
+                {t('landing_nav_highlights')}
+              </Button>
+              <Button className="landing-nav-button" type="text" onClick={() => scrollToSection('pricing')}>
+                {t('view_pricing')}
+              </Button>
+              <Button className="landing-nav-button" type="text" onClick={() => navigate('/terms')}>
+                {t('terms')}
+              </Button>
+              <Button className="landing-nav-button" type="text" onClick={() => navigate('/privacy')}>
+                {t('privacy')}
+              </Button>
+            </Space>
           </div>
-          <Space size="middle" style={{ display: 'flex' }}>
-            <Button type="text" onClick={() => navigate('/#pricing')} style={{ padding: '0 12px' }}>
-              {t('view_pricing')}
-            </Button>
-            <Button type="text" onClick={() => navigate('/terms')} style={{ padding: '0 12px' }}>
-              {t('terms')}
-            </Button>
-            <Button type="text" onClick={() => navigate('/privacy')} style={{ padding: '0 12px' }}>
-              {t('privacy')}
-            </Button>
+
+          <Space size="small">
+            <Dropdown
+              menu={{
+                items: LANGUAGE_OPTIONS.map((item) => ({
+                  key: item.value,
+                  label: item.label,
+                  onClick: () => changeLanguage(item.value),
+                })),
+              }}
+              trigger={['click']}
+            >
+              <Button className="landing-utility-button" type="text" icon={<GlobalOutlined />}>
+                {currentLanguageLabel}
+              </Button>
+            </Dropdown>
+            {isAuthenticated ? (
+              <>
+                <Button className="landing-secondary-button" shape="round" icon={<AppstoreOutlined />} onClick={() => navigate('/dashboard')}>
+                  {t('go_to_dashboard')}
+                </Button>
+                <Button
+                  className="landing-primary-button"
+                  type="primary"
+                  shape="round"
+                  icon={<LogoutOutlined />}
+                  onClick={() => {
+                    casdoorService.removeToken();
+                    navigate('/login');
+                  }}
+                >
+                  {t('logout')}
+                </Button>
+              </>
+            ) : (
+              <Button className="landing-primary-button" type="primary" shape="round" onClick={() => navigate('/login')}>
+                {t('login')}
+              </Button>
+            )}
           </Space>
         </div>
-
-        <Space size="middle">
-          <Button type="text" onClick={() => changeLanguage(i18n.language === 'en' ? 'zh-CN' : 'en')} icon={<GlobalOutlined />}>
-            {i18n.language === 'en' ? '中文' : 'English'}
-          </Button>
-          {isAuthenticated ? (
-            <>
-              <Button shape="round" icon={<AppstoreOutlined />} onClick={() => navigate('/dashboard')}>
-                Dashboard
-              </Button>
-              <Button
-                type="primary"
-                shape="round"
-                icon={<LogoutOutlined />}
-                onClick={() => {
-                  casdoorService.removeToken();
-                  navigate('/login');
-                }}
-              >
-                {t('logout')}
-              </Button>
-            </>
-          ) : (
-            <Button type="primary" shape="round" onClick={() => navigate('/login')}>
-              {t('login')}
-            </Button>
-          )}
-        </Space>
       </Header>
 
       <Content>{children}</Content>
@@ -87,8 +177,11 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
         <Row gutter={[32, 32]}>
           <Col xs={24} md={8}>
             <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
-              <div style={{ width: 24, height: 24, background: token.colorPrimary, borderRadius: 6, marginRight: 8 }} />
-              <Title level={5} style={{ margin: 0 }}>dotblue</Title>
+              <img
+                src="/brand/dotblue-logo.png"
+                alt="dotblue"
+                style={{ width: 88, height: 28, objectFit: 'contain', marginRight: 10 }}
+              />
             </div>
             <Paragraph type="secondary">{t('footer_desc')}</Paragraph>
             <Text type="secondary" style={{ fontSize: 12 }}>
@@ -99,7 +192,7 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             <Title level={5}>{t('footer_product')}</Title>
             <Space direction="vertical">
               <Link to="/">{t('welcome')}</Link>
-              <Link to={isAuthenticated ? "/dashboard" : "/login"}>{isAuthenticated ? "Dashboard" : t('get_started')}</Link>
+              <a href="/#highlights">{t('landing_nav_highlights')}</a>
               <a href="/#pricing">{t('view_pricing')}</a>
             </Space>
           </Col>
@@ -125,6 +218,62 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           </Col>
         </Row>
       </Footer>
+      <style>
+        {`
+          .landing-nav-group .landing-nav-button {
+            height: 36px;
+            padding: 0 14px;
+            border-radius: 999px;
+            color: #334155;
+            font-weight: 500;
+          }
+
+          .landing-nav-group .landing-nav-button:hover {
+            color: #1677ff !important;
+            background: #eff6ff !important;
+          }
+
+          .landing-utility-button {
+            height: 38px;
+            padding: 0 14px;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, 0.22);
+            background: #fff;
+            color: #334155;
+            font-weight: 500;
+          }
+
+          .landing-utility-button:hover {
+            color: #1677ff !important;
+            border-color: rgba(22, 119, 255, 0.22) !important;
+            background: #f8fbff !important;
+          }
+
+          .landing-secondary-button {
+            height: 40px;
+            padding: 0 18px;
+            border-radius: 999px;
+            border-color: rgba(148, 163, 184, 0.28);
+            color: #0f172a;
+            font-weight: 600;
+            box-shadow: none;
+          }
+
+          .landing-secondary-button:hover {
+            color: #1677ff !important;
+            border-color: rgba(22, 119, 255, 0.24) !important;
+            background: #f8fbff !important;
+          }
+
+          .landing-primary-button {
+            height: 40px;
+            padding: 0 18px;
+            border-radius: 999px;
+            font-weight: 600;
+            box-shadow: 0 10px 24px rgba(22, 119, 255, 0.18);
+          }
+        `}
+      </style>
     </Layout>
   );
 };

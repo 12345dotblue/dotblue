@@ -409,3 +409,52 @@ func TestServiceResolveEngineUsesInjectedFactory(t *testing.T) {
 		So(eng, ShouldBeNil)
 	})
 }
+
+func TestEngineMessagesForTurnBootstrapsNanobotFirstTurn(t *testing.T) {
+	prepared := &PreparedTurn{
+		Agent: &agent.Agent{
+			EngineType:   "nanobot",
+			SystemPrompt: "你是一个严谨的助手",
+		},
+		History: []interface{}{
+			map[string]any{"role": "user", "content": "你好"},
+		},
+	}
+
+	result := engineMessagesForTurn(prepared)
+	if len(result) != 2 {
+		t.Fatalf("len(result) = %d, want 2", len(result))
+	}
+	first, ok := result[0].(map[string]any)
+	if !ok {
+		t.Fatalf("first message type = %T, want map", result[0])
+	}
+	if first["role"] != "user" {
+		t.Fatalf("first role = %v, want user", first["role"])
+	}
+	if !strings.Contains(first["content"].(string), "[dotblue-system]") {
+		t.Fatalf("first content = %q, want dotblue system marker", first["content"])
+	}
+}
+
+func TestEngineMessagesForTurnKeepsOtherEnginesUntouched(t *testing.T) {
+	history := []interface{}{
+		map[string]any{"role": "user", "content": "hello"},
+	}
+	prepared := &PreparedTurn{
+		Agent:   &agent.Agent{EngineType: "hermes", SystemPrompt: "ignored"},
+		History: history,
+	}
+
+	result := engineMessagesForTurn(prepared)
+	if len(result) != len(history) {
+		t.Fatalf("len(result) = %d, want %d", len(result), len(history))
+	}
+	got, ok := result[0].(map[string]any)
+	if !ok {
+		t.Fatalf("result[0] type = %T, want map", result[0])
+	}
+	if got["role"] != "user" || got["content"] != "hello" {
+		t.Fatalf("result[0] = %+v, want original user message", got)
+	}
+}

@@ -46,6 +46,13 @@ type runtimePlatformConfig struct {
 	EndpointMode   string
 	DockerEndpoint string
 	DockerNetwork  string
+	RuntimeEngines []runtimeEngineConfig
+}
+
+type runtimeEngineConfig struct {
+	EngineType string
+	Enabled    bool
+	Image      string
 }
 
 type runtimeAgentReader interface {
@@ -93,6 +100,7 @@ func (defaultRuntimeSettingsReader) GetPlatformConfig() (*runtimePlatformConfig,
 		EndpointMode:   cfg.EndpointMode,
 		DockerEndpoint: cfg.DockerEndpoint,
 		DockerNetwork:  cfg.DockerNetwork,
+		RuntimeEngines: toRuntimeEngineConfigs(cfg.RuntimeEngines),
 	}, nil
 }
 
@@ -112,6 +120,7 @@ type DockerRuntime struct {
 
 type runtimePlan struct {
 	platformConfig *runtimePlatformConfig
+	runtimeConfig  *runtimeEngineConfig
 	providerConfig *ProviderConfig
 	agentRecord    *runtimeAgentInfo
 	engineType     string
@@ -144,8 +153,12 @@ func NewDockerRuntime() *DockerRuntime {
 	}
 }
 
-func containerName(agentID string) string {
-	return "hermes_" + agentID
+func containerName(agentID, engineType string) string {
+	engineType = strings.TrimSpace(engineType)
+	if engineType == "" {
+		engineType = "hermes"
+	}
+	return engineType + "_" + agentID
 }
 
 func profileVolumePath(basePath, agentID string) string {
@@ -158,7 +171,7 @@ func (d *DockerRuntime) EnsureRunning(ctx context.Context, orgID, userID, agentI
 		return nil, err
 	}
 
-	name := containerName(agentID)
+	name := containerName(agentID, plan.engineType)
 
 	cli, err := newDockerClient(plan.dockerEndpoint)
 	if err != nil {
@@ -192,6 +205,9 @@ func (d *DockerRuntime) EnsureRunning(ctx context.Context, orgID, userID, agentI
 	spec, err := plan.engineImpl.ContainerSpec(agentID, plan.workspacePath, plan.containerPort)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get container spec: %w", err)
+	}
+	if plan.runtimeConfig != nil && strings.TrimSpace(plan.runtimeConfig.Image) != "" {
+		spec.Image = strings.TrimSpace(plan.runtimeConfig.Image)
 	}
 
 	resp, err := d.createContainer(ctx, cli, spec, plan, name)
@@ -249,6 +265,10 @@ func (d *DockerRuntime) resolveRuntimePlan(ctx context.Context, agentID string) 
 	if engineType == "" {
 		engineType = "hermes"
 	}
+	runtimeCfg, ok := resolveRuntimeEngineConfig(platformConfig, engineType)
+	if !ok || !runtimeCfg.Enabled {
+		return nil, fmt.Errorf("engine %s is not enabled", engineType)
+	}
 	engineImpl, err := d.registry.GetEngine(engineType)
 	if err != nil {
 		return nil, err
@@ -268,13 +288,14 @@ func (d *DockerRuntime) resolveRuntimePlan(ctx context.Context, agentID string) 
 
 	return &runtimePlan{
 		platformConfig: platformConfig,
+		runtimeConfig:  runtimeCfg,
 		providerConfig: providerConfig,
 		agentRecord:    agentRecord,
 		engineType:     engineType,
 		engineImpl:     engineImpl,
 		workspacePath:  profileVolumePath(resolveWorkspaceBasePath(platformConfig), agentID),
 		volumePath:     profileVolumePath(platformConfig.DataBasePath, agentID),
-		containerPort:  resolveContainerPort(platformConfig),
+		containerPort:  resolveContainerPort(platformConfig, engineType, engineImpl),
 		apiKey:         agentRecord.EngineAPIKey,
 		endpointMode:   endpointMode,
 		dockerEndpoint: strings.TrimSpace(platformConfig.DockerEndpoint),
@@ -327,7 +348,13 @@ func (d *DockerRuntime) resolveProviderConfig(agentRecord *runtimeAgentInfo) (*P
 }
 
 func (d *DockerRuntime) Stop(ctx context.Context, agentID string) error {
-	name := containerName(agentID)
+	engineType := "hermes"
+	if d != nil && d.agents != nil {
+		if rec, err := d.agents.GetById(agentID); err == nil && rec != nil && strings.TrimSpace(rec.EngineType) != "" {
+			engineType = strings.TrimSpace(rec.EngineType)
+		}
+	}
+	name := containerName(agentID, engineType)
 
 	platformConfig, cfgErr := d.settings.GetPlatformConfig()
 	dockerEndpoint := ""
@@ -420,11 +447,39 @@ func resolveWorkspaceBasePath(cfg *runtimePlatformConfig) string {
 	return strings.TrimSpace(cfg.DataBasePath)
 }
 
-func resolveContainerPort(cfg *runtimePlatformConfig) string {
-	if cfg != nil && cfg.ContainerPort > 0 {
+func resolveContainerPort(cfg *runtimePlatformConfig, engineType string, eng Engine) string {
+	if runtimeCfg, ok := resolveRuntimeEngineConfig(cfg, engineType); ok && runtimeCfg.Enabled && runtimeCfg.EngineType == "hermes" && cfg != nil && cfg.ContainerPort > 0 {
 		return strconv.Itoa(cfg.ContainerPort)
 	}
+	if eng != nil && strings.TrimSpace(eng.DefaultPort()) != "" {
+		return strings.TrimSpace(eng.DefaultPort())
+	}
 	return HermesAPIPort
+}
+
+func resolveRuntimeEngineConfig(cfg *runtimePlatformConfig, engineType string) (*runtimeEngineConfig, bool) {
+	if cfg == nil {
+		return nil, false
+	}
+	target := strings.TrimSpace(strings.ToLower(engineType))
+	for i := range cfg.RuntimeEngines {
+		if cfg.RuntimeEngines[i].EngineType == target {
+			return &cfg.RuntimeEngines[i], true
+		}
+	}
+	return nil, false
+}
+
+func toRuntimeEngineConfigs(items []settings.RuntimeEngineConfig) []runtimeEngineConfig {
+	result := make([]runtimeEngineConfig, 0, len(items))
+	for _, item := range items {
+		result = append(result, runtimeEngineConfig{
+			EngineType: strings.TrimSpace(strings.ToLower(item.EngineType)),
+			Enabled:    item.Enabled,
+			Image:      strings.TrimSpace(item.Image),
+		})
+	}
+	return result
 }
 
 func resolveRuntimeMode(mode string) string {

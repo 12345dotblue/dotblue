@@ -12,6 +12,8 @@ import (
 const (
 	ModelScopePlatform   = "platform"
 	ModelScopeEnterprise = "enterprise"
+	EngineTypeHermes     = "hermes"
+	EngineTypeNanobot    = "nanobot"
 )
 
 // Agent represents a user's agent record (stored in agents table).
@@ -37,12 +39,14 @@ type AgentPublic struct {
 	ModelScope   string    `json:"modelScope"`
 	ModelId      string    `json:"modelId,omitempty"`
 	ModelName    string    `json:"modelName,omitempty"`
+	EngineType   string    `json:"engineType"`
 	CreatedAt    time.Time `json:"createdAt"`
 	UpdatedAt    time.Time `json:"updatedAt"`
 }
 
 func toPublic(a *Agent) AgentPublic {
 	modelScope, modelId := normalizeModelSelection(a.ModelScope, a.ModelId)
+	engineType := normalizeEngineType(a.EngineType)
 	return AgentPublic{
 		Id:           a.Id,
 		AgentName:    a.AgentName,
@@ -50,6 +54,7 @@ func toPublic(a *Agent) AgentPublic {
 		ModelScope:   modelScope,
 		ModelId:      modelId,
 		ModelName:    resolveModelName(a.GroupId, modelScope, modelId),
+		EngineType:   engineType,
 		CreatedAt:    a.CreatedAt,
 		UpdatedAt:    a.UpdatedAt,
 	}
@@ -102,13 +107,13 @@ func BelongsToUser(id, userId, enterpriseId string) (bool, error) {
 }
 
 // Create inserts a new agent record.
-func Create(userId, groupId, agentName, systemPrompt, modelScope, modelId string) (*Agent, error) {
-	return defaultService.Create(userId, groupId, agentName, systemPrompt, modelScope, modelId)
+func Create(userId, groupId, agentName, systemPrompt, modelScope, modelId, engineType string) (*Agent, error) {
+	return defaultService.Create(userId, groupId, agentName, systemPrompt, modelScope, modelId, engineType)
 }
 
 // Update modifies an agent's name and system prompt by ID.
-func Update(id, agentName, systemPrompt, modelScope, modelId string) error {
-	return defaultService.Update(id, agentName, systemPrompt, modelScope, modelId)
+func Update(id, agentName, systemPrompt, modelScope, modelId, engineType string) error {
+	return defaultService.Update(id, agentName, systemPrompt, modelScope, modelId, engineType)
 }
 
 // Delete removes an agent by ID.

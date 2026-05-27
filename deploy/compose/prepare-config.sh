@@ -270,7 +270,7 @@ cat > "${CASDOOR_DIR}/init_data.json" <<EOF
       "owner": "admin",
       "name": "$(json_escape_string "${CASDOOR_APP_NAME}")",
       "displayName": "$(json_escape_string "${DOTBLUE_BRAND_NAME}")",
-      "logo": "$(json_escape_string "${DOTBLUE_PUBLIC_URL}/brand/dotblue-logo.svg")",
+      "logo": "$(json_escape_string "${DOTBLUE_PUBLIC_URL}/brand/dotblue-logo.png")",
       "favicon": "$(json_escape_string "${DOTBLUE_PUBLIC_URL}/brand/dotblue-favicon.svg")",
       "homepageUrl": "$(json_escape_string "${DOTBLUE_PUBLIC_URL}")",
       "organization": "$(json_escape_string "${CASDOOR_ORG_NAME}")",
@@ -338,9 +338,9 @@ cat > "${CASDOOR_DIR}/init_data.json" <<EOF
         "isCompact": false,
         "isEnabled": true
       },
-      "formCss": ".login-panel{backdrop-filter:blur(18px);}.ant-btn-primary{box-shadow:none;}",
-      "formSideHtml": "<div style=\"padding:32px;color:#0f172a;\"><h2 style=\"margin:0 0 12px;\">$(json_escape_string "${DOTBLUE_BRAND_NAME}")</h2><p style=\"margin:0;color:#475569;\">AI agent sandbox for modern teams.</p></div>",
-      "formBackgroundUrl": "$(json_escape_string "${DOTBLUE_PUBLIC_URL}/brand/dotblue-login-bg.svg")"
+      "formCss": ".login-panel{backdrop-filter:blur(18px);background:rgba(255,255,255,0.78);border-radius:24px;box-shadow:0 24px 64px rgba(15,52,96,0.12);}.ant-btn-primary{box-shadow:none;}",
+      "formSideHtml": "<div style=\"padding:32px;color:#0f172a;\"><img src=\"$(json_escape_string "${DOTBLUE_PUBLIC_URL}/brand/dotblue-logo.png")\" alt=\"$(json_escape_string "${DOTBLUE_BRAND_NAME}")\" style=\"width:160px;max-width:100%;height:auto;display:block;margin-bottom:20px;\" /><h2 style=\"margin:0 0 12px;\">$(json_escape_string "${DOTBLUE_BRAND_NAME}")</h2><p style=\"margin:0;color:#475569;\">AI workspace platform for modern product, operations, and growth teams.</p></div>",
+      "formBackgroundUrl": "$(json_escape_string "${DOTBLUE_PUBLIC_URL}/brand/dotblue-login-bg.png")"
     }
   ],
   "users": [

@@ -20,7 +20,7 @@
       "owner": "admin",
       "name": "__CASDOOR_APP_NAME__",
       "displayName": "__DOTBLUE_BRAND_NAME__",
-      "logo": "__DOTBLUE_PUBLIC_URL__/brand/dotblue-logo.svg",
+      "logo": "__DOTBLUE_PUBLIC_URL__/brand/dotblue-logo.png",
       "favicon": "__DOTBLUE_PUBLIC_URL__/brand/dotblue-favicon.svg",
       "homepageUrl": "__DOTBLUE_PUBLIC_URL__",
       "organization": "__CASDOOR_ORG_NAME__",
@@ -98,9 +98,9 @@
         "isCompact": false,
         "isEnabled": true
       },
-      "formCss": ".login-panel{backdrop-filter:blur(18px);}.ant-btn-primary{box-shadow:none;}",
-      "formSideHtml": "<div style=\"padding:32px;color:#0f172a;\"><h2 style=\"margin:0 0 12px;\">__DOTBLUE_BRAND_NAME__</h2><p style=\"margin:0;color:#475569;\">AI agent sandbox for modern teams.</p></div>",
-      "formBackgroundUrl": "__DOTBLUE_PUBLIC_URL__/brand/dotblue-login-bg.svg"
+      "formCss": ".login-panel{backdrop-filter:blur(18px);background:rgba(255,255,255,0.78);border-radius:24px;box-shadow:0 24px 64px rgba(15,52,96,0.12);}.ant-btn-primary{box-shadow:none;}",
+      "formSideHtml": "<div style=\"padding:32px;color:#0f172a;\"><img src=\"__DOTBLUE_PUBLIC_URL__/brand/dotblue-logo.png\" alt=\"__DOTBLUE_BRAND_NAME__\" style=\"width:160px;max-width:100%;height:auto;display:block;margin-bottom:20px;\" /><h2 style=\"margin:0 0 12px;\">__DOTBLUE_BRAND_NAME__</h2><p style=\"margin:0;color:#475569;\">AI workspace platform for modern product, operations, and growth teams.</p></div>",
+      "formBackgroundUrl": "__DOTBLUE_PUBLIC_URL__/brand/dotblue-login-bg.png"
     }
   ],
   "users": [

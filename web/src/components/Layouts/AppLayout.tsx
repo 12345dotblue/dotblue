@@ -16,6 +16,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import axios from 'axios';
 import { casdoorService } from '../../domains/identity/CasdoorService';
 import { BACKEND_URL } from '../../config';
+import { LANGUAGE_OPTIONS, resolveSupportedLanguage } from '../../i18n/config';
 
 const { Header, Content, Sider } = Layout;
 const { Title, Text } = Typography;
@@ -51,6 +52,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const isAdmin = casdoorService.isAdmin();
   const isChatPage = location.pathname === '/chat';
   const username = casdoorService.getUsername() || 'User';
+  const currentLanguage = resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language);
+  const currentLanguageLabel = LANGUAGE_OPTIONS.find((item) => item.value === currentLanguage)?.shortLabel || 'EN';
 
   React.useEffect(() => {
     if (!casdoorService.isAuthenticated()) {
@@ -136,7 +139,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
   const getPageTitle = () => {
     if (location.pathname === '/dashboard') return t('agent_settings');
-    if (location.pathname === '/chat') return t('chat_hermes');
+    if (location.pathname === '/chat') return t('chat');
     if (location.pathname === '/admin/settings' || location.pathname === '/admin/enterprise') return t('enterprise_admin_nav');
     if (location.pathname === '/admin/platform') return t('platform_settings_nav');
     return '';
@@ -159,14 +162,16 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         overflow: 'hidden',
         transition: 'all 0.2s',
       }}>
-        <div style={{
-          minWidth: 32,
-          height: 32,
-          background: 'linear-gradient(135deg, #1677ff 0%, #36cfc9 100%)',
-          borderRadius: 8,
-          boxShadow: '0 4px 10px rgba(22,119,255,0.3)',
-          flexShrink: 0,
-        }} />
+        <img
+          src="/brand/dotblue-logo.png"
+          alt="dotblue"
+          style={{
+            width: collapsed && !mobileVisible ? 32 : 92,
+            height: 32,
+            objectFit: 'contain',
+            flexShrink: 0,
+          }}
+        />
         {(!collapsed || mobileVisible) && (
           <Title level={4} style={{ margin: '0 0 0 12px', color: '#fff', letterSpacing: 1, whiteSpace: 'nowrap' }}>
             dotblue
@@ -280,12 +285,15 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
           <Space size="middle">
             <Dropdown menu={{
-              items: [
-                { key: 'en', label: 'English', onClick: () => changeLanguage('en') },
-                { key: 'zh-CN', label: '简体中文', onClick: () => changeLanguage('zh-CN') },
-              ],
+              items: LANGUAGE_OPTIONS.map((item) => ({
+                key: item.value,
+                label: item.label,
+                onClick: () => changeLanguage(item.value),
+              })),
             }}>
-              <Button type="text" icon={<GlobalOutlined />} />
+              <Button type="text" icon={<GlobalOutlined />}>
+                {currentLanguageLabel}
+              </Button>
             </Dropdown>
             <Dropdown menu={{
               items: [

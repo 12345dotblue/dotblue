@@ -71,6 +71,7 @@ func (s *Service) GetPlatformConfig() (*PlatformConfig, error) {
 	if err := json.Unmarshal(settings.Platform, &cfg); err != nil {
 		return nil, err
 	}
+	cfg = *NormalizePlatformConfig(&cfg)
 	if cfg.DataBasePath == "" {
 		return nil, nil
 	}
@@ -98,6 +99,7 @@ func (s *Service) GetProviderConfig() (*ProviderConfig, error) {
 func (s *Service) UpdatePlatformConfig(cfg *PlatformConfig) error {
 	ctx := context.Background()
 	s.ensureRow(ctx)
+	cfg = NormalizePlatformConfig(cfg)
 	data, err := json.Marshal(cfg)
 	if err != nil {
 		return err

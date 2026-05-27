@@ -70,5 +70,6 @@ func GetRuntime() Runtime {
 // Init initializes the default runtime and registers built-in engines.
 func Init() {
 	RegisterEngine(&HermesEngine{})
+	RegisterEngine(&NanobotEngine{})
 	SetRuntime(NewDockerRuntime())
 }

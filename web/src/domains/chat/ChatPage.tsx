@@ -16,6 +16,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useXChat } from '@ant-design/x-sdk';
 import { BACKEND_URL } from '../../config';
+import { LANGUAGE_OPTIONS, resolveSupportedLanguage } from '../../i18n/config';
 import { casdoorService } from '../identity/CasdoorService';
 import { getOrCreateProvider } from './SSEChatProvider';
 import type {
@@ -34,6 +35,7 @@ const { Text } = Typography;
 interface AgentOption {
   id: string;
   agentName: string;
+  engineType?: 'hermes' | 'nanobot';
 }
 
 interface ConversationItem {
@@ -83,6 +85,10 @@ const mapConversationFromApi = (c: any, getGroupLabel: (dateStr: string) => stri
   agentName: c.agentName || '',
   updatedAt: c.updatedAt,
 });
+
+function formatEngineLabel(engineType: string | undefined, t: any): string {
+  return engineType === 'nanobot' ? t('agent_engine_nanobot') : t('agent_engine_hermes');
+}
 
 function formatMessageTime(value?: string, locale = 'zh-CN'): string {
   if (!value) return '';
@@ -356,6 +362,7 @@ interface ConversationPaneProps {
   conversationId: string;
   selectedAgentId: string | null;
   selectedAgentName?: string;
+  runtimeFooter: string;
   provider: ReturnType<typeof getOrCreateProvider> | undefined;
   authHeaders: () => { headers: { Authorization: string } };
   getJwt: () => string | null;
@@ -367,6 +374,7 @@ const ConversationPane: React.FC<ConversationPaneProps> = ({
   conversationId,
   selectedAgentId,
   selectedAgentName,
+  runtimeFooter,
   provider,
   authHeaders,
   getJwt,
@@ -501,13 +509,20 @@ const ConversationPane: React.FC<ConversationPaneProps> = ({
   return (
     <>
       {parsedMessages.length === 0 ? (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Welcome
-            variant="borderless"
-            icon={<ThunderboltOutlined style={{ color: '#1677ff', fontSize: 48 }} />}
-            title={selectedAgentName || t('welcome')}
-            description={t('hero_subtitle')}
-          />
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>
+          <div style={{ width: '100%', maxWidth: 760, borderRadius: 24, border: '1px solid #eef2f6', background: 'linear-gradient(180deg, #ffffff 0%, #f7fbff 100%)', boxShadow: '0 20px 60px rgba(15,52,96,0.08)', padding: '32px 28px' }}>
+            <Welcome
+              variant="borderless"
+              icon={<ThunderboltOutlined style={{ color: '#1677ff', fontSize: 48 }} />}
+              title={selectedAgentName || t('welcome')}
+              description={t('hero_subtitle')}
+            />
+            <Space wrap size={[8, 8]} style={{ marginTop: 20 }}>
+              <Tag color="blue">{t('hero_stat_security')}</Tag>
+              <Tag color="gold">{t('highlight_runtime_metric')}</Tag>
+              <Tag color="purple">{t('feat_api_title')}</Tag>
+            </Space>
+          </div>
         </div>
       ) : (
         <Bubble.List
@@ -583,7 +598,7 @@ const ConversationPane: React.FC<ConversationPaneProps> = ({
         />
         <div style={{ textAlign: 'center', marginTop: 8 }}>
           <Text type="secondary" style={{ fontSize: 12 }}>
-            Powered by Hermes Engine &bull; gVisor Isolated
+            {runtimeFooter}
           </Text>
         </div>
       </div>
@@ -649,6 +664,7 @@ const ChatPage: React.FC = () => {
         .map((a: any) => ({
           id: a.id,
           agentName: a.agentName,
+          engineType: a.engineType || 'hermes',
         }))
         .filter((agent: AgentOption, index: number, all: AgentOption[]) =>
           all.findIndex((candidate) => candidate.id === agent.id) === index,
@@ -794,17 +810,29 @@ const ChatPage: React.FC = () => {
   // --- No agents ---
   if (!agentsLoading && agents.length === 0) {
     return (
-      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f4f7f9' }}>
-        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('chat_no_agents')}>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/dashboard')}>
-            {t('chat_create_first_agent')}
-          </Button>
-        </Empty>
+      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(180deg, #f4f7f9 0%, #ffffff 100%)', padding: 24 }}>
+        <div style={{ width: '100%', maxWidth: 560, borderRadius: 24, background: '#fff', border: '1px solid #eef2f6', boxShadow: '0 20px 60px rgba(15,52,96,0.08)', padding: 32, textAlign: 'center' }}>
+          <Space wrap size={[8, 8]} style={{ justifyContent: 'center', marginBottom: 16 }}>
+            <Tag color="blue">{t('hero_stat_security')}</Tag>
+            <Tag color="cyan">{t('feat_multi_title')}</Tag>
+            <Tag color="purple">{t('feat_api_title')}</Tag>
+          </Space>
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('chat_no_agents')}>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/dashboard')}>
+              {t('chat_create_first_agent')}
+            </Button>
+          </Empty>
+        </div>
       </div>
     );
   }
 
   const selectedAgent = agents.find(a => a.id === selectedAgentId);
+  const runtimeFooter = t('chat_runtime_footer', {
+    engine: formatEngineLabel(selectedAgent?.engineType, t),
+  });
+  const currentLanguage = resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language);
+  const currentLanguageLabel = LANGUAGE_OPTIONS.find((option) => option.value === currentLanguage)?.shortLabel || 'EN';
 
   const renderTimestamp = (value?: string, align: 'left' | 'right' = 'left') => {
     const formatted = formatMessageTime(value, i18n.language || 'zh-CN');
@@ -1010,8 +1038,11 @@ const ChatPage: React.FC = () => {
         <Space>
           <Button type="text" icon={sidebarCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)} />
-          <div style={{ width: 28, height: 28, background: `linear-gradient(135deg, ${token.colorPrimary} 0%, #36cfc9 100%)`, borderRadius: 6 }} />
-          <Text strong style={{ fontSize: 16 }}>dotblue</Text>
+          <img
+            src="/brand/dotblue-logo.png"
+            alt="dotblue"
+            style={{ width: 84, height: 28, objectFit: 'contain' }}
+          />
         </Space>
         <Space size="middle">
           <Space size={6}>
@@ -1026,13 +1057,16 @@ const ChatPage: React.FC = () => {
             icon={<AppstoreOutlined />}
             onClick={() => navigate('/dashboard')}
           >
-            Dashboard
+            {t('go_to_dashboard')}
           </Button>
-          <Dropdown menu={{ items: [
-            { key: 'en', label: 'English', onClick: () => i18n.changeLanguage('en') },
-            { key: 'zh-CN', label: '简体中文', onClick: () => i18n.changeLanguage('zh-CN') },
-          ]}}>
-            <Button type="text" size="small" icon={<GlobalOutlined />} />
+          <Dropdown menu={{ items: LANGUAGE_OPTIONS.map((option) => ({
+            key: option.value,
+            label: option.label,
+            onClick: () => i18n.changeLanguage(option.value),
+          })) }}>
+            <Button type="text" size="small" icon={<GlobalOutlined />}>
+              {currentLanguageLabel}
+            </Button>
           </Dropdown>
           <Dropdown menu={{ items: [
             { key: 'agents', label: t('agent_settings'), icon: <AppstoreOutlined />, onClick: () => navigate('/dashboard') },
@@ -1102,6 +1136,7 @@ const ChatPage: React.FC = () => {
             conversationId={curConvId}
             selectedAgentId={selectedAgentId}
             selectedAgentName={selectedAgent?.agentName}
+            runtimeFooter={runtimeFooter}
             provider={provider}
             authHeaders={authHeaders}
             getJwt={getJwt}

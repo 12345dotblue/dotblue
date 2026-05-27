@@ -5,6 +5,7 @@ import (
 
 	"dotblue/internal/domains/identity"
 	"dotblue/internal/domains/model"
+	"dotblue/internal/domains/settings"
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
 )
@@ -14,6 +15,7 @@ type createReq struct {
 	SystemPrompt string `json:"systemPrompt" v:"required"`
 	ModelScope   string `json:"modelScope" v:"required"`
 	ModelId      string `json:"modelId"`
+	EngineType   string `json:"engineType"`
 }
 
 type updateReq struct {
@@ -21,6 +23,7 @@ type updateReq struct {
 	SystemPrompt string `json:"systemPrompt" v:"required"`
 	ModelScope   string `json:"modelScope" v:"required"`
 	ModelId      string `json:"modelId"`
+	EngineType   string `json:"engineType"`
 }
 
 type modelOption struct {
@@ -34,6 +37,15 @@ type modelOption struct {
 type modelOptionGroup struct {
 	Label   string        `json:"label"`
 	Options []modelOption `json:"options"`
+}
+
+type runtimeOption struct {
+	Value string `json:"value"`
+}
+
+type agentOptionsResp struct {
+	ModelOptions   []modelOptionGroup `json:"modelOptions"`
+	RuntimeOptions []runtimeOption    `json:"runtimeOptions"`
 }
 
 // ModelOptionsHandler returns grouped model options for agent creation.
@@ -84,7 +96,20 @@ func ModelOptionsHandler(r *ghttp.Request) {
 		})
 	}
 
-	r.Response.WriteJson(result)
+	runtimeOptions := make([]runtimeOption, 0, 2)
+	platformCfg, err := settings.GetPlatformConfig()
+	if err != nil {
+		g.Log().Warningf(r.Context(), "Failed to read platform runtime config: %v", err)
+	} else {
+		for _, item := range settings.EnabledRuntimeEngines(platformCfg) {
+			runtimeOptions = append(runtimeOptions, runtimeOption{Value: item.EngineType})
+		}
+	}
+
+	r.Response.WriteJson(agentOptionsResp{
+		ModelOptions:   result,
+		RuntimeOptions: runtimeOptions,
+	})
 }
 
 // ListHandler returns all agents for the current user.
@@ -127,7 +152,7 @@ func CreateHandler(r *ghttp.Request) {
 		return
 	}
 
-	agent, err := defaultService.Create(userId, enterpriseId, req.AgentName, req.SystemPrompt, req.ModelScope, req.ModelId)
+	agent, err := defaultService.Create(userId, enterpriseId, req.AgentName, req.SystemPrompt, req.ModelScope, req.ModelId, req.EngineType)
 	if err != nil {
 		g.Log().Errorf(r.Context(), "Failed to create agent: %v", err)
 		r.Response.WriteStatus(http.StatusBadRequest, err.Error())
@@ -186,7 +211,7 @@ func UpdateHandler(r *ghttp.Request) {
 		return
 	}
 
-	if err := defaultService.Update(agentId, req.AgentName, req.SystemPrompt, req.ModelScope, req.ModelId); err != nil {
+	if err := defaultService.Update(agentId, req.AgentName, req.SystemPrompt, req.ModelScope, req.ModelId, req.EngineType); err != nil {
 		g.Log().Errorf(r.Context(), "Failed to update agent: %v", err)
 		r.Response.WriteStatus(http.StatusBadRequest, err.Error())
 		return

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button, List, Modal, Form, Input, message, Typography, Space, Empty, Popconfirm, Select, Tag, Statistic, Table } from 'antd';
+import { Card, Button, List, Modal, Form, Input, message, Typography, Space, Empty, Popconfirm, Select, Tag, Statistic, Table, Radio } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, RobotOutlined, LineChartOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -16,6 +16,7 @@ interface AgentItem {
   modelScope: 'platform' | 'enterprise';
   modelId?: string;
   modelName?: string;
+  engineType: 'hermes' | 'nanobot';
   todayTokens?: number;
   todayCharge?: number;
   monthTokens?: number;
@@ -54,10 +55,24 @@ interface ModelOptionGroup {
   options: ModelOptionItem[];
 }
 
+interface RuntimeOptionItem {
+  value: 'hermes' | 'nanobot';
+}
+
+interface AgentOptionsResponse {
+  modelOptions: ModelOptionGroup[];
+  runtimeOptions: RuntimeOptionItem[];
+}
+
 interface AgentFormValues {
   agentName: string;
   systemPrompt: string;
   modelSelection: string;
+  engineType: 'hermes' | 'nanobot';
+}
+
+function formatEngineLabel(engineType: string, t: (key: string) => string): string {
+  return engineType === 'nanobot' ? t('agent_engine_nanobot') : t('agent_engine_hermes');
 }
 
 const AgentList: React.FC = () => {
@@ -65,6 +80,7 @@ const AgentList: React.FC = () => {
   const navigate = useNavigate();
   const [agents, setAgents] = useState<AgentItem[]>([]);
   const [modelOptions, setModelOptions] = useState<ModelOptionGroup[]>([]);
+  const [runtimeOptions, setRuntimeOptions] = useState<RuntimeOptionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingAgent, setEditingAgent] = useState<AgentItem | null>(null);
@@ -108,14 +124,26 @@ const AgentList: React.FC = () => {
     });
   };
 
-  const fetchModelOptions = () => {
+  const resolvedRuntimeOptions = runtimeOptions.length > 0 ? runtimeOptions : [{ value: 'hermes' as const }];
+
+  const defaultRuntimeEngine = () => resolvedRuntimeOptions[0]?.value || 'hermes';
+
+  const fetchAgentOptions = () => {
     const token = localStorage.getItem('casdoor_token');
     axios.get(`${BACKEND_URL}/api/agents/model-options`, {
       headers: { Authorization: `Bearer ${token}` },
     }).then(res => {
-      setModelOptions(Array.isArray(res.data) ? res.data : []);
+      const data: AgentOptionsResponse | ModelOptionGroup[] = res.data;
+      if (Array.isArray(data)) {
+        setModelOptions(data);
+        setRuntimeOptions([{ value: 'hermes' }]);
+        return;
+      }
+      setModelOptions(Array.isArray(data?.modelOptions) ? data.modelOptions : []);
+      setRuntimeOptions(Array.isArray(data?.runtimeOptions) && data.runtimeOptions.length > 0 ? data.runtimeOptions : [{ value: 'hermes' }]);
     }).catch(() => {
       setModelOptions([]);
+      setRuntimeOptions([{ value: 'hermes' }]);
     });
   };
 
@@ -152,13 +180,14 @@ const AgentList: React.FC = () => {
 
   useEffect(() => {
     fetchAgents();
-    fetchModelOptions();
+    fetchAgentOptions();
   }, []);
 
   const openCreate = () => {
     setEditingAgent(null);
     form.resetFields();
     form.setFieldValue('modelSelection', getDefaultModelSelection());
+    form.setFieldValue('engineType', defaultRuntimeEngine());
     setModalOpen(true);
   };
 
@@ -168,6 +197,7 @@ const AgentList: React.FC = () => {
       agentName: agent.agentName,
       systemPrompt: agent.systemPrompt,
       modelSelection: toModelSelection(agent),
+      engineType: agent.engineType || 'hermes',
     });
     setModalOpen(true);
   };
@@ -183,6 +213,7 @@ const AgentList: React.FC = () => {
         systemPrompt: values.systemPrompt,
         modelScope,
         modelId,
+        engineType: values.engineType,
       };
 
       if (editingAgent) {
@@ -302,6 +333,9 @@ const AgentList: React.FC = () => {
                     <Tag color={item.modelScope === 'enterprise' ? 'blue' : 'green'}>
                       {item.modelScope === 'enterprise' ? t('agent_model_scope_enterprise') : t('agent_model_scope_platform')}
                     </Tag>
+                    <Tag color={item.engineType === 'nanobot' ? 'purple' : 'gold'}>
+                      {formatEngineLabel(item.engineType, t)}
+                    </Tag>
                     {item.modelName ? <Text type="secondary">{item.modelName}</Text> : null}
                   </div>
                   <div style={{ marginTop: 12, display: 'flex', gap: 24, flexWrap: 'wrap' }}>
@@ -347,7 +381,7 @@ const AgentList: React.FC = () => {
         <Form
           form={form}
           layout="vertical"
-          initialValues={{ agentName: '', systemPrompt: '', modelSelection: getDefaultModelSelection() }}
+          initialValues={{ agentName: '', systemPrompt: '', modelSelection: getDefaultModelSelection(), engineType: 'hermes' }}
         >
           <Form.Item
             label={t('agent_name')}
@@ -372,6 +406,20 @@ const AgentList: React.FC = () => {
               placeholder={t('agent_model_placeholder')}
               options={modelOptions}
               notFoundContent={t('agent_model_empty')}
+            />
+          </Form.Item>
+          <Form.Item
+            label={t('agent_engine')}
+            name="engineType"
+            rules={[{ required: true, message: t('agent_engine_required') }]}
+          >
+            <Radio.Group
+              options={resolvedRuntimeOptions.map((item) => ({
+                label: formatEngineLabel(item.value, t),
+                value: item.value,
+              }))}
+              optionType="button"
+              buttonStyle="solid"
             />
           </Form.Item>
         </Form>

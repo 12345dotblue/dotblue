@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Card, Col, Form, Input, InputNumber, Row, Select, Typography, message } from 'antd';
+import { Button, Card, Col, Form, Input, InputNumber, Row, Select, Switch, Typography, message } from 'antd';
 import { DatabaseOutlined, SettingOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
@@ -10,6 +10,35 @@ import PlatformUsageSettingsCard from './PlatformUsageSettingsCard';
 
 const { Paragraph, Title } = Typography;
 
+const runtimeEngineDefaults: Record<'hermes' | 'nanobot', { enabled: boolean; image: string }> = {
+  hermes: { enabled: true, image: 'nousresearch/hermes-agent:latest' },
+  nanobot: { enabled: false, image: 'nanobot' },
+};
+
+function toRuntimeEngineMap(items?: RuntimeEngineConfig[]): PlatformFormValues['runtimeEngines'] {
+  const result: PlatformFormValues['runtimeEngines'] = {
+    hermes: { ...runtimeEngineDefaults.hermes },
+    nanobot: { ...runtimeEngineDefaults.nanobot },
+  };
+  (items || []).forEach((item) => {
+    if (item.engineType === 'hermes' || item.engineType === 'nanobot') {
+      result[item.engineType] = {
+        enabled: item.enabled,
+        image: item.image || runtimeEngineDefaults[item.engineType].image,
+      };
+    }
+  });
+  return result;
+}
+
+function toRuntimeEngineList(values: PlatformFormValues['runtimeEngines']): RuntimeEngineConfig[] {
+  return (['hermes', 'nanobot'] as const).map((engineType) => ({
+    engineType,
+    enabled: values?.[engineType]?.enabled ?? runtimeEngineDefaults[engineType].enabled,
+    image: values?.[engineType]?.image || runtimeEngineDefaults[engineType].image,
+  }));
+}
+
 interface PlatformConfig {
   dataBasePath: string;
   dataMountPath: string;
@@ -18,6 +47,17 @@ interface PlatformConfig {
   endpointMode: 'auto' | 'host_loopback' | 'docker_dns';
   dockerEndpoint: string;
   dockerNetwork: string;
+  runtimeEngines?: RuntimeEngineConfig[];
+}
+
+interface RuntimeEngineConfig {
+  engineType: 'hermes' | 'nanobot';
+  enabled: boolean;
+  image: string;
+}
+
+interface PlatformFormValues extends Omit<PlatformConfig, 'runtimeEngines'> {
+  runtimeEngines: Record<'hermes' | 'nanobot', { enabled: boolean; image: string }>;
 }
 
 interface AdminSettingsData {
@@ -34,7 +74,7 @@ const PlatformSettingsPage: React.FC = () => {
   const [messageApi, contextHolder] = message.useMessage();
   const [fetching, setFetching] = useState(true);
   const [savingPlatform, setSavingPlatform] = useState(false);
-  const [platformForm] = Form.useForm<PlatformConfig>();
+  const [platformForm] = Form.useForm<PlatformFormValues>();
 
   useEffect(() => {
     axios.get(`${BACKEND_URL}/api/admin/settings`, {
@@ -49,6 +89,7 @@ const PlatformSettingsPage: React.FC = () => {
         endpointMode: data.platform?.endpointMode || 'auto',
         dockerEndpoint: data.platform?.dockerEndpoint || '',
         dockerNetwork: data.platform?.dockerNetwork || '',
+        runtimeEngines: toRuntimeEngineMap(data.platform?.runtimeEngines),
       });
     }).catch(() => {
       messageApi.error(t('platform_settings_load_failed'));
@@ -57,10 +98,20 @@ const PlatformSettingsPage: React.FC = () => {
     });
   }, [messageApi, platformForm, t]);
 
-  const handlePlatformSave = async (values: PlatformConfig) => {
+  const handlePlatformSave = async (values: PlatformFormValues) => {
     setSavingPlatform(true);
     try {
-      await axios.post(`${BACKEND_URL}/api/admin/settings`, { platform: values }, {
+      const payload: PlatformConfig = {
+        dataBasePath: values.dataBasePath,
+        dataMountPath: values.dataMountPath,
+        containerPort: values.containerPort,
+        runtimeMode: values.runtimeMode,
+        endpointMode: values.endpointMode,
+        dockerEndpoint: values.dockerEndpoint,
+        dockerNetwork: values.dockerNetwork,
+        runtimeEngines: toRuntimeEngineList(values.runtimeEngines),
+      };
+      await axios.post(`${BACKEND_URL}/api/admin/settings`, { platform: payload }, {
         headers: getAuthHeaders(),
       });
       messageApi.success(t('platform_settings_runtime_saved'));
@@ -154,6 +205,36 @@ const PlatformSettingsPage: React.FC = () => {
               >
                 <Input placeholder="dotblue_default" />
               </Form.Item>
+              <Card
+                size="small"
+                style={{ marginBottom: 16, background: '#fafafa' }}
+                title={t('platform_settings_runtime_engines_title')}
+              >
+                <Paragraph type="secondary">
+                  {t('platform_settings_runtime_engines_desc')}
+                </Paragraph>
+                {(['hermes', 'nanobot'] as const).map((engineType) => (
+                  <div key={engineType} style={{ marginBottom: engineType === 'nanobot' ? 0 : 16 }}>
+                    <Title level={5} style={{ marginBottom: 12 }}>
+                      {engineType === 'hermes' ? t('platform_settings_runtime_engine_hermes') : t('platform_settings_runtime_engine_nanobot')}
+                    </Title>
+                    <Form.Item
+                      label={t('platform_settings_runtime_engine_enabled')}
+                      name={['runtimeEngines', engineType, 'enabled']}
+                      valuePropName="checked"
+                    >
+                      <Switch />
+                    </Form.Item>
+                    <Form.Item
+                      label={t('platform_settings_runtime_engine_image')}
+                      name={['runtimeEngines', engineType, 'image']}
+                      rules={[{ required: true, message: t('platform_settings_runtime_engine_image_required') }]}
+                    >
+                      <Input />
+                    </Form.Item>
+                  </div>
+                ))}
+              </Card>
               <Button type="primary" htmlType="submit" loading={savingPlatform}>
                 {t('platform_settings_save_runtime')}
               </Button>

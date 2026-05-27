@@ -10,6 +10,8 @@ import (
 type Engine interface {
 	// Name returns the engine identifier (e.g. "hermes").
 	Name() string
+	// DefaultPort returns the container port exposed by the engine runtime.
+	DefaultPort() string
 	// PrepareVolume writes engine-specific config files to the volume directory.
 	PrepareVolume(ctx context.Context, volPath string, agent *AgentConfig, providerCfg *ProviderConfig) error
 	// ContainerSpec returns the container creation spec for this engine.

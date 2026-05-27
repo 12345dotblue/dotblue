@@ -143,11 +143,11 @@ func proxyToHermes(r *ghttp.Request, ws *ghttp.WebSocket, prepared *PreparedTurn
 		return
 	}
 
-	httpResp, err := eng.ProxyRequest(upstreamCtx, prepared.Endpoint, prepared.History, convId)
+	httpResp, err := eng.ProxyRequest(upstreamCtx, prepared.Endpoint, engineMessagesForTurn(prepared), convId)
 	if err != nil {
 		defaultService.failMeteringInvocation(usageEvent, err)
-		g.Log().Errorf(r.Context(), "Hermes request failed: %v", err)
-		sendError(ws, "Hermes engine unreachable")
+		g.Log().Errorf(r.Context(), "Engine request failed: %v", err)
+		sendError(ws, "Engine unreachable")
 		return
 	}
 	defer httpResp.Body.Close()
@@ -155,8 +155,8 @@ func proxyToHermes(r *ghttp.Request, ws *ghttp.WebSocket, prepared *PreparedTurn
 	if httpResp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(httpResp.Body)
 		defaultService.failMeteringInvocation(usageEvent, errors.New(strings.TrimSpace(string(body))))
-		g.Log().Errorf(r.Context(), "Hermes error: %s", string(body))
-		sendError(ws, "Hermes error: "+string(body))
+		g.Log().Errorf(r.Context(), "Engine error: %s", string(body))
+		sendError(ws, "Engine error: "+string(body))
 		return
 	}
 
@@ -441,7 +441,7 @@ func proxyToHermesSSE(r *ghttp.Request, prepared *PreparedTurn) {
 		return
 	}
 
-	resp, err := eng.ProxyRequest(upstreamCtx, prepared.Endpoint, prepared.History, convId)
+	resp, err := eng.ProxyRequest(upstreamCtx, prepared.Endpoint, engineMessagesForTurn(prepared), convId)
 	if err != nil {
 		defaultService.failMeteringInvocation(usageEvent, err)
 		g.Log().Errorf(r.Context(), "Engine request failed: %v", err)
@@ -455,8 +455,8 @@ func proxyToHermesSSE(r *ghttp.Request, prepared *PreparedTurn) {
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		defaultService.failMeteringInvocation(usageEvent, errors.New(strings.TrimSpace(string(body))))
-		g.Log().Errorf(r.Context(), "Hermes error: %s", string(body))
-		sseWrite(r, "error", MsgRes{Content: "Hermes error: " + string(body), Status: "error"})
+		g.Log().Errorf(r.Context(), "Engine error: %s", string(body))
+		sseWrite(r, "error", MsgRes{Content: "Engine error: " + string(body), Status: "error"})
 		return
 	}
 

@@ -31,6 +31,8 @@ type integrationEngine struct{}
 
 func (integrationEngine) Name() string { return "hermes" }
 
+func (integrationEngine) DefaultPort() string { return engine.HermesAPIPort }
+
 func (integrationEngine) PrepareVolume(ctx context.Context, volPath string, agent *engine.AgentConfig, providerCfg *engine.ProviderConfig) error {
 	return nil
 }

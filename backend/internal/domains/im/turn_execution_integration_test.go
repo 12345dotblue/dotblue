@@ -185,6 +185,8 @@ type executionTestEngine struct{}
 
 func (executionTestEngine) Name() string { return "hermes" }
 
+func (executionTestEngine) DefaultPort() string { return engine.HermesAPIPort }
+
 func (executionTestEngine) PrepareVolume(ctx context.Context, volPath string, agent *engine.AgentConfig, providerCfg *engine.ProviderConfig) error {
 	return nil
 }

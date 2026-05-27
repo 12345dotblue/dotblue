@@ -319,7 +319,12 @@ func (s *Service) ExecutePreparedTurn(ctx context.Context, prepared *PreparedTur
 		return nil, err
 	}
 
-	httpResp, err := resp.ProxyRequest(upstreamCtx, prepared.Endpoint, prepared.History, prepared.ConversationID)
+	httpResp, err := resp.ProxyRequest(
+		upstreamCtx,
+		prepared.Endpoint,
+		engineMessagesForTurn(prepared),
+		prepared.ConversationID,
+	)
 	if err != nil {
 		s.failMeteringInvocation(usageEvent, err)
 		g.Log().Errorf(ctx, "chat.turn.proxy.error conv=%s err=%v", prepared.ConversationID, err)
@@ -501,6 +506,27 @@ func EngineTypeForTurn(agentRec *agent.Agent) string {
 		return agentRec.EngineType
 	}
 	return "hermes"
+}
+
+func engineMessagesForTurn(prepared *PreparedTurn) []interface{} {
+	if prepared == nil {
+		return nil
+	}
+	if EngineTypeForTurn(prepared.Agent) != "nanobot" {
+		return prepared.History
+	}
+	systemPrompt := strings.TrimSpace(prepared.Agent.SystemPrompt)
+	if systemPrompt == "" || len(prepared.History) != 1 {
+		return prepared.History
+	}
+
+	result := make([]interface{}, 0, len(prepared.History)+1)
+	result = append(result, map[string]any{
+		"role":    "user",
+		"content": "[dotblue-system]\n" + systemPrompt,
+	})
+	result = append(result, prepared.History...)
+	return result
 }
 
 func resolvePreparedSourceType(prepared *PreparedTurn) string {

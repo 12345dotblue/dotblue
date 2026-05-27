@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"dotblue/internal/domains/model"
+	"dotblue/internal/domains/settings"
 )
 
 type stubRepository struct {
@@ -13,7 +14,7 @@ type stubRepository struct {
 	listByUserIdFunc  func(userId, enterpriseId string) ([]*Agent, error)
 	belongsToUserFunc func(id, userId, enterpriseId string) (bool, error)
 	createFunc        func(agent *Agent) error
-	updateFunc        func(id, agentName, systemPrompt, modelScope, modelId string, updatedAt time.Time) error
+	updateFunc        func(id, agentName, systemPrompt, modelScope, modelId, engineType string, updatedAt time.Time) error
 	deleteFunc        func(id string) error
 }
 
@@ -45,9 +46,9 @@ func (s *stubRepository) Create(agent *Agent) error {
 	return nil
 }
 
-func (s *stubRepository) Update(id, agentName, systemPrompt, modelScope, modelId string, updatedAt time.Time) error {
+func (s *stubRepository) Update(id, agentName, systemPrompt, modelScope, modelId, engineType string, updatedAt time.Time) error {
 	if s.updateFunc != nil {
-		return s.updateFunc(id, agentName, systemPrompt, modelScope, modelId, updatedAt)
+		return s.updateFunc(id, agentName, systemPrompt, modelScope, modelId, engineType, updatedAt)
 	}
 	return nil
 }
@@ -59,7 +60,22 @@ func (s *stubRepository) Delete(id string) error {
 	return nil
 }
 
+func allowRuntimeEnginesForTest(t *testing.T, items ...settings.RuntimeEngineConfig) {
+	t.Helper()
+	originalPlatformLoader := loadPlatformConfig
+	loadPlatformConfig = func() (*settings.PlatformConfig, error) {
+		return &settings.PlatformConfig{
+			DataBasePath:   "/runtime-data",
+			RuntimeEngines: items,
+		}, nil
+	}
+	t.Cleanup(func() {
+		loadPlatformConfig = originalPlatformLoader
+	})
+}
+
 func TestServiceCreateGeneratesDefaults(t *testing.T) {
+	allowRuntimeEnginesForTest(t, settings.RuntimeEngineConfig{EngineType: EngineTypeHermes, Enabled: true})
 	originalModelLoader := loadModelByID
 	loadModelByID = func(id string) (*model.LLMModel, error) {
 		return &model.LLMModel{Id: id, Scope: model.ScopePlatform}, nil
@@ -90,7 +106,7 @@ func TestServiceCreateGeneratesDefaults(t *testing.T) {
 	service.idGenerator = func() string { return "agent-123" }
 	service.apiKeyGenerator = func() string { return "generated-key" }
 
-	got, err := service.Create("user-1", "group-1", "support", "helpful", ModelScopePlatform, "platform-default")
+	got, err := service.Create("user-1", "group-1", "support", "helpful", ModelScopePlatform, "platform-default", "")
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
@@ -112,6 +128,11 @@ func TestServiceCreateGeneratesDefaults(t *testing.T) {
 }
 
 func TestServiceUpdateUsesClock(t *testing.T) {
+	allowRuntimeEnginesForTest(
+		t,
+		settings.RuntimeEngineConfig{EngineType: EngineTypeHermes, Enabled: true},
+		settings.RuntimeEngineConfig{EngineType: EngineTypeNanobot, Enabled: true},
+	)
 	originalModelLoader := loadModelByID
 	loadModelByID = func(id string) (*model.LLMModel, error) {
 		return &model.LLMModel{Id: id, Scope: model.ScopeEnterprise, EnterpriseId: "group-1"}, nil
@@ -123,7 +144,7 @@ func TestServiceUpdateUsesClock(t *testing.T) {
 		getByIdFunc: func(id string) (*Agent, error) {
 			return &Agent{Id: id, GroupId: "group-1"}, nil
 		},
-		updateFunc: func(id, agentName, systemPrompt, modelScope, modelId string, updatedAt time.Time) error {
+		updateFunc: func(id, agentName, systemPrompt, modelScope, modelId, engineType string, updatedAt time.Time) error {
 			if id != "agent-1" {
 				t.Fatalf("unexpected id %q", id)
 			}
@@ -139,6 +160,9 @@ func TestServiceUpdateUsesClock(t *testing.T) {
 			if modelId != "model-1" {
 				t.Fatalf("unexpected modelId %q", modelId)
 			}
+			if engineType != EngineTypeNanobot {
+				t.Fatalf("unexpected engineType %q", engineType)
+			}
 			if !updatedAt.Equal(expectedTime) {
 				t.Fatalf("unexpected updatedAt %v", updatedAt)
 			}
@@ -149,12 +173,13 @@ func TestServiceUpdateUsesClock(t *testing.T) {
 	service := NewService(repo)
 	service.now = func() time.Time { return expectedTime }
 
-	if err := service.Update("agent-1", "renamed", "new prompt", ModelScopeEnterprise, "model-1"); err != nil {
+	if err := service.Update("agent-1", "renamed", "new prompt", ModelScopeEnterprise, "model-1", EngineTypeNanobot); err != nil {
 		t.Fatalf("Update() error = %v", err)
 	}
 }
 
 func TestServiceCreatePropagatesRepositoryError(t *testing.T) {
+	allowRuntimeEnginesForTest(t, settings.RuntimeEngineConfig{EngineType: EngineTypeHermes, Enabled: true})
 	originalModelLoader := loadModelByID
 	loadModelByID = func(id string) (*model.LLMModel, error) {
 		return &model.LLMModel{Id: id, Scope: model.ScopePlatform}, nil
@@ -169,22 +194,24 @@ func TestServiceCreatePropagatesRepositoryError(t *testing.T) {
 
 	service := NewService(repo)
 
-	_, err := service.Create("user-1", "group-1", "support", "helpful", ModelScopePlatform, "platform-default")
+	_, err := service.Create("user-1", "group-1", "support", "helpful", ModelScopePlatform, "platform-default", "")
 	if err == nil || err.Error() != "insert failed" {
 		t.Fatalf("expected repository error, got %v", err)
 	}
 }
 
 func TestServiceCreateRequiresModelSelection(t *testing.T) {
+	allowRuntimeEnginesForTest(t, settings.RuntimeEngineConfig{EngineType: EngineTypeHermes, Enabled: true})
 	service := NewService(&stubRepository{})
 
-	_, err := service.Create("user-1", "group-1", "support", "helpful", "", "")
+	_, err := service.Create("user-1", "group-1", "support", "helpful", "", "", "")
 	if err == nil || err.Error() != "model scope is required" {
 		t.Fatalf("expected model scope validation error, got %v", err)
 	}
 }
 
 func TestServiceCreateRequiresConfiguredPlatformModel(t *testing.T) {
+	allowRuntimeEnginesForTest(t, settings.RuntimeEngineConfig{EngineType: EngineTypeHermes, Enabled: true})
 	originalModelLoader := loadModelByID
 	loadModelByID = func(id string) (*model.LLMModel, error) {
 		return nil, nil
@@ -193,8 +220,90 @@ func TestServiceCreateRequiresConfiguredPlatformModel(t *testing.T) {
 
 	service := NewService(&stubRepository{})
 
-	_, err := service.Create("user-1", "group-1", "support", "helpful", ModelScopePlatform, "platform-default")
+	_, err := service.Create("user-1", "group-1", "support", "helpful", ModelScopePlatform, "platform-default", "")
 	if err == nil || err.Error() != "platform model not found" {
 		t.Fatalf("expected platform model validation error, got %v", err)
+	}
+}
+
+func TestServiceCreateAcceptsNanobotEngine(t *testing.T) {
+	allowRuntimeEnginesForTest(
+		t,
+		settings.RuntimeEngineConfig{EngineType: EngineTypeHermes, Enabled: true},
+		settings.RuntimeEngineConfig{EngineType: EngineTypeNanobot, Enabled: true},
+	)
+	originalModelLoader := loadModelByID
+	loadModelByID = func(id string) (*model.LLMModel, error) {
+		return &model.LLMModel{Id: id, Scope: model.ScopePlatform}, nil
+	}
+	defer func() { loadModelByID = originalModelLoader }()
+
+	var created *Agent
+	repo := &stubRepository{
+		createFunc: func(agent *Agent) error {
+			created = agent
+			return nil
+		},
+		getByIdFunc: func(id string) (*Agent, error) {
+			return &Agent{Id: id, EngineType: EngineTypeNanobot}, nil
+		},
+	}
+
+	service := NewService(repo)
+	service.idGenerator = func() string { return "agent-456" }
+	service.apiKeyGenerator = func() string { return "generated-key" }
+
+	got, err := service.Create("user-1", "group-1", "support", "helpful", ModelScopePlatform, "platform-default", EngineTypeNanobot)
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	if created == nil || created.EngineType != EngineTypeNanobot {
+		t.Fatalf("expected nanobot engine, got %#v", created)
+	}
+	if got == nil || got.EngineType != EngineTypeNanobot {
+		t.Fatalf("expected created agent to keep nanobot engine, got %#v", got)
+	}
+}
+
+func TestServiceCreateRejectsInvalidEngine(t *testing.T) {
+	allowRuntimeEnginesForTest(t, settings.RuntimeEngineConfig{EngineType: EngineTypeHermes, Enabled: true})
+	originalModelLoader := loadModelByID
+	loadModelByID = func(id string) (*model.LLMModel, error) {
+		return &model.LLMModel{Id: id, Scope: model.ScopePlatform}, nil
+	}
+	defer func() { loadModelByID = originalModelLoader }()
+
+	service := NewService(&stubRepository{})
+
+	_, err := service.Create("user-1", "group-1", "support", "helpful", ModelScopePlatform, "platform-default", "unknown")
+	if err == nil || err.Error() != "engine type is invalid" {
+		t.Fatalf("expected engine validation error, got %v", err)
+	}
+}
+
+func TestToPublicIncludesNormalizedEngineType(t *testing.T) {
+	got := toPublic(&Agent{
+		Id:           "agent-1",
+		AgentName:    "assistant",
+		SystemPrompt: "prompt",
+		ModelScope:   ModelScopeEnterprise,
+		ModelId:      "",
+		EngineType:   "",
+	})
+
+	if got.EngineType != EngineTypeHermes {
+		t.Fatalf("expected default public engine type %q, got %q", EngineTypeHermes, got.EngineType)
+	}
+
+	got = toPublic(&Agent{
+		Id:           "agent-2",
+		AgentName:    "assistant",
+		SystemPrompt: "prompt",
+		ModelScope:   ModelScopeEnterprise,
+		ModelId:      "",
+		EngineType:   EngineTypeNanobot,
+	})
+	if got.EngineType != EngineTypeNanobot {
+		t.Fatalf("expected public engine type %q, got %q", EngineTypeNanobot, got.EngineType)
 	}
 }

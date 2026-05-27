@@ -61,13 +61,14 @@ func (r *GFRepository) Create(agent *Agent) error {
 	return err
 }
 
-func (r *GFRepository) Update(id, agentName, systemPrompt, modelScope, modelId string, updatedAt time.Time) error {
+func (r *GFRepository) Update(id, agentName, systemPrompt, modelScope, modelId, engineType string, updatedAt time.Time) error {
 	_, err := g.DB().Model("agents").
 		Data(g.Map{
 			"agent_name":    agentName,
 			"system_prompt": systemPrompt,
 			"model_scope":   modelScope,
 			"model_id":      modelId,
+			"engine_type":   engineType,
 			"updated_at":    updatedAt,
 		}).
 		Where("id = ?", id).
