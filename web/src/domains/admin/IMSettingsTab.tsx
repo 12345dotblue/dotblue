@@ -32,6 +32,9 @@ import { BACKEND_URL } from '../../config';
 import { casdoorService } from '../identity/CasdoorService';
 
 const { Paragraph, Text } = Typography;
+const TELEGRAM_PLATFORM = 'telegram';
+const DISCORD_PLATFORM = 'discord';
+const SLACK_PLATFORM = 'slack';
 const FEISHU_PLATFORM = 'feishu';
 const WEB_PLATFORM = 'web';
 
@@ -150,7 +153,7 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
   const [savingBinding, setSavingBinding] = React.useState(false);
   const [connectionForm] = Form.useForm();
   const [bindingForm] = Form.useForm();
-  const connectionFormPlatform = Form.useWatch('platform', connectionForm) || editingConnection?.platform || FEISHU_PLATFORM;
+  const connectionFormPlatform = Form.useWatch('platform', connectionForm) || editingConnection?.platform || TELEGRAM_PLATFORM;
 
   const selectedConnection = React.useMemo(
     () => connections.find((item) => item.id === selectedConnectionId) || null,
@@ -161,9 +164,18 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
     [selectedConnection],
   );
   const connectionModeOptions = React.useMemo(
-    () => connectionFormPlatform === WEB_PLATFORM
-      ? [{ label: 'direct', value: 'direct' }]
-      : [{ label: 'socket_mode', value: 'socket_mode' }],
+    () => {
+      if (connectionFormPlatform === WEB_PLATFORM) {
+        return [{ label: 'direct', value: 'direct' }];
+      }
+      if (connectionFormPlatform === TELEGRAM_PLATFORM) {
+        return [{ label: 'polling', value: 'polling' }];
+      }
+      if (connectionFormPlatform === DISCORD_PLATFORM) {
+        return [{ label: 'gateway', value: 'gateway' }];
+      }
+      return [{ label: 'socket_mode', value: 'socket_mode' }];
+    },
     [connectionFormPlatform],
   );
 
@@ -293,9 +305,14 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
   const openCreateConnection = () => {
     setEditingConnection(null);
     connectionForm.setFieldsValue({
-      platform: FEISHU_PLATFORM,
+      platform: TELEGRAM_PLATFORM,
       name: '',
-      connectionMode: 'socket_mode',
+      connectionMode: 'polling',
+      token: '',
+      pollTimeoutSeconds: 30,
+      discordToken: '',
+      botToken: '',
+      appToken: '',
       appId: '',
       appSecret: '',
       domain: 'feishu',
@@ -308,7 +325,20 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
     connectionForm.setFieldsValue({
       platform: connection.platform,
       name: connection.name,
-      connectionMode: connection.connectionMode || (connection.platform === WEB_PLATFORM ? 'direct' : 'socket_mode'),
+      connectionMode: connection.connectionMode || (
+        connection.platform === WEB_PLATFORM
+          ? 'direct'
+          : connection.platform === TELEGRAM_PLATFORM
+            ? 'polling'
+            : connection.platform === DISCORD_PLATFORM
+              ? 'gateway'
+            : 'socket_mode'
+      ),
+      token: '',
+      pollTimeoutSeconds: connection.config?.pollTimeoutSeconds || 30,
+      discordToken: '',
+      botToken: '',
+      appToken: '',
       appId: connection.config?.appId || '',
       appSecret: '',
       domain: connection.config?.domain || 'feishu',
@@ -327,20 +357,58 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
             channel: 'web_chat',
           },
         }
-      : {
-          platform: values.platform,
-          name: values.name,
-          connectionMode: values.connectionMode,
-          config: {
-            appId: values.appId,
-            domain: values.domain,
-          },
-          ...(values.appSecret
-            ? { secrets: { appSecret: values.appSecret } }
-            : editingConnection
-              ? {}
-              : { secrets: { appSecret: values.appSecret } }),
-        };
+      : values.platform === TELEGRAM_PLATFORM
+        ? {
+            platform: values.platform,
+            name: values.name,
+            connectionMode: values.connectionMode,
+            config: {
+              pollTimeoutSeconds: values.pollTimeoutSeconds,
+            },
+            ...(values.token
+              ? { secrets: { token: values.token } }
+              : editingConnection
+                ? {}
+                : { secrets: { token: values.token } }),
+          }
+        : values.platform === DISCORD_PLATFORM
+          ? {
+              platform: values.platform,
+              name: values.name,
+              connectionMode: values.connectionMode,
+              config: {},
+              ...(values.discordToken
+                ? { secrets: { token: values.discordToken } }
+                : editingConnection
+                  ? {}
+                  : { secrets: { token: values.discordToken } }),
+            }
+        : values.platform === SLACK_PLATFORM
+          ? {
+              platform: values.platform,
+              name: values.name,
+              connectionMode: values.connectionMode,
+              config: {},
+              ...((values.botToken || values.appToken)
+                ? { secrets: { botToken: values.botToken, appToken: values.appToken } }
+                : editingConnection
+                  ? {}
+                  : { secrets: { botToken: values.botToken, appToken: values.appToken } }),
+            }
+        : {
+            platform: values.platform,
+            name: values.name,
+            connectionMode: values.connectionMode,
+            config: {
+              appId: values.appId,
+              domain: values.domain,
+            },
+            ...(values.appSecret
+              ? { secrets: { appSecret: values.appSecret } }
+              : editingConnection
+                ? {}
+                : { secrets: { appSecret: values.appSecret } }),
+          };
 
     setSavingConnection(true);
     try {
@@ -788,7 +856,13 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
                       <Text type="secondary">
                         {selectedConnection.platform === WEB_PLATFORM
                           ? `通道：${selectedConnection.config?.channel || 'web_chat'}`
-                          : `App ID：${selectedConnection.config?.appId || '-'}`}
+                          : selectedConnection.platform === TELEGRAM_PLATFORM
+                            ? `轮询超时：${selectedConnection.config?.pollTimeoutSeconds || 30}s`
+                            : selectedConnection.platform === DISCORD_PLATFORM
+                              ? '模式：Gateway'
+                            : selectedConnection.platform === SLACK_PLATFORM
+                              ? '模式：Socket Mode'
+                            : `App ID：${selectedConnection.config?.appId || '-'}`}
                       </Text>
                       <Text type="secondary">回调路径：{selectedConnection.callbackPath || '-'}</Text>
                       {selectedConnection.lastError ? <Text type="danger">{selectedConnection.lastError}</Text> : null}
@@ -922,6 +996,9 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
             <Select
               disabled={Boolean(editingConnection)}
               options={[
+                { label: 'Telegram', value: TELEGRAM_PLATFORM },
+                { label: 'Discord', value: DISCORD_PLATFORM },
+                { label: 'Slack', value: SLACK_PLATFORM },
                 { label: 'Feishu', value: FEISHU_PLATFORM },
                 { label: 'Web Chat', value: WEB_PLATFORM },
               ]}
@@ -940,6 +1017,48 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
               message="Web Chat 连接"
               description="Web Chat 连接不需要第三方 App ID / Secret。系统会把网页聊天请求接入 IM 框架，并通过该连接记录绑定、事件和投递。"
             />
+          ) : connectionFormPlatform === TELEGRAM_PLATFORM ? (
+            <>
+              <Alert
+                type="info"
+                showIcon
+                message="Telegram 连接"
+                description="Telegram 使用 long polling 直连 Bot API，不需要公网回调地址。建议优先用于快速落地外部 IM 接入。"
+              />
+              <Form.Item label={editingConnection ? 'Bot Token（留空表示保持不变）' : 'Bot Token'} name="token" rules={editingConnection ? [] : [{ required: true, message: '请输入 Bot Token' }]}>
+                <Input.Password placeholder="例如：123456:ABCDEF..." />
+              </Form.Item>
+              <Form.Item label="轮询超时（秒）" name="pollTimeoutSeconds" rules={[{ required: true, message: '请输入轮询超时' }]}>
+                <InputNumber min={10} max={60} style={{ width: '100%' }} />
+              </Form.Item>
+            </>
+          ) : connectionFormPlatform === DISCORD_PLATFORM ? (
+            <>
+              <Alert
+                type="info"
+                showIcon
+                message="Discord 连接"
+                description="Discord 使用 Gateway WebSocket 接收消息，不需要公网 webhook。建议在开发者后台开启 Message Content Intent。"
+              />
+              <Form.Item label={editingConnection ? 'Bot Token（留空表示保持不变）' : 'Bot Token'} name="discordToken" rules={editingConnection ? [] : [{ required: true, message: '请输入 Bot Token' }]}>
+                <Input.Password placeholder="Discord Bot Token" />
+              </Form.Item>
+            </>
+          ) : connectionFormPlatform === SLACK_PLATFORM ? (
+            <>
+              <Alert
+                type="info"
+                showIcon
+                message="Slack 连接"
+                description="Slack 使用 Socket Mode 接收事件，不需要公网 webhook。需要同时配置 Bot Token 和 App Token。"
+              />
+              <Form.Item label={editingConnection ? 'Bot Token（留空表示保持不变）' : 'Bot Token'} name="botToken" rules={editingConnection ? [] : [{ required: true, message: '请输入 Bot Token' }]}>
+                <Input.Password placeholder="例如：xoxb-..." />
+              </Form.Item>
+              <Form.Item label={editingConnection ? 'App Token（留空表示保持不变）' : 'App Token'} name="appToken" rules={editingConnection ? [] : [{ required: true, message: '请输入 App Token' }]}>
+                <Input.Password placeholder="例如：xapp-..." />
+              </Form.Item>
+            </>
           ) : (
             <>
               <Form.Item label="App ID" name="appId" rules={[{ required: true, message: '请输入 App ID' }]}>
