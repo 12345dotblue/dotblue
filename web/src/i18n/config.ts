@@ -12,10 +12,12 @@ export const LANGUAGE_OPTIONS = [
 ] as const;
 
 export const SUPPORTED_LANGUAGES = LANGUAGE_OPTIONS.map((item) => item.value);
+export const SEO_BASE_URL = 'https://dotblue.ai';
+export const DEFAULT_LANGUAGE = 'en';
 
 export function resolveSupportedLanguage(language?: string) {
   if (!language) {
-    return 'en';
+    return DEFAULT_LANGUAGE;
   }
 
   if (SUPPORTED_LANGUAGES.includes(language as typeof SUPPORTED_LANGUAGES[number])) {
@@ -28,7 +30,7 @@ export function resolveSupportedLanguage(language?: string) {
   }
 
   const base = normalized.split('-')[0];
-  return SUPPORTED_LANGUAGES.find((item) => item === base) || 'en';
+  return SUPPORTED_LANGUAGES.find((item) => item === base) || DEFAULT_LANGUAGE;
 }
 
 const resources = {
@@ -47,6 +49,10 @@ const resources = {
       "brand_header_subtitle": "Ready-made for modern teams",
       "landing_nav_assistants": "Assistants",
       "landing_nav_highlights": "Highlights",
+      "landing_nav_docs": "Docs",
+      "landing_nav_github": "GitHub",
+      "home_seo_title": "dotblue | Enterprise AI Assistants, Deployment, and Governance",
+      "home_seo_description": "Launch enterprise-ready AI assistants with productized templates, secure deployment, Casdoor login, and governed runtime operations.",
 
       // === Landing ===
       "hero_tagline": "ENTERPRISE AI ASSISTANTS, READY TO LAUNCH",
@@ -585,6 +591,10 @@ const resources = {
       "brand_header_subtitle": "为现代团队开箱即用",
       "landing_nav_assistants": "助手模板",
       "landing_nav_highlights": "亮点",
+      "landing_nav_docs": "使用文档",
+      "landing_nav_github": "GitHub",
+      "home_seo_title": "dotblue | 企业级 AI 助手平台、部署与治理",
+      "home_seo_description": "用 dotblue 快速上线企业级 AI 助手，统一产品模板、Casdoor 登录、私有化部署与运行治理能力。",
 
       "hero_tagline": "企业级 AI 助手，开箱即可上线",
       "hero_badge_product": "热门企业助手体验，默认即可用",
@@ -1099,6 +1109,10 @@ const resources = {
   ja: {
     translation: {
       "description": "チームと企業向けの安全な AI Agent サンドボックスプラットフォーム。",
+      "landing_nav_docs": "ドキュメント",
+      "landing_nav_github": "GitHub",
+      "home_seo_title": "dotblue | エンタープライズ AI アシスタント基盤",
+      "home_seo_description": "dotblue でエンタープライズ向け AI アシスタントを立ち上げ、デプロイ、Casdoor ログイン、運用ガバナンスを一元化します。",
       "landing_nav_highlights": "特長",
       "hero_tagline": "AI AGENT SANDBOX PLATFORM",
       "hero_title": "分離されたランタイム制御で\n安全な AI エージェントを提供",
@@ -1141,6 +1155,10 @@ const resources = {
   ko: {
     translation: {
       "description": "팀과 엔터프라이즈를 위한 안전한 AI Agent 샌드박스 플랫폼입니다.",
+      "landing_nav_docs": "문서",
+      "landing_nav_github": "GitHub",
+      "home_seo_title": "dotblue | 엔터프라이즈 AI 어시스턴트 플랫폼",
+      "home_seo_description": "dotblue 로 엔터프라이즈 AI 어시스턴트를 빠르게 배포하고 Casdoor 로그인과 운영 거버넌스를 함께 관리하세요.",
       "landing_nav_highlights": "핵심 포인트",
       "hero_tagline": "AI AGENT SANDBOX PLATFORM",
       "hero_title": "격리된 런타임 제어로\n안전한 AI 에이전트를 제공하세요",
@@ -1183,6 +1201,10 @@ const resources = {
   fr: {
     translation: {
       "description": "Une plateforme sandbox securisee pour agents IA, concue pour les equipes et les entreprises.",
+      "landing_nav_docs": "Documentation",
+      "landing_nav_github": "GitHub",
+      "home_seo_title": "dotblue | Plateforme d'assistants IA pour l'entreprise",
+      "home_seo_description": "Lancez des assistants IA d'entreprise avec dotblue, unifiez deploiement, connexion Casdoor et gouvernance runtime.",
       "landing_nav_highlights": "Points forts",
       "hero_tagline": "PLATEFORME SANDBOX POUR AGENTS IA",
       "hero_title": "Lancez des agents IA\navec un controle d'execution isole",
@@ -1225,6 +1247,10 @@ const resources = {
   es: {
     translation: {
       "description": "Una plataforma sandbox segura para agentes de IA, creada para equipos y empresas.",
+      "landing_nav_docs": "Documentacion",
+      "landing_nav_github": "GitHub",
+      "home_seo_title": "dotblue | Plataforma de asistentes de IA empresariales",
+      "home_seo_description": "Lanza asistentes de IA empresariales con dotblue y unifica despliegue, acceso con Casdoor y gobierno operativo.",
       "landing_nav_highlights": "Aspectos clave",
       "hero_tagline": "PLATAFORMA SANDBOX PARA AGENTES DE IA",
       "hero_title": "Lanza agentes de IA\ncon control de ejecucion aislado",
@@ -1272,11 +1298,101 @@ i18n
   .init({
     resources,
     supportedLngs: [...SUPPORTED_LANGUAGES],
-    fallbackLng: 'en',
+    fallbackLng: DEFAULT_LANGUAGE,
     nonExplicitSupportedLngs: true,
+    detection: {
+      order: ['querystring', 'localStorage', 'navigator'],
+      lookupQuerystring: 'lng',
+      caches: ['localStorage'],
+    },
     interpolation: {
       escapeValue: false
     }
   });
+
+export async function applyLanguagePreference(language: string) {
+  const resolved = resolveSupportedLanguage(language);
+
+  try {
+    localStorage.setItem('i18nextLng', resolved);
+  } catch {
+    // Ignore storage failures and still attempt to switch language in memory.
+  }
+
+  await i18n.changeLanguage(resolved);
+  syncLanguagePath(resolved);
+  return resolved;
+}
+
+export function getLanguageFromPath(pathname: string) {
+  const firstSegment = pathname.split('/').filter(Boolean)[0];
+  if (!firstSegment) {
+    return null;
+  }
+
+  return SUPPORTED_LANGUAGES.includes(firstSegment as typeof SUPPORTED_LANGUAGES[number]) ? firstSegment : null;
+}
+
+export function stripLanguagePrefix(pathname: string) {
+  const segments = pathname.split('/').filter(Boolean);
+  if (segments.length === 0) {
+    return '/';
+  }
+
+  const [firstSegment, ...rest] = segments;
+  if (!SUPPORTED_LANGUAGES.includes(firstSegment as typeof SUPPORTED_LANGUAGES[number])) {
+    return pathname || '/';
+  }
+
+  return rest.length > 0 ? `/${rest.join('/')}` : '/';
+}
+
+export function getLocalizedPath(path: string, language: string) {
+  const resolved = resolveSupportedLanguage(language);
+  const url = new URL(path, SEO_BASE_URL);
+  const strippedPath = stripLanguagePrefix(url.pathname);
+  const normalizedPath = strippedPath === '/' ? '' : strippedPath;
+  return `/${resolved}${normalizedPath}${url.search}${url.hash}`;
+}
+
+export function buildLocalizedUrl(path: string, language: string) {
+  return new URL(getLocalizedPath(path, language), SEO_BASE_URL).toString();
+}
+
+export function getPreferredLanguage(language?: string) {
+  if (language) {
+    return resolveSupportedLanguage(language);
+  }
+
+  if (typeof window !== 'undefined') {
+    const pathLanguage = getLanguageFromPath(window.location.pathname);
+    if (pathLanguage) {
+      return pathLanguage;
+    }
+  }
+
+  try {
+    const storedLanguage = localStorage.getItem('i18nextLng');
+    if (storedLanguage) {
+      return resolveSupportedLanguage(storedLanguage);
+    }
+  } catch {
+    // Ignore storage failures and fall back to runtime language.
+  }
+
+  return resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language);
+}
+
+export function syncLanguagePath(language: string) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const resolved = resolveSupportedLanguage(language);
+  const url = new URL(window.location.href);
+  url.searchParams.delete('lng');
+  const localizedPath = getLocalizedPath(`${stripLanguagePrefix(url.pathname)}${url.search}${url.hash}`, resolved);
+  window.history.replaceState(null, '', localizedPath);
+}
 
 export default i18n;

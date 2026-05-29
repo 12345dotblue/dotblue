@@ -1,11 +1,11 @@
 import React from 'react';
 import { Layout, Button, Space, Typography, Row, Col, Divider, Dropdown } from 'antd';
-import { AppstoreOutlined, GlobalOutlined, LogoutOutlined } from '@ant-design/icons';
+import { AppstoreOutlined, GithubOutlined, GlobalOutlined, LogoutOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { casdoorService } from '../../domains/identity/CasdoorService';
 import { useAuthState } from '../../domains/identity/useAuthState';
-import { LANGUAGE_OPTIONS, resolveSupportedLanguage } from '../../i18n/config';
+import { LANGUAGE_OPTIONS, applyLanguagePreference, getLocalizedPath, resolveSupportedLanguage, stripLanguagePrefix } from '../../i18n/config';
 
 const { Header, Content, Footer } = Layout;
 const { Title, Text, Paragraph } = Typography;
@@ -17,22 +17,25 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const currentLanguage = resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language);
   const currentLanguageLabel = LANGUAGE_OPTIONS.find((item) => item.value === currentLanguage)?.shortLabel || 'EN';
 
-  const changeLanguage = (lng: string) => {
-    i18n.changeLanguage(lng);
+  const changeLanguage = async (lng: string) => {
+    const resolved = await applyLanguagePreference(lng);
+    if (resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language) !== resolved) {
+      window.location.reload();
+    }
   };
 
   const scrollToSection = (sectionId: string) => {
-    if (window.location.pathname !== '/') {
-      window.location.href = `/#${sectionId}`;
+    if (stripLanguagePrefix(window.location.pathname) !== '/') {
+      window.location.href = `${getLocalizedPath('/', currentLanguage)}#${sectionId}`;
       return;
     }
 
-    window.history.replaceState(null, '', `/#${sectionId}`);
+    window.history.replaceState(null, '', `${getLocalizedPath('/', currentLanguage)}#${sectionId}`);
     document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   React.useEffect(() => {
-    if (window.location.pathname === '/' && window.location.hash) {
+    if (stripLanguagePrefix(window.location.pathname) === '/' && window.location.hash) {
       const targetId = window.location.hash.replace('#', '');
       window.setTimeout(() => {
         document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -71,7 +74,7 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           <div style={{ display: 'flex', alignItems: 'center', gap: 20, minWidth: 0 }}>
             <div
               style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', minWidth: 0 }}
-              onClick={() => navigate('/')}
+              onClick={() => navigate(getLocalizedPath('/', currentLanguage))}
             >
               <img
                 src="/brand/dotblue-logo.png"
@@ -120,10 +123,23 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               <Button className="landing-nav-button" type="text" onClick={() => scrollToSection('pricing')}>
                 {t('view_pricing')}
               </Button>
-              <Button className="landing-nav-button" type="text" onClick={() => navigate('/terms')}>
+              <Button className="landing-nav-button" type="text" onClick={() => navigate(getLocalizedPath('/docs', currentLanguage))}>
+                {t('landing_nav_docs')}
+              </Button>
+              <Button
+                className="landing-nav-button"
+                type="text"
+                icon={<GithubOutlined />}
+                href="https://github.com/12345dotblue/dotblue"
+                target="_blank"
+                rel="noreferrer"
+              >
+                {t('landing_nav_github')}
+              </Button>
+              <Button className="landing-nav-button" type="text" onClick={() => navigate(getLocalizedPath('/terms', currentLanguage))}>
                 {t('terms')}
               </Button>
-              <Button className="landing-nav-button" type="text" onClick={() => navigate('/privacy')}>
+              <Button className="landing-nav-button" type="text" onClick={() => navigate(getLocalizedPath('/privacy', currentLanguage))}>
                 {t('privacy')}
               </Button>
             </Space>
@@ -135,8 +151,8 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                 items: LANGUAGE_OPTIONS.map((item) => ({
                   key: item.value,
                   label: item.label,
-                  onClick: () => changeLanguage(item.value),
                 })),
+                onClick: ({ key }) => changeLanguage(String(key)),
               }}
               trigger={['click']}
             >
@@ -146,7 +162,7 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             </Dropdown>
             {isAuthenticated ? (
               <>
-                <Button className="landing-secondary-button" shape="round" icon={<AppstoreOutlined />} onClick={() => navigate('/dashboard')}>
+                <Button className="landing-secondary-button" shape="round" icon={<AppstoreOutlined />} onClick={() => navigate(getLocalizedPath('/dashboard', currentLanguage))}>
                   {t('go_to_dashboard')}
                 </Button>
                 <Button
@@ -156,14 +172,14 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                   icon={<LogoutOutlined />}
                   onClick={() => {
                     casdoorService.removeToken();
-                    navigate('/login');
+                    navigate(getLocalizedPath('/login', currentLanguage));
                   }}
                 >
                   {t('logout')}
                 </Button>
               </>
             ) : (
-              <Button className="landing-primary-button" type="primary" shape="round" onClick={() => navigate('/login')}>
+              <Button className="landing-primary-button" type="primary" shape="round" onClick={() => navigate(getLocalizedPath('/login', currentLanguage))}>
                 {t('login')}
               </Button>
             )}
@@ -191,23 +207,32 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           <Col xs={12} md={4}>
             <Title level={5}>{t('footer_product')}</Title>
             <Space direction="vertical">
-              <Link to="/">{t('welcome')}</Link>
-              <a href="/#highlights">{t('landing_nav_highlights')}</a>
-              <a href="/#pricing">{t('view_pricing')}</a>
+              <Link to={getLocalizedPath('/', currentLanguage)}>{t('welcome')}</Link>
+              <Link to={getLocalizedPath('/docs', currentLanguage)}>{t('landing_nav_docs')}</Link>
+              <a href={`${getLocalizedPath('/', currentLanguage)}#highlights`}>{t('landing_nav_highlights')}</a>
+              <a href={`${getLocalizedPath('/', currentLanguage)}#pricing`}>{t('view_pricing')}</a>
             </Space>
           </Col>
           <Col xs={12} md={4}>
             <Title level={5}>{t('footer_legal')}</Title>
             <Space direction="vertical">
-              <Link to="/terms">{t('terms')}</Link>
-              <Link to="/privacy">{t('privacy')}</Link>
-              <Link to="/refund">{t('refund')}</Link>
+              <Link to={getLocalizedPath('/terms', currentLanguage)}>{t('terms')}</Link>
+              <Link to={getLocalizedPath('/privacy', currentLanguage)}>{t('privacy')}</Link>
+              <Link to={getLocalizedPath('/refund', currentLanguage)}>{t('refund')}</Link>
             </Space>
           </Col>
           <Col xs={24} md={8}>
             <Title level={5}>{t('contact_us')}</Title>
             <Paragraph type="secondary">
               Email: support@dotblue.ai
+            </Paragraph>
+            <Paragraph style={{ marginBottom: 0 }}>
+              <a href="https://github.com/12345dotblue/dotblue" target="_blank" rel="noreferrer">
+                <Space size={8}>
+                  <GithubOutlined />
+                  <span>{t('landing_nav_github')}</span>
+                </Space>
+              </a>
             </Paragraph>
             <Divider style={{ margin: '16px 0' }} />
             <div style={{ display: 'flex', gap: 12, opacity: 0.5 }}>
@@ -226,6 +251,10 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             border-radius: 999px;
             color: #334155;
             font-weight: 500;
+          }
+
+          .landing-nav-group .landing-nav-button .anticon {
+            font-size: 14px;
           }
 
           .landing-nav-group .landing-nav-button:hover {

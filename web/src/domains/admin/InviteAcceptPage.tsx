@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import { BACKEND_URL } from '../../config';
 import { casdoorService } from '../identity/CasdoorService';
+import { getLocalizedPath, resolveSupportedLanguage } from '../../i18n/config';
 
 const { Paragraph, Title } = Typography;
 
@@ -17,9 +18,10 @@ function getAuthHeaders() {
 }
 
 const InviteAcceptPage: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { code = '' } = useParams();
+  const currentLanguage = resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language);
   const [messageApi, contextHolder] = message.useMessage();
   const [loading, setLoading] = useState(false);
   const [acceptedEnterpriseName, setAcceptedEnterpriseName] = useState('');
@@ -64,7 +66,7 @@ const InviteAcceptPage: React.FC = () => {
           status="404"
           title={t('invite_not_found_title')}
           subTitle={t('invite_not_found_desc')}
-          extra={<Button type="primary" onClick={() => navigate('/')}>{t('invite_back_home')}</Button>}
+          extra={<Button type="primary" onClick={() => navigate(getLocalizedPath('/', currentLanguage))}>{t('invite_back_home')}</Button>}
         />
       </div>
     );
@@ -133,10 +135,10 @@ const InviteAcceptPage: React.FC = () => {
           title={t('invite_accepted_title')}
           subTitle={t('invite_accepted_desc', { enterpriseName: acceptedEnterpriseName })}
           extra={[
-            <Button type="primary" key="admin" onClick={() => navigate('/admin/settings')}>
+            <Button type="primary" key="admin" onClick={() => navigate(getLocalizedPath('/admin/enterprise', currentLanguage))}>
               {t('invite_open_admin_console')}
             </Button>,
-            <Button key="chat" onClick={() => navigate('/chat')}>
+            <Button key="chat" onClick={() => navigate(getLocalizedPath('/chat', currentLanguage))}>
               {t('invite_go_chat')}
             </Button>,
           ]}
@@ -156,7 +158,7 @@ const InviteAcceptPage: React.FC = () => {
           <Button type="primary" key="retry" onClick={() => window.location.reload()}>
             {t('invite_retry')}
           </Button>,
-          <Button key="dashboard" onClick={() => navigate('/dashboard')}>
+          <Button key="dashboard" onClick={() => navigate(getLocalizedPath('/dashboard', currentLanguage))}>
             {t('invite_back_dashboard')}
           </Button>,
         ]}

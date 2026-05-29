@@ -29,7 +29,7 @@
       "enablePassword": true,
       "enableSignUp": true,
       "disableSignin": false,
-      "enableSigninSession": true,
+      "enableSigninSession": false,
       "clientId": "__DOTBLUE_CASDOOR_CLIENT_ID__",
       "clientSecret": "__DOTBLUE_CASDOOR_CLIENT_SECRET__",
       "signinMethods": [
@@ -67,13 +67,6 @@
           "required": true,
           "prompted": false,
           "rule": "None"
-        },
-        {
-          "name": "Email",
-          "visible": true,
-          "required": true,
-          "prompted": false,
-          "rule": "None"
         }
       ],
       "grantTypes": [
@@ -98,8 +91,8 @@
         "isCompact": false,
         "isEnabled": true
       },
-      "formCss": ".login-panel{backdrop-filter:blur(18px);background:rgba(255,255,255,0.78);border-radius:24px;box-shadow:0 24px 64px rgba(15,52,96,0.12);}.ant-btn-primary{box-shadow:none;}",
-      "formSideHtml": "<div style=\"padding:32px;color:#0f172a;\"><img src=\"__DOTBLUE_PUBLIC_URL__/brand/dotblue-logo.png\" alt=\"__DOTBLUE_BRAND_NAME__\" style=\"width:160px;max-width:100%;height:auto;display:block;margin-bottom:20px;\" /><h2 style=\"margin:0 0 12px;\">__DOTBLUE_BRAND_NAME__</h2><p style=\"margin:0;color:#475569;\">AI workspace platform for modern product, operations, and growth teams.</p></div>",
+      "formCss": "",
+      "formSideHtml": "<div style=\"display:flex;flex-direction:column;justify-content:flex-end;min-height:640px;padding:52px;background:linear-gradient(180deg, rgba(15,23,42,0.10), rgba(15,23,42,0.42)), url('__DOTBLUE_PUBLIC_URL__/brand/dotblue-login-bg.png') center/cover no-repeat;color:#fff;\"><div style=\"max-width:430px;\"><img src=\"__DOTBLUE_PUBLIC_URL__/brand/dotblue-logo.png\" alt=\"__DOTBLUE_BRAND_NAME__\" style=\"width:168px;max-width:100%;height:auto;display:block;margin-bottom:22px;\" /><div style=\"display:inline-flex;align-items:center;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,0.16);font-size:12px;font-weight:600;letter-spacing:.08em;margin-bottom:18px;\">ENTERPRISE AI ASSISTANTS</div><h2 style=\"margin:0 0 14px;font-size:36px;line-height:1.1;color:#fff;\">Launch secure AI workspaces with dotblue</h2><p style=\"margin:0 0 18px;font-size:15px;line-height:1.8;color:rgba(255,255,255,0.88);\">Unified login, runtime governance, and ready-to-launch assistant experiences for product, operations, and growth teams.</p><div style=\"display:flex;flex-direction:column;gap:10px;\"><div style=\"display:flex;align-items:center;gap:10px;font-size:14px;line-height:1.5;color:rgba(255,255,255,0.90);\"><span style=\"width:8px;height:8px;border-radius:999px;background:#7dd3fc;display:inline-block;flex-shrink:0;\"></span><span>Casdoor powered branded access</span></div><div style=\"display:flex;align-items:center;gap:10px;font-size:14px;line-height:1.5;color:rgba(255,255,255,0.90);\"><span style=\"width:8px;height:8px;border-radius:999px;background:#7dd3fc;display:inline-block;flex-shrink:0;\"></span><span>Enterprise-ready assistant workspace</span></div><div style=\"display:flex;align-items:center;gap:10px;font-size:14px;line-height:1.5;color:rgba(255,255,255,0.90);\"><span style=\"width:8px;height:8px;border-radius:999px;background:#7dd3fc;display:inline-block;flex-shrink:0;\"></span><span>Deployment and runtime governance built in</span></div></div></div></div>",
       "formBackgroundUrl": "__DOTBLUE_PUBLIC_URL__/brand/dotblue-login-bg.png"
     }
   ],

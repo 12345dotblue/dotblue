@@ -16,7 +16,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import axios from 'axios';
 import { casdoorService } from '../../domains/identity/CasdoorService';
 import { BACKEND_URL } from '../../config';
-import { LANGUAGE_OPTIONS, resolveSupportedLanguage } from '../../i18n/config';
+import { LANGUAGE_OPTIONS, applyLanguagePreference, getLocalizedPath, resolveSupportedLanguage } from '../../i18n/config';
 
 const { Header, Content, Sider } = Layout;
 const { Title, Text } = Typography;
@@ -78,8 +78,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     });
   }, [location.pathname]);
 
-  const changeLanguage = (lng: string) => {
-    i18n.changeLanguage(lng);
+  const changeLanguage = async (lng: string) => {
+    const resolved = await applyLanguagePreference(lng);
+    if (resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language) !== resolved) {
+      window.location.reload();
+    }
   };
 
   const handleEnterpriseSwitch = async (enterpriseId: string) => {
@@ -288,8 +291,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               items: LANGUAGE_OPTIONS.map((item) => ({
                 key: item.value,
                 label: item.label,
-                onClick: () => changeLanguage(item.value),
               })),
+              onClick: ({ key }) => changeLanguage(String(key)),
             }}>
               <Button type="text" icon={<GlobalOutlined />}>
                 {currentLanguageLabel}
@@ -303,7 +306,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                   label: t('logout'),
                   onClick: () => {
                     casdoorService.removeToken();
-                    window.location.href = '/login';
+                    window.location.href = getLocalizedPath('/login', currentLanguage);
                   },
                 },
               ],
@@ -322,7 +325,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           <div style={{ marginBottom: 24 }}>
             <Breadcrumb
               items={[
-                { title: <Link to="/dashboard">{t('app_name')}</Link> },
+                { title: <Link to={getLocalizedPath('/dashboard', currentLanguage)}>{t('app_name')}</Link> },
                 { title: getPageTitle() },
               ]}
               style={{ marginBottom: hidePageHeading ? 0 : 8 }}

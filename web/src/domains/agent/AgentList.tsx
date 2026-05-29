@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { BACKEND_URL } from '../../config';
+import { getLocalizedPath, getPreferredLanguage } from '../../i18n/config';
 
 const { Title, Paragraph, Text } = Typography;
 const { TextArea } = Input;
@@ -78,6 +79,7 @@ function formatEngineLabel(engineType: string, t: (key: string) => string): stri
 const AgentList: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const currentLanguage = getPreferredLanguage();
   const [agents, setAgents] = useState<AgentItem[]>([]);
   const [modelOptions, setModelOptions] = useState<ModelOptionGroup[]>([]);
   const [runtimeOptions, setRuntimeOptions] = useState<RuntimeOptionItem[]>([]);
@@ -300,7 +302,7 @@ const AgentList: React.FC = () => {
               <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
                 {t('agent_create_first')}
               </Button>
-              <Button onClick={() => navigate('/chat')}>
+              <Button onClick={() => navigate(getLocalizedPath('/chat', currentLanguage))}>
                 {t('agent_go_chat')}
               </Button>
             </Space>

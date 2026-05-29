@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import { BACKEND_URL } from '../../config';
+import { getLocalizedPath, resolveSupportedLanguage } from '../../i18n/config';
 
 const { Title, Text } = Typography;
 const { Password } = Input;
@@ -16,10 +17,11 @@ interface AdminInfo {
 }
 
 const SetupWizard: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [initialized, setInitialized] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const currentLanguage = resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language);
 
   const [form] = Form.useForm<AdminInfo>();
 
@@ -38,7 +40,7 @@ const SetupWizard: React.FC = () => {
     try {
       await axios.post(`${BACKEND_URL}/api/setup/install`, values);
       message.success(t('setup_install_success'));
-      navigate('/login');
+      navigate(getLocalizedPath('/login', currentLanguage));
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 409) {
         message.error(t('setup_user_exists'));
@@ -83,7 +85,7 @@ const SetupWizard: React.FC = () => {
             title={t('setup_locked_title')}
             subTitle={t('setup_locked_desc')}
             extra={
-              <Button type="primary" size="large" onClick={() => navigate('/login')}>
+              <Button type="primary" size="large" onClick={() => navigate(getLocalizedPath('/login', currentLanguage))}>
                 {t('setup_go_login')}
               </Button>
             }

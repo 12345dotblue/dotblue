@@ -17,21 +17,31 @@ import {
   ReadOutlined,
   SolutionOutlined,
 } from '@ant-design/icons';
+import { Helmet } from 'react-helmet-async';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useAuthState } from '../identity/useAuthState';
+import { SUPPORTED_LANGUAGES, buildLocalizedUrl, getLocalizedPath, resolveSupportedLanguage } from '../../i18n/config';
 
 const { Title, Paragraph, Text } = Typography;
 
 type StyledIconElement = React.ReactElement<{ style?: React.CSSProperties }>;
 
 const LandingPage: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { token } = theme.useToken();
   const [yearly, setYearly] = useState(false);
   const isAuthenticated = useAuthState();
-  const primaryTarget = isAuthenticated ? '/dashboard' : '/login';
+  const currentLanguage = resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language);
+  const primaryTarget = getLocalizedPath(isAuthenticated ? '/dashboard' : '/login', currentLanguage);
+  const homeTitle =
+    t('home_seo_title', 'dotblue | Enterprise AI Assistants, Deployment, and Governance');
+  const homeDescription = t(
+    'home_seo_description',
+    'Launch enterprise-ready AI assistants with productized templates, secure deployment, Casdoor login, and governed runtime operations.',
+  );
+  const canonicalUrl = buildLocalizedUrl('/', currentLanguage);
 
   const heroProofs = useMemo(() => ([
     t('hero_proof_security'),
@@ -138,6 +148,25 @@ const LandingPage: React.FC = () => {
 
   return (
     <div style={{ width: '100%', overflow: 'hidden' }}>
+      <Helmet>
+        <html lang={currentLanguage} />
+        <title>{homeTitle}</title>
+        <meta name="description" content={homeDescription} />
+        <meta
+          name="keywords"
+          content="dotblue, enterprise AI assistants, AI assistant platform, Casdoor, AI agent deployment, private AI platform, product docs"
+        />
+        <meta name="robots" content="index,follow" />
+        <link rel="canonical" href={canonicalUrl} />
+        <link rel="alternate" href="https://dotblue.ai/" hrefLang="x-default" />
+        {SUPPORTED_LANGUAGES.map((language) => (
+          <link key={language} rel="alternate" hrefLang={language} href={buildLocalizedUrl('/', language)} />
+        ))}
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content={homeTitle} />
+        <meta property="og:description" content={homeDescription} />
+        <meta property="og:url" content={canonicalUrl} />
+      </Helmet>
       <section style={{
         padding: '112px 5% 88px',
         background: 'radial-gradient(circle at top right, rgba(22,119,255,0.18), transparent 34%), linear-gradient(180deg, #f7fbff 0%, #ffffff 72%)',
@@ -180,6 +209,20 @@ const LandingPage: React.FC = () => {
                     style={{ height: 52, padding: '0 36px', fontSize: 16 }}
                   >
                     {t('hero_cta_secondary')}
+                  </Button>
+                </Space>
+                <Space size={[16, 12]} wrap>
+                  <Button type="link" onClick={() => navigate(getLocalizedPath('/docs', currentLanguage))} style={{ paddingInline: 0 }}>
+                    {t('landing_nav_docs')}
+                  </Button>
+                  <Button
+                    type="link"
+                    href="https://github.com/12345dotblue/dotblue"
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ paddingInline: 0 }}
+                  >
+                    {t('landing_nav_github')}
                   </Button>
                 </Space>
                 <Space wrap size={[10, 10]}>

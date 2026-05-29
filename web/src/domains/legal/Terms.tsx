@@ -2,6 +2,7 @@ import React from 'react';
 import { Typography, Breadcrumb, Divider, Anchor, Row, Col } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { getLocalizedPath, resolveSupportedLanguage } from '../../i18n/config';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -18,11 +19,12 @@ const sections = [
 ];
 
 const Terms: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const currentLanguage = resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language);
 
   return (
     <div style={{ maxWidth: 1000, margin: '40px auto', padding: '0 24px' }}>
-      <Breadcrumb items={[{ title: <Link to="/">{t('welcome')}</Link> }, { title: t('terms') }]} />
+      <Breadcrumb items={[{ title: <Link to={getLocalizedPath('/', currentLanguage)}>{t('welcome')}</Link> }, { title: t('terms') }]} />
 
       <Row gutter={48} style={{ marginTop: 40 }}>
         <Col xs={0} md={6}>

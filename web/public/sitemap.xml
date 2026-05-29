@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset
+  xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+  xmlns:xhtml="http://www.w3.org/1999/xhtml"
+>
+  <url>
+    <loc>https://dotblue.ai/en</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://dotblue.ai/en" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://dotblue.ai/zh-CN" />
+    <xhtml:link rel="alternate" hreflang="ja" href="https://dotblue.ai/ja" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://dotblue.ai/ko" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://dotblue.ai/fr" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://dotblue.ai/es" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://dotblue.ai/" />
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://dotblue.ai/en/docs</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://dotblue.ai/en/docs" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://dotblue.ai/zh-CN/docs" />
+    <xhtml:link rel="alternate" hreflang="ja" href="https://dotblue.ai/ja/docs" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://dotblue.ai/ko/docs" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://dotblue.ai/fr/docs" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://dotblue.ai/es/docs" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://dotblue.ai/docs" />
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://dotblue.ai/en/terms</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://dotblue.ai/en/terms" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://dotblue.ai/zh-CN/terms" />
+    <xhtml:link rel="alternate" hreflang="ja" href="https://dotblue.ai/ja/terms" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://dotblue.ai/ko/terms" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://dotblue.ai/fr/terms" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://dotblue.ai/es/terms" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://dotblue.ai/terms" />
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://dotblue.ai/en/privacy</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://dotblue.ai/en/privacy" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://dotblue.ai/zh-CN/privacy" />
+    <xhtml:link rel="alternate" hreflang="ja" href="https://dotblue.ai/ja/privacy" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://dotblue.ai/ko/privacy" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://dotblue.ai/fr/privacy" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://dotblue.ai/es/privacy" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://dotblue.ai/privacy" />
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://dotblue.ai/en/refund</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://dotblue.ai/en/refund" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://dotblue.ai/zh-CN/refund" />
+    <xhtml:link rel="alternate" hreflang="ja" href="https://dotblue.ai/ja/refund" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://dotblue.ai/ko/refund" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://dotblue.ai/fr/refund" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://dotblue.ai/es/refund" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://dotblue.ai/refund" />
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+</urlset>

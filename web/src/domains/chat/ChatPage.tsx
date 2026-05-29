@@ -16,7 +16,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useXChat } from '@ant-design/x-sdk';
 import { BACKEND_URL } from '../../config';
-import { LANGUAGE_OPTIONS, resolveSupportedLanguage } from '../../i18n/config';
+import { LANGUAGE_OPTIONS, applyLanguagePreference, getLocalizedPath, resolveSupportedLanguage } from '../../i18n/config';
 import { casdoorService } from '../identity/CasdoorService';
 import { getOrCreateProvider } from './SSEChatProvider';
 import type {
@@ -807,6 +807,9 @@ const ChatPage: React.FC = () => {
       )
     : conversations;
 
+  const currentLanguage = resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language);
+  const currentLanguageLabel = LANGUAGE_OPTIONS.find((option) => option.value === currentLanguage)?.shortLabel || 'EN';
+
   // --- No agents ---
   if (!agentsLoading && agents.length === 0) {
     return (
@@ -818,7 +821,7 @@ const ChatPage: React.FC = () => {
             <Tag color="purple">{t('feat_api_title')}</Tag>
           </Space>
           <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('chat_no_agents')}>
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/dashboard')}>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate(getLocalizedPath('/dashboard', currentLanguage))}>
               {t('chat_create_first_agent')}
             </Button>
           </Empty>
@@ -831,9 +834,6 @@ const ChatPage: React.FC = () => {
   const runtimeFooter = t('chat_runtime_footer', {
     engine: formatEngineLabel(selectedAgent?.engineType, t),
   });
-  const currentLanguage = resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language);
-  const currentLanguageLabel = LANGUAGE_OPTIONS.find((option) => option.value === currentLanguage)?.shortLabel || 'EN';
-
   const renderTimestamp = (value?: string, align: 'left' | 'right' = 'left') => {
     const formatted = formatMessageTime(value, i18n.language || 'zh-CN');
     if (!formatted) return null;
@@ -1055,23 +1055,30 @@ const ChatPage: React.FC = () => {
             type="default"
             size="small"
             icon={<AppstoreOutlined />}
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate(getLocalizedPath('/dashboard', currentLanguage))}
           >
             {t('go_to_dashboard')}
           </Button>
-          <Dropdown menu={{ items: LANGUAGE_OPTIONS.map((option) => ({
-            key: option.value,
-            label: option.label,
-            onClick: () => i18n.changeLanguage(option.value),
-          })) }}>
+          <Dropdown menu={{
+            items: LANGUAGE_OPTIONS.map((option) => ({
+              key: option.value,
+              label: option.label,
+            })),
+            onClick: async ({ key }) => {
+              const resolved = await applyLanguagePreference(String(key));
+              if (resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language) !== resolved) {
+                window.location.reload();
+              }
+            },
+          }}>
             <Button type="text" size="small" icon={<GlobalOutlined />}>
               {currentLanguageLabel}
             </Button>
           </Dropdown>
           <Dropdown menu={{ items: [
-            { key: 'agents', label: t('agent_settings'), icon: <AppstoreOutlined />, onClick: () => navigate('/dashboard') },
+            { key: 'agents', label: t('agent_settings'), icon: <AppstoreOutlined />, onClick: () => navigate(getLocalizedPath('/dashboard', currentLanguage)) },
             { type: 'divider' as const },
-            { key: 'logout', label: t('logout'), icon: <LogoutOutlined />, onClick: () => { casdoorService.removeToken(); window.location.href = '/login'; } },
+            { key: 'logout', label: t('logout'), icon: <LogoutOutlined />, onClick: () => { casdoorService.removeToken(); window.location.href = getLocalizedPath('/login', currentLanguage); } },
           ]}}>
             <Avatar size="small" icon={<UserOutlined />} style={{ background: token.colorPrimary, cursor: 'pointer' }} />
           </Dropdown>

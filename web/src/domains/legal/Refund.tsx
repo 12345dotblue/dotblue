@@ -2,17 +2,19 @@ import React from 'react';
 import { Typography, Breadcrumb, Divider } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { getLocalizedPath, resolveSupportedLanguage } from '../../i18n/config';
 
 const { Title, Paragraph, Text } = Typography;
 
 const Refund: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const currentLanguage = resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language);
 
   const eligibilityItems = [1, 2, 3, 4].map(i => t(`refund_eligibility_${i}`));
 
   return (
     <div style={{ maxWidth: 800, margin: '40px auto', padding: '0 24px' }}>
-      <Breadcrumb items={[{ title: <Link to="/">{t('welcome')}</Link> }, { title: t('refund') }]} />
+      <Breadcrumb items={[{ title: <Link to={getLocalizedPath('/', currentLanguage)}>{t('welcome')}</Link> }, { title: t('refund') }]} />
 
       <div style={{ marginTop: 40 }}>
         <Title level={1}>{t('refund_policy_title')}</Title>
