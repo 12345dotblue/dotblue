@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button, List, Modal, Form, Input, message, Typography, Space, Empty, Popconfirm, Select, Tag, Statistic, Table, Radio } from 'antd';
+import { Card, Button, Modal, Form, Input, message, Typography, Space, Empty, Popconfirm, Select, Tag, Statistic, Table, Radio, Tabs } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, RobotOutlined, LineChartOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { BACKEND_URL } from '../../config';
 import { getLocalizedPath, getPreferredLanguage } from '../../i18n/config';
+import { casdoorService } from '../identity/CasdoorService';
+import AgentSkillsPanel from './AgentSkillsPanel';
 
 const { Title, Paragraph, Text } = Typography;
 const { TextArea } = Input;
@@ -293,7 +295,7 @@ const AgentList: React.FC = () => {
       </div>
 
       {agents.length === 0 && !loading ? (
-        <Card bordered={false} style={{ borderRadius: 12, maxWidth: 800, textAlign: 'center', padding: '40px 0' }}>
+        <Card variant="borderless" style={{ borderRadius: 12, maxWidth: 800, textAlign: 'center', padding: '40px 0' }}>
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
             description={t('agent_no_agents')}
@@ -309,15 +311,14 @@ const AgentList: React.FC = () => {
           </Empty>
         </Card>
       ) : (
-        <List
-          loading={loading}
-          dataSource={agents}
-          style={{ maxWidth: 800 }}
-          renderItem={(item) => (
-            <Card
-              bordered={false}
-              style={{ borderRadius: 12, marginBottom: 16, boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}
-            >
+        <div style={{ maxWidth: 800 }}>
+          <Space orientation="vertical" size={16} style={{ width: '100%' }}>
+            {agents.map((item) => (
+              <Card
+                key={item.id}
+                variant="borderless"
+                style={{ borderRadius: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}
+              >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <Space>
@@ -366,9 +367,10 @@ const AgentList: React.FC = () => {
                   </Popconfirm>
                 </Space>
               </div>
-            </Card>
-          )}
-        />
+              </Card>
+            ))}
+          </Space>
+        </div>
       )}
 
       <Modal
@@ -378,53 +380,79 @@ const AgentList: React.FC = () => {
         onCancel={() => setModalOpen(false)}
         confirmLoading={saving}
         okText={editingAgent ? t('agent_save') : t('agent_create')}
-        destroyOnClose
+        destroyOnHidden
       >
-        <Form
-          form={form}
-          layout="vertical"
-          initialValues={{ agentName: '', systemPrompt: '', modelSelection: getDefaultModelSelection(), engineType: 'hermes' }}
-        >
-          <Form.Item
-            label={t('agent_name')}
-            name="agentName"
-            rules={[{ required: true, message: t('agent_name_required') }]}
-          >
-            <Input placeholder={t('placeholder_agent_name')} />
-          </Form.Item>
-          <Form.Item
-            label={t('system_prompt')}
-            name="systemPrompt"
-            rules={[{ required: true, message: t('system_prompt_required') }]}
-          >
-            <TextArea rows={6} placeholder={t('placeholder_system_prompt')} />
-          </Form.Item>
-          <Form.Item
-            label={t('agent_model')}
-            name="modelSelection"
-            rules={[{ required: true, message: t('agent_model_required') }]}
-          >
-            <Select
-              placeholder={t('agent_model_placeholder')}
-              options={modelOptions}
-              notFoundContent={t('agent_model_empty')}
-            />
-          </Form.Item>
-          <Form.Item
-            label={t('agent_engine')}
-            name="engineType"
-            rules={[{ required: true, message: t('agent_engine_required') }]}
-          >
-            <Radio.Group
-              options={resolvedRuntimeOptions.map((item) => ({
-                label: formatEngineLabel(item.value, t),
-                value: item.value,
-              }))}
-              optionType="button"
-              buttonStyle="solid"
-            />
-          </Form.Item>
-        </Form>
+        <Tabs
+          defaultActiveKey="basic"
+          items={[
+            {
+              key: 'basic',
+              label: '基础配置',
+              children: (
+                <Form
+                  form={form}
+                  layout="vertical"
+                  initialValues={{ agentName: '', systemPrompt: '', modelSelection: getDefaultModelSelection(), engineType: 'hermes' }}
+                >
+                  <Form.Item
+                    label={t('agent_name')}
+                    name="agentName"
+                    rules={[{ required: true, message: t('agent_name_required') }]}
+                  >
+                    <Input placeholder={t('placeholder_agent_name')} />
+                  </Form.Item>
+                  <Form.Item
+                    label={t('system_prompt')}
+                    name="systemPrompt"
+                    rules={[{ required: true, message: t('system_prompt_required') }]}
+                  >
+                    <TextArea rows={6} placeholder={t('placeholder_system_prompt')} />
+                  </Form.Item>
+                  <Form.Item
+                    label={t('agent_model')}
+                    name="modelSelection"
+                    rules={[{ required: true, message: t('agent_model_required') }]}
+                  >
+                    <Select
+                      placeholder={t('agent_model_placeholder')}
+                      options={modelOptions}
+                      notFoundContent={t('agent_model_empty')}
+                    />
+                  </Form.Item>
+                  <Form.Item
+                    label={t('agent_engine')}
+                    name="engineType"
+                    rules={[{ required: true, message: t('agent_engine_required') }]}
+                  >
+                    <Radio.Group
+                      options={resolvedRuntimeOptions.map((item) => ({
+                        label: formatEngineLabel(item.value, t),
+                        value: item.value,
+                      }))}
+                      optionType="button"
+                      buttonStyle="solid"
+                    />
+                  </Form.Item>
+                </Form>
+              ),
+            },
+            {
+              key: 'skills',
+              label: '已安装 Skills',
+              children: editingAgent ? (
+                <AgentSkillsPanel
+                  agentId={editingAgent.id}
+                  authHeaders={(() => {
+                    const token = casdoorService.getToken();
+                    return token ? { Authorization: `Bearer ${token}` } : {};
+                  })()}
+                />
+              ) : (
+                <Empty description="请先创建 Agent，再安装 Skill" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+              ),
+            },
+          ]}
+        />
       </Modal>
 
       <Modal
@@ -433,10 +461,10 @@ const AgentList: React.FC = () => {
         onCancel={() => setUsageModalOpen(false)}
         footer={null}
         width={880}
-        destroyOnClose
+        destroyOnHidden
       >
-        <Space direction="vertical" size={16} style={{ width: '100%' }}>
-          <Card bordered={false} loading={usageLoading} style={{ background: '#fafafa' }}>
+        <Space orientation="vertical" size={16} style={{ width: '100%' }}>
+          <Card variant="borderless" loading={usageLoading} style={{ background: '#fafafa' }}>
             <Space size={24} wrap>
               <Statistic title="今日请求" value={usageOverview?.todayRequests || 0} />
               <Statistic title="今日 Tokens" value={usageOverview?.todayTokens || 0} />
@@ -446,7 +474,7 @@ const AgentList: React.FC = () => {
               <Statistic title="本月计费" value={usageOverview?.monthCharge || 0} precision={4} />
             </Space>
           </Card>
-          <Card bordered={false} title="近 7 天趋势">
+          <Card variant="borderless" title="近 7 天趋势">
             <Table
               rowKey="date"
               loading={usageLoading}

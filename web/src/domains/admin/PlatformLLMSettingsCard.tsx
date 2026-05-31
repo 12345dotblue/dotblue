@@ -52,7 +52,19 @@ const PlatformLLMSettingsCard: React.FC = () => {
 
   const openCreate = () => {
     setEditingModel(null);
-    form.setFieldsValue({
+    setModalOpen(true);
+  };
+
+  const openEdit = (item: PlatformLLMModel) => {
+    setEditingModel(item);
+    setModalOpen(true);
+  };
+
+  useEffect(() => {
+    if (!modalOpen) {
+      return;
+    }
+    form.setFieldsValue(editingModel || {
       displayName: '',
       type: 'openai',
       apiBase: 'https://api.openai.com/v1',
@@ -60,14 +72,7 @@ const PlatformLLMSettingsCard: React.FC = () => {
       model: '',
       isDefault: models.length === 0,
     });
-    setModalOpen(true);
-  };
-
-  const openEdit = (item: PlatformLLMModel) => {
-    setEditingModel(item);
-    form.setFieldsValue(item);
-    setModalOpen(true);
-  };
+  }, [modalOpen, editingModel, form, models.length]);
 
   const handleSave = async () => {
     const values = await form.validateFields();
@@ -133,7 +138,7 @@ const PlatformLLMSettingsCard: React.FC = () => {
             dataIndex: 'displayName',
             key: 'displayName',
             render: (value: string, item: PlatformLLMModel) => (
-              <Space direction="vertical" size={0}>
+              <Space orientation="vertical" size={0}>
                 <Space size={8}>
                   <Text strong>{value}</Text>
                   {item.isDefault ? <Tag color="gold">{t('platform_admin_llm_default')}</Tag> : null}
@@ -183,7 +188,7 @@ const PlatformLLMSettingsCard: React.FC = () => {
         onCancel={() => setModalOpen(false)}
         confirmLoading={saving}
         okText={editingModel ? t('agent_save') : t('platform_admin_llm_create')}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form
           form={form}
@@ -232,4 +237,3 @@ const PlatformLLMSettingsCard: React.FC = () => {
 };
 
 export default PlatformLLMSettingsCard;
-

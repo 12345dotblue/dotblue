@@ -167,6 +167,141 @@ func postgresSchemaStatements() []statement {
 			`,
 		},
 		{
+			name: "create skills table",
+			sql: `
+				CREATE TABLE IF NOT EXISTS skills (
+					id                          UUID PRIMARY KEY DEFAULT uuidv7(),
+					code                        VARCHAR(255) NOT NULL,
+					name                        VARCHAR(255) NOT NULL,
+					description                 TEXT NOT NULL DEFAULT '',
+					owner_scope                 VARCHAR(32) NOT NULL,
+					owner_enterprise_id         VARCHAR(128) NOT NULL DEFAULT '',
+					source_type                 VARCHAR(32) NOT NULL,
+					provider_type               VARCHAR(32) NOT NULL DEFAULT 'native',
+					trust_level                 VARCHAR(32) NOT NULL DEFAULT 'unverified',
+					status                      VARCHAR(32) NOT NULL DEFAULT 'draft',
+					latest_version_id           UUID NULL,
+					latest_published_version_id UUID NULL,
+					latest_stable_version_id    UUID NULL,
+					tags_json                   JSONB NOT NULL DEFAULT '[]'::jsonb,
+					metadata_json               JSONB NOT NULL DEFAULT '{}'::jsonb,
+					created_by                  VARCHAR(128) NOT NULL DEFAULT '',
+					updated_by                  VARCHAR(128) NOT NULL DEFAULT '',
+					created_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+					updated_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+				)
+			`,
+		},
+		{
+			name: "create skills scope_code unique index",
+			sql:  `CREATE UNIQUE INDEX IF NOT EXISTS uk_skills_owner_scope_owner_enterprise_code ON skills(owner_scope, owner_enterprise_id, code)`,
+		},
+		{
+			name: "create skills status index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_skills_status_created_at ON skills(status, created_at DESC)`,
+		},
+		{
+			name: "create skills source_type index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_skills_source_type_created_at ON skills(source_type, created_at DESC)`,
+		},
+		{
+			name: "create skill_versions table",
+			sql: `
+				CREATE TABLE IF NOT EXISTS skill_versions (
+					id                       UUID PRIMARY KEY DEFAULT uuidv7(),
+					skill_id                 UUID NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+					version                  VARCHAR(64) NOT NULL,
+					release_channel          VARCHAR(32) NOT NULL DEFAULT 'candidate',
+					release_status           VARCHAR(32) NOT NULL DEFAULT 'draft',
+					manifest_json            JSONB NOT NULL DEFAULT '{}'::jsonb,
+					input_schema_json        JSONB NOT NULL DEFAULT '{}'::jsonb,
+					output_schema_json       JSONB NOT NULL DEFAULT '{}'::jsonb,
+					default_policy_json      JSONB NOT NULL DEFAULT '{}'::jsonb,
+					runtime_contract_json    JSONB NOT NULL DEFAULT '{}'::jsonb,
+					compatibility_json       JSONB NOT NULL DEFAULT '{}'::jsonb,
+					verification_report_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+					risk_report_json         JSONB NOT NULL DEFAULT '{}'::jsonb,
+					checksum                 VARCHAR(255) NOT NULL DEFAULT '',
+					signature_json           JSONB NOT NULL DEFAULT '{}'::jsonb,
+					change_log               TEXT NOT NULL DEFAULT '',
+					published_by             VARCHAR(128) NOT NULL DEFAULT '',
+					published_at             TIMESTAMPTZ NULL,
+					created_by               VARCHAR(128) NOT NULL DEFAULT '',
+					created_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+					UNIQUE(skill_id, version)
+				)
+			`,
+		},
+		{
+			name: "create skill_versions skill index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_skill_versions_skill_created_at ON skill_versions(skill_id, created_at DESC)`,
+		},
+		{
+			name: "create skill_versions release_status index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_skill_versions_release_status ON skill_versions(release_status, created_at DESC)`,
+		},
+		{
+			name: "create skill_references table",
+			sql: `
+				CREATE TABLE IF NOT EXISTS skill_references (
+					id                   UUID PRIMARY KEY DEFAULT uuidv7(),
+					from_skill_version_id UUID NOT NULL REFERENCES skill_versions(id) ON DELETE CASCADE,
+					to_skill_version_id   UUID NOT NULL REFERENCES skill_versions(id) ON DELETE RESTRICT,
+					invoke_mode           VARCHAR(24) NOT NULL DEFAULT 'sync',
+					condition_expr        TEXT NOT NULL DEFAULT '',
+					context_passthrough   BOOLEAN NOT NULL DEFAULT FALSE,
+					result_passthrough    BOOLEAN NOT NULL DEFAULT FALSE,
+					sort_order            INTEGER NOT NULL DEFAULT 0,
+					created_by            VARCHAR(128) NOT NULL DEFAULT '',
+					created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+					UNIQUE(from_skill_version_id, to_skill_version_id)
+				)
+			`,
+		},
+		{
+			name: "create skill_references from_version index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_skill_references_from_version ON skill_references(from_skill_version_id, sort_order ASC, created_at ASC)`,
+		},
+		{
+			name: "create skill_references to_version index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_skill_references_to_version ON skill_references(to_skill_version_id)`,
+		},
+		{
+			name: "create skill_hubs table",
+			sql: `
+				CREATE TABLE IF NOT EXISTS skill_hubs (
+					id                      UUID PRIMARY KEY DEFAULT uuidv7(),
+					hub_code                VARCHAR(128) NOT NULL,
+					name                    VARCHAR(255) NOT NULL,
+					hub_type                VARCHAR(64) NOT NULL,
+					base_url                TEXT NOT NULL DEFAULT '',
+					status                  VARCHAR(24) NOT NULL DEFAULT 'disabled',
+					trust_level             VARCHAR(32) NOT NULL DEFAULT 'unverified',
+					sync_mode               VARCHAR(24) NOT NULL DEFAULT 'manual',
+					auth_scheme             VARCHAR(32) NOT NULL DEFAULT 'none',
+					config_json             JSONB NOT NULL DEFAULT '{}'::jsonb,
+					secret_json             JSONB NOT NULL DEFAULT '{}'::jsonb,
+					import_policy_json      JSONB NOT NULL DEFAULT '{}'::jsonb,
+					allowed_namespaces_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+					network_policy_json     JSONB NOT NULL DEFAULT '{}'::jsonb,
+					signature_policy_json   JSONB NOT NULL DEFAULT '{}'::jsonb,
+					last_synced_at          TIMESTAMPTZ NULL,
+					last_error              TEXT NOT NULL DEFAULT '',
+					created_by              VARCHAR(128) NOT NULL DEFAULT '',
+					created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+					updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
+				)
+			`,
+		},
+		{
+			name: "create skill_hubs hub_code unique index",
+			sql:  `CREATE UNIQUE INDEX IF NOT EXISTS uk_skill_hubs_hub_code ON skill_hubs(hub_code)`,
+		},
+		{
+			name: "create skill_hubs status index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_skill_hubs_status_updated_at ON skill_hubs(status, updated_at DESC)`,
+		},
+		{
 			name: "create conversations table",
 			sql: `
 				CREATE TABLE IF NOT EXISTS conversations (
@@ -556,6 +691,115 @@ func postgresSchemaStatements() []statement {
 					updated_at         TIMESTAMPTZ DEFAULT NOW()
 				)
 			`,
+		},
+		{
+			name: "create enterprise_skill_enablements table",
+			sql: `
+				CREATE TABLE IF NOT EXISTS enterprise_skill_enablements (
+					id                   UUID PRIMARY KEY DEFAULT uuidv7(),
+					enterprise_id        VARCHAR(128) NOT NULL REFERENCES enterprises(id) ON DELETE CASCADE,
+					skill_id             UUID NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+					enablement_status    VARCHAR(24) NOT NULL DEFAULT 'enabled',
+					org_scope_json       JSONB NOT NULL DEFAULT '[]'::jsonb,
+					channel_scope_json   JSONB NOT NULL DEFAULT '[]'::jsonb,
+					policy_override_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+					review_status        VARCHAR(24) NOT NULL DEFAULT 'approved',
+					review_note          TEXT NOT NULL DEFAULT '',
+					enabled_by           VARCHAR(128) NOT NULL DEFAULT '',
+					enabled_at           TIMESTAMPTZ NULL,
+					created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+					updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+					UNIQUE(enterprise_id, skill_id)
+				)
+			`,
+		},
+		{
+			name: "create enterprise_skill_enablements status index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_enterprise_skill_enablements_status ON enterprise_skill_enablements(enterprise_id, enablement_status, updated_at DESC)`,
+		},
+		{
+			name: "create agent_skill_bindings table",
+			sql: `
+				CREATE TABLE IF NOT EXISTS agent_skill_bindings (
+					id                   UUID PRIMARY KEY DEFAULT uuidv7(),
+					enterprise_id        VARCHAR(128) NOT NULL REFERENCES enterprises(id) ON DELETE CASCADE,
+					agent_id             UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+					skill_id             UUID NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+					skill_version_id     UUID NOT NULL REFERENCES skill_versions(id) ON DELETE RESTRICT,
+					binding_status       VARCHAR(24) NOT NULL DEFAULT 'installed',
+					entry_alias          VARCHAR(255) NOT NULL DEFAULT '',
+					invoke_visibility    VARCHAR(24) NOT NULL DEFAULT 'auto',
+					priority             INTEGER NOT NULL DEFAULT 100,
+					policy_override_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+					channel_scope_json   JSONB NOT NULL DEFAULT '[]'::jsonb,
+					installed_by         VARCHAR(128) NOT NULL DEFAULT '',
+					installed_at         TIMESTAMPTZ NULL,
+					updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+					UNIQUE(agent_id, skill_id)
+				)
+			`,
+		},
+		{
+			name: "create agent_skill_bindings enterprise_agent index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_agent_skill_bindings_enterprise_agent ON agent_skill_bindings(enterprise_id, agent_id)`,
+		},
+		{
+			name: "create agent_skill_bindings status_priority index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_agent_skill_bindings_status_priority ON agent_skill_bindings(binding_status, priority)`,
+		},
+		{
+			name: "create skill_release_records table",
+			sql: `
+				CREATE TABLE IF NOT EXISTS skill_release_records (
+					id               UUID PRIMARY KEY DEFAULT uuidv7(),
+					skill_id         UUID NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+					skill_version_id UUID NOT NULL REFERENCES skill_versions(id) ON DELETE CASCADE,
+					action           VARCHAR(32) NOT NULL,
+					from_status      VARCHAR(32) NOT NULL DEFAULT '',
+					to_status        VARCHAR(32) NOT NULL DEFAULT '',
+					release_channel  VARCHAR(32) NOT NULL DEFAULT 'candidate',
+					scope_json       JSONB NOT NULL DEFAULT '{}'::jsonb,
+					note             TEXT NOT NULL DEFAULT '',
+					operated_by      VARCHAR(128) NOT NULL DEFAULT '',
+					created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+				)
+			`,
+		},
+		{
+			name: "create skill_release_records skill index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_skill_release_records_skill_created ON skill_release_records(skill_id, created_at DESC)`,
+		},
+		{
+			name: "create skill_import_jobs table",
+			sql: `
+				CREATE TABLE IF NOT EXISTS skill_import_jobs (
+					id                       UUID PRIMARY KEY DEFAULT uuidv7(),
+					hub_id                    UUID NOT NULL REFERENCES skill_hubs(id) ON DELETE CASCADE,
+					requested_by              VARCHAR(128) NOT NULL DEFAULT '',
+					source_locator            TEXT NOT NULL,
+					source_namespace          VARCHAR(255) NOT NULL DEFAULT '',
+					source_version            VARCHAR(128) NOT NULL DEFAULT '',
+					job_status                VARCHAR(24) NOT NULL DEFAULT 'pending',
+					parsed_descriptor_json    JSONB NOT NULL DEFAULT '{}'::jsonb,
+					normalized_manifest_json  JSONB NOT NULL DEFAULT '{}'::jsonb,
+					verification_report_json  JSONB NOT NULL DEFAULT '{}'::jsonb,
+					risk_report_json          JSONB NOT NULL DEFAULT '{}'::jsonb,
+					target_skill_id           UUID NULL REFERENCES skills(id) ON DELETE SET NULL,
+					target_skill_version_id   UUID NULL REFERENCES skill_versions(id) ON DELETE SET NULL,
+					error_message             TEXT NOT NULL DEFAULT '',
+					started_at                TIMESTAMPTZ NULL,
+					finished_at               TIMESTAMPTZ NULL,
+					created_at                TIMESTAMPTZ NOT NULL DEFAULT NOW()
+				)
+			`,
+		},
+		{
+			name: "create skill_import_jobs hub_created index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_skill_import_jobs_hub_created ON skill_import_jobs(hub_id, created_at DESC)`,
+		},
+		{
+			name: "create skill_import_jobs status_created index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_skill_import_jobs_status_created ON skill_import_jobs(job_status, created_at DESC)`,
 		},
 		{
 			name: "create im_connections table",

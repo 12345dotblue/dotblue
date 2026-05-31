@@ -32,12 +32,13 @@ import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { BACKEND_URL } from '../../config';
 import { casdoorService } from '../identity/CasdoorService';
+import EnterpriseSkillsTab from './EnterpriseSkillsTab';
 import EnterpriseLLMSettingsTab from './EnterpriseLLMSettingsTab';
 import EnterpriseUsageSettingsTab from './EnterpriseUsageSettingsTab';
 import IMSettingsTab from './IMSettingsTab';
 
 const { Paragraph, Text, Title } = Typography;
-const ENTERPRISE_ADMIN_TABS = ['organization', 'members', 'invitations', 'llm', 'usage', 'im'] as const;
+const ENTERPRISE_ADMIN_TABS = ['organization', 'members', 'invitations', 'llm', 'usage', 'im', 'skills'] as const;
 type EnterpriseAdminTab = typeof ENTERPRISE_ADMIN_TABS[number];
 
 interface EnterpriseSummary {
@@ -153,6 +154,7 @@ const AdminSettings: React.FC = () => {
   const [creatingInvitation, setCreatingInvitation] = useState(false);
   const [llmCreateSignal, setLLMCreateSignal] = useState(0);
   const [imCreateSignal, setIMCreateSignal] = useState(0);
+  const [skillCreateSignal, setSkillCreateSignal] = useState(0);
   const [createEnterpriseForm] = Form.useForm<{ name: string }>();
   const [orgForm] = Form.useForm<OrgUnit>();
   const [memberForm] = Form.useForm<{ userId?: string; email?: string; role: string; orgUnitId?: string }>();
@@ -178,7 +180,6 @@ const AdminSettings: React.FC = () => {
         icon: <PlusOutlined />,
         onClick: () => {
           setEditingOrgUnit(null);
-          orgForm.setFieldsValue({ name: '', code: '', parentId: undefined, managerUserId: undefined, sortOrder: 100 });
           setOrgModalOpen(true);
         },
       };
@@ -211,12 +212,19 @@ const AdminSettings: React.FC = () => {
         onClick: () => window.location.reload(),
       };
     }
+    if (activeTab === 'skills') {
+      return {
+        label: t('enterprise_admin_skills_action_create'),
+        icon: <PlusOutlined />,
+        onClick: () => setSkillCreateSignal((current) => current + 1),
+      };
+    }
     return {
       label: t('enterprise_admin_create_invite'),
       icon: <PlusOutlined />,
       onClick: () => setInvitationModalOpen(true),
     };
-  }, [activeTab, orgForm, t]);
+  }, [activeTab, t]);
 
   const loadEnterpriseData = async () => {
     try {
@@ -259,6 +267,43 @@ const AdminSettings: React.FC = () => {
     loadAll();
   }, [t]);
 
+  useEffect(() => {
+    if (!createEnterpriseOpen) {
+      return;
+    }
+    createEnterpriseForm.resetFields();
+  }, [createEnterpriseOpen, createEnterpriseForm]);
+
+  useEffect(() => {
+    if (!orgModalOpen) {
+      return;
+    }
+    orgForm.setFieldsValue(editingOrgUnit || {
+      name: '',
+      code: '',
+      parentId: undefined,
+      managerUserId: undefined,
+      sortOrder: 100,
+    });
+  }, [orgModalOpen, editingOrgUnit, orgForm]);
+
+  useEffect(() => {
+    if (!memberModalOpen) {
+      return;
+    }
+    memberForm.resetFields();
+    memberForm.setFieldsValue({ role: 'member' });
+    setUserSearchOptions([]);
+  }, [memberModalOpen, memberForm]);
+
+  useEffect(() => {
+    if (!invitationModalOpen) {
+      return;
+    }
+    invitationForm.resetFields();
+    invitationForm.setFieldsValue({ role: 'member', expiresInDays: 7, maxUses: 1 });
+  }, [invitationModalOpen, invitationForm]);
+
   const handleTabChange = (nextTab: string) => {
     const tab = ENTERPRISE_ADMIN_TABS.includes(nextTab as EnterpriseAdminTab)
       ? (nextTab as EnterpriseAdminTab)
@@ -285,13 +330,11 @@ const AdminSettings: React.FC = () => {
 
   const openCreateOrgUnit = () => {
     setEditingOrgUnit(null);
-    orgForm.setFieldsValue({ name: '', code: '', parentId: undefined, managerUserId: undefined, sortOrder: 100 });
     setOrgModalOpen(true);
   };
 
   const openEditOrgUnit = (unit: OrgUnit) => {
     setEditingOrgUnit(unit);
-    orgForm.setFieldsValue(unit);
     setOrgModalOpen(true);
   };
 
@@ -612,7 +655,7 @@ const AdminSettings: React.FC = () => {
                     <Button type="primary" size="large" icon={<PlusOutlined />} onClick={() => setCreateEnterpriseOpen(true)} block>
                       {t('enterprise_admin_create_enterprise')}
                     </Button>
-                    <Button size="large" icon={activeTabAction.icon} onClick={activeTabAction.onClick} block>
+                    <Button size="large" icon={activeTabAction.icon} onClick={activeTabAction.onClick} block type="default">
                       {activeTabAction.label}
                     </Button>
                   </Space>
@@ -785,6 +828,11 @@ const AdminSettings: React.FC = () => {
                   label: 'IM 接入',
                   children: <IMSettingsTab createSignal={imCreateSignal} />,
                 },
+                {
+                  key: 'skills',
+                  label: t('enterprise_admin_tab_skills'),
+                  children: <EnterpriseSkillsTab createSignal={skillCreateSignal} />,
+                },
               ]}
             />
           </>
@@ -794,10 +842,10 @@ const AdminSettings: React.FC = () => {
       <Modal
         title={t('enterprise_admin_create_enterprise')}
         open={createEnterpriseOpen}
-        forceRender
         onOk={handleCreateEnterprise}
         onCancel={() => setCreateEnterpriseOpen(false)}
         okText={t('enterprise_admin_create')}
+        destroyOnHidden
       >
         <Form form={createEnterpriseForm} layout="vertical">
           <Form.Item label={t('enterprise_admin_enterprise_name')} name="name" rules={[{ required: true, message: t('enterprise_admin_enterprise_name_required') }]}>
@@ -809,11 +857,11 @@ const AdminSettings: React.FC = () => {
       <Modal
         title={editingOrgUnit ? t('enterprise_admin_edit_department') : t('enterprise_admin_create_department')}
         open={orgModalOpen}
-        forceRender
         onOk={handleSaveOrgUnit}
         onCancel={() => setOrgModalOpen(false)}
         confirmLoading={savingOrgUnit}
         okText={editingOrgUnit ? t('enterprise_admin_save') : t('enterprise_admin_create')}
+        destroyOnHidden
       >
         <Form form={orgForm} layout="vertical">
           <Form.Item label={t('enterprise_admin_department_name')} name="name" rules={[{ required: true, message: t('enterprise_admin_department_name_required') }]}>
@@ -837,13 +885,13 @@ const AdminSettings: React.FC = () => {
       <Modal
         title={t('enterprise_admin_add_existing_member')}
         open={memberModalOpen}
-        forceRender
         onOk={handleAddExistingMember}
         onCancel={() => setMemberModalOpen(false)}
         confirmLoading={addingMember}
         okText={t('enterprise_admin_add_member')}
+        destroyOnHidden
       >
-        <Form form={memberForm} layout="vertical" initialValues={{ role: 'member' }}>
+        <Form form={memberForm} layout="vertical">
           <Form.Item
             label={t('enterprise_admin_search_user')}
             name="userId"
@@ -879,13 +927,13 @@ const AdminSettings: React.FC = () => {
       <Modal
         title={t('enterprise_admin_create_invite')}
         open={invitationModalOpen}
-        forceRender
         onOk={handleCreateInvitation}
         onCancel={() => setInvitationModalOpen(false)}
         confirmLoading={creatingInvitation}
         okText={t('enterprise_admin_create')}
+        destroyOnHidden
       >
-        <Form form={invitationForm} layout="vertical" initialValues={{ role: 'member', expiresInDays: 7, maxUses: 1 }}>
+        <Form form={invitationForm} layout="vertical">
           <Form.Item label={t('enterprise_admin_restricted_email')} name="email">
             <Input placeholder={t('enterprise_admin_restricted_email_placeholder')} />
           </Form.Item>

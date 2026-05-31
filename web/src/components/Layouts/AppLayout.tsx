@@ -16,7 +16,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import axios from 'axios';
 import { casdoorService } from '../../domains/identity/CasdoorService';
 import { BACKEND_URL } from '../../config';
-import { LANGUAGE_OPTIONS, applyLanguagePreference, getLocalizedPath, resolveSupportedLanguage } from '../../i18n/config';
+import { LANGUAGE_OPTIONS, applyLanguagePreference, getLocalizedPath, resolveSupportedLanguage, stripLanguagePrefix } from '../../i18n/config';
 
 const { Header, Content, Sider } = Layout;
 const { Title, Text } = Typography;
@@ -30,6 +30,8 @@ interface EnterpriseMembership {
   name: string;
   role: string;
 }
+
+const CURRENT_ENTERPRISE_STORAGE_KEY = 'dotblue_current_enterprise_id';
 
 function getAuthHeaders() {
   const token = casdoorService.getToken();
@@ -47,10 +49,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const [switchingEnterprise, setSwitchingEnterprise] = React.useState(false);
   const [enterpriseList, setEnterpriseList] = React.useState<EnterpriseMembership[]>([]);
   const [currentEnterpriseId, setCurrentEnterpriseId] = React.useState<string>();
+  const [openKeys, setOpenKeys] = React.useState<string[]>([]);
   const [messageApi, contextHolder] = message.useMessage();
 
   const isAdmin = casdoorService.isAdmin();
-  const isChatPage = location.pathname === '/chat';
+  const normalizedPath = stripLanguagePrefix(location.pathname);
+  const isChatPage = normalizedPath === '/chat';
   const username = casdoorService.getUsername() || 'User';
   const currentLanguage = resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language);
   const currentLanguageLabel = LANGUAGE_OPTIONS.find((item) => item.value === currentLanguage)?.shortLabel || 'EN';
@@ -68,11 +72,16 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       const list = rawList.filter((item: EnterpriseMembership, index: number, all: EnterpriseMembership[]) =>
         all.findIndex((candidate) => candidate.enterpriseId === item.enterpriseId) === index,
       );
+      const resolvedEnterpriseId = currentRes.data?.enterpriseId || list[0]?.enterpriseId;
       setEnterpriseList(list);
-      setCurrentEnterpriseId(currentRes.data?.enterpriseId || list[0]?.enterpriseId);
+      setCurrentEnterpriseId(resolvedEnterpriseId);
+      if (resolvedEnterpriseId) {
+        localStorage.setItem(CURRENT_ENTERPRISE_STORAGE_KEY, resolvedEnterpriseId);
+      }
     }).catch(() => {
       setEnterpriseList([]);
       setCurrentEnterpriseId(undefined);
+      localStorage.removeItem(CURRENT_ENTERPRISE_STORAGE_KEY);
     }).finally(() => {
       setEnterpriseLoading(false);
     });
@@ -95,6 +104,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         headers: getAuthHeaders(),
       });
       setCurrentEnterpriseId(enterpriseId);
+      localStorage.setItem(CURRENT_ENTERPRISE_STORAGE_KEY, enterpriseId);
       messageApi.success(t('enterprise_switch_success'));
       window.location.reload();
     } catch {
@@ -103,6 +113,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       setSwitchingEnterprise(false);
     }
   };
+
+  React.useEffect(() => {
+    if (normalizedPath.startsWith('/admin/platform')) {
+      setOpenKeys(['platform-admin']);
+      return;
+    }
+    setOpenKeys([]);
+  }, [normalizedPath]);
 
   const currentEnterprise = enterpriseList.find((item) => item.enterpriseId === currentEnterpriseId);
   const canManageEnterprise = ['owner', 'admin'].includes((currentEnterprise?.role || '').toLowerCase());
@@ -131,9 +149,19 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     }
     if (isAdmin) {
       adminItems.push({
-        key: '/admin/platform',
+        key: 'platform-admin',
         icon: <SettingOutlined style={{ fontSize: '18px' }} />,
-        label: t('platform_settings_nav'),
+        label: t('platform_admin_nav'),
+        children: [
+          {
+            key: '/admin/platform',
+            label: t('platform_settings_nav'),
+          },
+          {
+            key: '/admin/platform/skills',
+            label: t('platform_skills_title'),
+          },
+        ],
       });
     }
 
@@ -141,13 +169,20 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   }, [t, isAdmin, canManageEnterprise]);
 
   const getPageTitle = () => {
-    if (location.pathname === '/dashboard') return t('agent_settings');
-    if (location.pathname === '/chat') return t('chat');
-    if (location.pathname === '/admin/settings' || location.pathname === '/admin/enterprise') return t('enterprise_admin_nav');
-    if (location.pathname === '/admin/platform') return t('platform_settings_nav');
+    if (normalizedPath === '/dashboard') return t('agent_settings');
+    if (normalizedPath === '/chat') return t('chat');
+    if (normalizedPath === '/admin/settings' || normalizedPath === '/admin/enterprise') return t('enterprise_admin_nav');
+    if (normalizedPath === '/admin/platform') return t('platform_settings_nav');
+    if (normalizedPath.startsWith('/admin/platform/skills')) return t('platform_skills_title');
     return '';
   };
-  const hidePageHeading = location.pathname === '/admin/enterprise';
+  const getPageSectionTitle = () => {
+    if (normalizedPath === '/admin/platform' || normalizedPath.startsWith('/admin/platform/skills')) {
+      return t('platform_admin_nav');
+    }
+    return undefined;
+  };
+  const hidePageHeading = normalizedPath === '/admin/enterprise';
 
   // Keep hook order stable across route changes, then branch the render.
   if (isChatPage) {
@@ -185,10 +220,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         theme="dark"
         mode="inline"
         inlineCollapsed={collapsed}
-        selectedKeys={[location.pathname]}
+        selectedKeys={[normalizedPath]}
+        openKeys={collapsed || mobileVisible ? openKeys : openKeys}
+        onOpenChange={(keys) => setOpenKeys(keys as string[])}
         items={menuItems}
         onClick={({ key }) => {
-          navigate(key);
+          navigate(getLocalizedPath(String(key), currentLanguage));
           setMobileVisible(false);
         }}
         style={{ flex: 1, paddingTop: 16, borderRight: 0 }}
@@ -326,6 +363,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             <Breadcrumb
               items={[
                 { title: <Link to={getLocalizedPath('/dashboard', currentLanguage)}>{t('app_name')}</Link> },
+                ...(getPageSectionTitle() ? [{ title: getPageSectionTitle() }] : []),
                 { title: getPageTitle() },
               ]}
               style={{ marginBottom: hidePageHeading ? 0 : 8 }}

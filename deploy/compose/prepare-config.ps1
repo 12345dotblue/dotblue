@@ -155,6 +155,28 @@ function Resolve-DockerSocketGid($EnvMap) {
   return $gid.Trim()
 }
 
+function Get-RedirectUris($EnvMap) {
+  $seen = @{}
+  $uris = New-Object System.Collections.Generic.List[string]
+  $defaults = @(
+    "$($EnvMap["DOTBLUE_PUBLIC_URL"])/callback",
+    "http://localhost:9000/callback",
+    "http://127.0.0.1:9000/callback"
+  )
+  $extras = @()
+  if ($EnvMap.ContainsKey("DOTBLUE_CASDOOR_EXTRA_REDIRECT_URIS") -and -not [string]::IsNullOrWhiteSpace($EnvMap["DOTBLUE_CASDOOR_EXTRA_REDIRECT_URIS"])) {
+    $extras = $EnvMap["DOTBLUE_CASDOOR_EXTRA_REDIRECT_URIS"].Split(",")
+  }
+  foreach ($raw in ($defaults + $extras)) {
+    $value = "$raw".Trim()
+    if ([string]::IsNullOrWhiteSpace($value)) { continue }
+    if ($seen.ContainsKey($value)) { continue }
+    $seen[$value] = $true
+    $uris.Add($value)
+  }
+  return $uris.ToArray()
+}
+
 Require-File $envFile
 $envMap = Read-DotEnv $envFile
 
@@ -326,7 +348,7 @@ $casdoorInitData = @{
         @{ name = "Confirm password"; visible = $true; required = $true; prompted = $false; rule = "None" }
       )
       grantTypes = @("authorization_code", "password", "client_credentials", "refresh_token")
-      redirectUris = @("$($envMap["DOTBLUE_PUBLIC_URL"])/callback")
+      redirectUris = @(Get-RedirectUris $envMap)
       tokenFormat = "JWT"
       tokenFields = @()
       expireInHours = 168

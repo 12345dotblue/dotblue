@@ -55,25 +55,10 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
         borderBottom: '1px solid rgba(15, 23, 42, 0.05)',
         height: 88,
       }}>
-        <div
-          style={{
-            maxWidth: 1240,
-            margin: '12px auto',
-            height: 64,
-            padding: '0 18px 0 20px',
-            borderRadius: 20,
-            border: '1px solid rgba(15, 23, 42, 0.06)',
-            background: 'rgba(255, 255, 255, 0.86)',
-            boxShadow: '0 12px 32px rgba(15, 23, 42, 0.06)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 20,
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 20, minWidth: 0 }}>
+        <div className="landing-header-shell">
+          <div className="landing-header-main">
             <div
-              style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', minWidth: 0 }}
+              className="landing-brand-block"
               onClick={() => navigate(getLocalizedPath('/', currentLanguage))}
             >
               <img
@@ -113,7 +98,7 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                 </Text>
               </div>
             </div>
-            <Space size={4} wrap className="landing-nav-group">
+            <Space size={4} className="landing-nav-group">
               <Button className="landing-nav-button" type="text" onClick={() => scrollToSection('assistants')}>
                 {t('landing_nav_assistants')}
               </Button>
@@ -136,16 +121,16 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               >
                 {t('landing_nav_github')}
               </Button>
-              <Button className="landing-nav-button" type="text" onClick={() => navigate(getLocalizedPath('/terms', currentLanguage))}>
+              <Button className="landing-nav-button landing-nav-button--secondary" type="text" onClick={() => navigate(getLocalizedPath('/terms', currentLanguage))}>
                 {t('terms')}
               </Button>
-              <Button className="landing-nav-button" type="text" onClick={() => navigate(getLocalizedPath('/privacy', currentLanguage))}>
+              <Button className="landing-nav-button landing-nav-button--secondary" type="text" onClick={() => navigate(getLocalizedPath('/privacy', currentLanguage))}>
                 {t('privacy')}
               </Button>
             </Space>
           </div>
 
-          <Space size="small">
+          <Space size="small" className="landing-header-actions">
             <Dropdown
               menu={{
                 items: LANGUAGE_OPTIONS.map((item) => ({
@@ -206,7 +191,7 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           </Col>
           <Col xs={12} md={4}>
             <Title level={5}>{t('footer_product')}</Title>
-            <Space direction="vertical">
+            <Space orientation="vertical">
               <Link to={getLocalizedPath('/', currentLanguage)}>{t('welcome')}</Link>
               <Link to={getLocalizedPath('/docs', currentLanguage)}>{t('landing_nav_docs')}</Link>
               <a href={`${getLocalizedPath('/', currentLanguage)}#highlights`}>{t('landing_nav_highlights')}</a>
@@ -215,7 +200,7 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           </Col>
           <Col xs={12} md={4}>
             <Title level={5}>{t('footer_legal')}</Title>
-            <Space direction="vertical">
+            <Space orientation="vertical">
               <Link to={getLocalizedPath('/terms', currentLanguage)}>{t('terms')}</Link>
               <Link to={getLocalizedPath('/privacy', currentLanguage)}>{t('privacy')}</Link>
               <Link to={getLocalizedPath('/refund', currentLanguage)}>{t('refund')}</Link>
@@ -245,6 +230,59 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       </Footer>
       <style>
         {`
+          .landing-header-shell {
+            max-width: 1240px;
+            margin: 12px auto;
+            height: 64px;
+            padding: 0 18px 0 20px;
+            border-radius: 20px;
+            border: 1px solid rgba(15, 23, 42, 0.06);
+            background: rgba(255, 255, 255, 0.86);
+            box-shadow: 0 12px 32px rgba(15, 23, 42, 0.06);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+          }
+
+          .landing-header-main {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            min-width: 0;
+            flex: 1 1 auto;
+            overflow: hidden;
+          }
+
+          .landing-brand-block {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            cursor: pointer;
+            min-width: 0;
+            flex: 0 0 auto;
+          }
+
+          .landing-nav-group {
+            display: flex;
+            flex-wrap: nowrap !important;
+            min-width: 0;
+            overflow-x: auto;
+            overflow-y: hidden;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            white-space: nowrap;
+            flex: 1 1 auto;
+          }
+
+          .landing-nav-group::-webkit-scrollbar {
+            display: none;
+          }
+
+          .landing-nav-group .ant-space-item {
+            flex: 0 0 auto;
+          }
+
           .landing-nav-group .landing-nav-button {
             height: 36px;
             padding: 0 14px;
@@ -300,6 +338,23 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             border-radius: 999px;
             font-weight: 600;
             box-shadow: 0 10px 24px rgba(22, 119, 255, 0.18);
+          }
+
+          .landing-header-actions {
+            flex: 0 0 auto;
+            white-space: nowrap;
+          }
+
+          @media (max-width: 1320px) {
+            .landing-nav-button--secondary {
+              display: none;
+            }
+          }
+
+          @media (max-width: 1180px) {
+            .landing-brand-block > div:last-child {
+              display: none !important;
+            }
           }
         `}
       </style>

@@ -62,6 +62,40 @@ json_escape_file() {
     }' "$1"
 }
 
+build_redirect_uris_json() {
+  local item trimmed
+  local first=1
+  local -a defaults
+  local -a extras=()
+  declare -A seen=()
+
+  defaults=(
+    "${DOTBLUE_PUBLIC_URL}/callback"
+    "http://localhost:9000/callback"
+    "http://127.0.0.1:9000/callback"
+  )
+
+  if [[ -n "${DOTBLUE_CASDOOR_EXTRA_REDIRECT_URIS:-}" ]]; then
+    IFS=',' read -r -a extras <<< "${DOTBLUE_CASDOOR_EXTRA_REDIRECT_URIS}"
+  fi
+
+  printf '['
+  for item in "${defaults[@]}" "${extras[@]}"; do
+    trimmed="$(printf '%s' "${item}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+    [[ -n "${trimmed}" ]] || continue
+    if [[ -n "${seen["${trimmed}"]:-}" ]]; then
+      continue
+    fi
+    seen["${trimmed}"]=1
+    if [[ ${first} -eq 0 ]]; then
+      printf ', '
+    fi
+    printf '"%s"' "$(json_escape_string "${trimmed}")"
+    first=0
+  done
+  printf ']'
+}
+
 indent_file() {
   local prefix="$1"
   local file="$2"
@@ -320,7 +354,7 @@ cat > "${CASDOOR_DIR}/init_data.json" <<EOF
         }
       ],
       "grantTypes": ["authorization_code", "password", "client_credentials", "refresh_token"],
-      "redirectUris": ["$(json_escape_string "${DOTBLUE_PUBLIC_URL}/callback")"],
+      "redirectUris": $(build_redirect_uris_json),
       "tokenFormat": "JWT",
       "tokenFields": [],
       "expireInHours": 168,

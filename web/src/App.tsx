@@ -13,6 +13,7 @@ import AgentList from './domains/agent/AgentList'
 import ChatPage from './domains/chat/ChatPage'
 import AdminSettings from './domains/admin/AdminSettings'
 import PlatformSettingsPage from './domains/admin/PlatformSettingsPage'
+import PlatformSkillsPage from './domains/admin/PlatformSkillsPage'
 import InviteAcceptPage from './domains/admin/InviteAcceptPage'
 import SetupWizard from './domains/setup/SetupWizard'
 
@@ -83,14 +84,15 @@ function RedirectToLocalized({ path }: { path?: string }) {
   return <Navigate to={`${getLocalizedPath(targetPath, language)}${search ? `?${search}` : ''}${location.hash}`} replace />
 }
 
-function LocalizedRouteGuard() {
+export function LocalizedRouteGuard() {
   const { lng } = useParams()
   const location = useLocation()
   const { i18n } = useTranslation()
   const resolved = resolveSupportedLanguage(lng || getPreferredLanguage())
+  const currentLanguage = resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language)
 
   React.useEffect(() => {
-    if (resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language) === resolved) {
+    if (currentLanguage === resolved) {
       return
     }
 
@@ -101,7 +103,7 @@ function LocalizedRouteGuard() {
     }
 
     void i18n.changeLanguage(resolved)
-  }, [i18n, resolved])
+  }, [currentLanguage, i18n, resolved])
 
   if (lng !== resolved) {
     const segments = location.pathname.split('/').filter(Boolean)
@@ -110,6 +112,12 @@ function LocalizedRouteGuard() {
     params.delete('lng')
     const search = params.toString()
     return <Navigate to={`${getLocalizedPath(restPath, resolved)}${search ? `?${search}` : ''}${location.hash}`} replace />
+  }
+
+  // Delay child route rendering until the route language has been applied,
+  // otherwise pages can paint once with a stale locale and stay inconsistent.
+  if (currentLanguage !== resolved) {
+    return null
   }
 
   return <Outlet />
@@ -174,6 +182,7 @@ function App() {
             <Route path="/admin/settings" element={<RedirectToLocalized path="/admin/enterprise" />} />
             <Route path="/admin/enterprise" element={<RedirectToLocalized path="/admin/enterprise" />} />
             <Route path="/admin/platform" element={<RedirectToLocalized path="/admin/platform" />} />
+            <Route path="/admin/platform/skills" element={<RedirectToLocalized path="/admin/platform/skills" />} />
 
             <Route path="/:lng" element={<LocalizedRouteGuard />}>
               <Route index element={<LandingLayout><LandingPage /></LandingLayout>} />
@@ -228,6 +237,18 @@ function App() {
                     <PlatformAdminRoute>
                       <AppLayout>
                         <PlatformSettingsPage />
+                      </AppLayout>
+                    </PlatformAdminRoute>
+                  </SetupGuard>
+                }
+              />
+              <Route
+                path="admin/platform/skills"
+                element={
+                  <SetupGuard>
+                    <PlatformAdminRoute>
+                      <AppLayout>
+                        <PlatformSkillsPage />
                       </AppLayout>
                     </PlatformAdminRoute>
                   </SetupGuard>

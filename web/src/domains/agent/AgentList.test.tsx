@@ -11,14 +11,18 @@ vi.mock('axios');
 vi.mock('react-router-dom', () => ({
   useNavigate: () => vi.fn(),
 }));
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string, options?: Record<string, unknown>) => {
-      if (options?.count !== undefined) return `${key}:${String(options.count)}`;
-      return key;
-    },
-  }),
-}));
+vi.mock('react-i18next', async () => {
+  const actual = await vi.importActual<typeof import('react-i18next')>('react-i18next');
+  return {
+    ...actual,
+    useTranslation: () => ({
+      t: (key: string, options?: Record<string, unknown>) => {
+        if (options?.count !== undefined) return `${key}:${String(options.count)}`;
+        return key;
+      },
+    }),
+  };
+});
 
 const mockedAxios = vi.mocked(axios, true);
 const mockedAxiosPost = vi.mocked(axios.post);

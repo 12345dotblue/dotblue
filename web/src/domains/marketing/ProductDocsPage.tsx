@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Anchor, Breadcrumb, Button, Card, Col, Divider, List, Row, Space, Tag, Typography } from 'antd';
+import { Anchor, Breadcrumb, Button, Card, Col, Divider, Row, Space, Tag, Typography } from 'antd';
 import { BookOutlined, GithubOutlined, LoginOutlined, RocketOutlined } from '@ant-design/icons';
 import { Helmet } from 'react-helmet-async';
 import { Link, useNavigate } from 'react-router-dom';
@@ -54,7 +54,7 @@ const ProductDocsPage: React.FC = () => {
         />
 
         <section style={{ padding: '40px 0 32px' }}>
-          <Space direction="vertical" size={18} style={{ width: '100%' }}>
+          <Space orientation="vertical" size={18} style={{ width: '100%' }}>
             <Tag color="blue" style={{ width: 'fit-content', borderRadius: 999, padding: '6px 12px' }}>
               {content.eyebrow}
             </Tag>
@@ -80,7 +80,7 @@ const ProductDocsPage: React.FC = () => {
 
         <Row gutter={[40, 32]} align="top">
           <Col xs={24} lg={17}>
-            <Space direction="vertical" size={40} style={{ width: '100%' }}>
+            <Space orientation="vertical" size={40} style={{ width: '100%' }}>
               {content.sections.map((section) => (
                 <section id={section.id} key={section.id}>
                   <Title level={2}>{section.title}</Title>
@@ -90,8 +90,8 @@ const ProductDocsPage: React.FC = () => {
                     <Row gutter={[16, 16]} style={{ marginTop: 8 }}>
                       {section.cards.map((card) => (
                         <Col xs={24} md={12} key={card.title}>
-                          <Card bordered={false} style={{ height: '100%', borderRadius: 20, boxShadow: '0 12px 32px rgba(15, 23, 42, 0.06)' }}>
-                            <Space direction="vertical" size={10} style={{ width: '100%' }}>
+                          <Card variant="borderless" style={{ height: '100%', borderRadius: 20, boxShadow: '0 12px 32px rgba(15, 23, 42, 0.06)' }}>
+                            <Space orientation="vertical" size={10} style={{ width: '100%' }}>
                               {card.tag && <Tag style={{ width: 'fit-content', borderRadius: 999 }}>{card.tag}</Tag>}
                               <Title level={4} style={{ margin: 0 }}>
                                 {card.title}
@@ -107,41 +107,37 @@ const ProductDocsPage: React.FC = () => {
                   )}
 
                   {section.steps && (
-                    <List
-                      style={{ marginTop: 8 }}
-                      dataSource={section.steps}
-                      renderItem={(item, index) => (
-                        <List.Item style={{ paddingInline: 0 }}>
-                          <Space align="start" size={16}>
-                            <div
-                              style={{
-                                width: 32,
-                                height: 32,
-                                borderRadius: 999,
-                                background: '#eaf3ff',
-                                color: '#1677ff',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontWeight: 700,
-                                flexShrink: 0,
-                                marginTop: 4,
-                              }}
-                            >
-                              {index + 1}
-                            </div>
-                            <div>
-                              <Text strong style={{ display: 'block', fontSize: 16, marginBottom: 4 }}>
-                                {item.title}
-                              </Text>
-                              <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-                                {item.desc}
-                              </Paragraph>
-                            </div>
-                          </Space>
-                        </List.Item>
-                      )}
-                    />
+                    <Space orientation="vertical" size={16} style={{ width: '100%', marginTop: 8 }}>
+                      {section.steps.map((item, index) => (
+                        <Space key={`${section.id}-${item.title}-${index}`} align="start" size={16}>
+                          <div
+                            style={{
+                              width: 32,
+                              height: 32,
+                              borderRadius: 999,
+                              background: '#eaf3ff',
+                              color: '#1677ff',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: 700,
+                              flexShrink: 0,
+                              marginTop: 4,
+                            }}
+                          >
+                            {index + 1}
+                          </div>
+                          <div>
+                            <Text strong style={{ display: 'block', fontSize: 16, marginBottom: 4 }}>
+                              {item.title}
+                            </Text>
+                            <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+                              {item.desc}
+                            </Paragraph>
+                          </div>
+                        </Space>
+                      ))}
+                    </Space>
                   )}
 
                   {section.paragraphs?.map((paragraph) => (
@@ -161,15 +157,15 @@ const ProductDocsPage: React.FC = () => {
                   )}
 
                   {section.links && (
-                    <Space direction="vertical" size={12} style={{ width: '100%', marginTop: 20 }}>
+                    <Space orientation="vertical" size={12} style={{ width: '100%', marginTop: 20 }}>
                       {section.links.map((link) => (
                         <Card
                           key={link.url}
                           size="small"
-                          bordered={false}
+                          variant="borderless"
                           style={{ borderRadius: 16, background: '#f8fbff', boxShadow: '0 8px 24px rgba(15, 23, 42, 0.04)' }}
                         >
-                          <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                          <Space orientation="vertical" size={4} style={{ width: '100%' }}>
                             <a href={link.url} target="_blank" rel="noreferrer">
                               {link.label}
                             </a>
@@ -224,13 +220,13 @@ const ProductDocsPage: React.FC = () => {
 
           <Col xs={24} lg={7}>
             <div style={{ position: 'sticky', top: 108 }}>
-              <Card bordered={false} style={{ borderRadius: 20, boxShadow: '0 12px 32px rgba(15, 23, 42, 0.06)' }}>
+              <Card variant="borderless" style={{ borderRadius: 20, boxShadow: '0 12px 32px rgba(15, 23, 42, 0.06)' }}>
                 <Title level={5} style={{ marginTop: 0 }}>
                   {content.anchorTitle}
                 </Title>
                 <Anchor offsetTop={120} items={[...anchorItems, { key: 'github', href: '#github', title: content.repoTitle }]} />
                 <Divider />
-                <Space direction="vertical" size={10} style={{ width: '100%' }}>
+                <Space orientation="vertical" size={10} style={{ width: '100%' }}>
                   <Button block icon={<BookOutlined />} onClick={() => navigate(localizedHomePath)}>
                     {t('welcome')}
                   </Button>

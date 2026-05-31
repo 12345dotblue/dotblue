@@ -33,6 +33,8 @@ import { casdoorService } from '../identity/CasdoorService';
 
 const { Paragraph, Text } = Typography;
 const TELEGRAM_PLATFORM = 'telegram';
+const QQ_PLATFORM = 'qq';
+const MATRIX_PLATFORM = 'matrix';
 const DISCORD_PLATFORM = 'discord';
 const SLACK_PLATFORM = 'slack';
 const FEISHU_PLATFORM = 'feishu';
@@ -170,6 +172,12 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
       }
       if (connectionFormPlatform === TELEGRAM_PLATFORM) {
         return [{ label: 'polling', value: 'polling' }];
+      }
+      if (connectionFormPlatform === MATRIX_PLATFORM) {
+        return [{ label: 'sync', value: 'sync' }];
+      }
+      if (connectionFormPlatform === QQ_PLATFORM) {
+        return [{ label: 'gateway', value: 'gateway' }];
       }
       if (connectionFormPlatform === DISCORD_PLATFORM) {
         return [{ label: 'gateway', value: 'gateway' }];
@@ -310,6 +318,12 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
       connectionMode: 'polling',
       token: '',
       pollTimeoutSeconds: 30,
+      qqAppId: '',
+      qqAppSecret: '',
+      matrixHomeserver: '',
+      matrixUserId: '',
+      matrixAccessToken: '',
+      matrixSyncTimeoutSeconds: 30,
       discordToken: '',
       botToken: '',
       appToken: '',
@@ -330,12 +344,22 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
           ? 'direct'
           : connection.platform === TELEGRAM_PLATFORM
             ? 'polling'
+            : connection.platform === QQ_PLATFORM
+              ? 'gateway'
+            : connection.platform === MATRIX_PLATFORM
+              ? 'sync'
             : connection.platform === DISCORD_PLATFORM
               ? 'gateway'
             : 'socket_mode'
       ),
       token: '',
       pollTimeoutSeconds: connection.config?.pollTimeoutSeconds || 30,
+      qqAppId: connection.config?.appId || '',
+      qqAppSecret: '',
+      matrixHomeserver: connection.config?.homeserver || '',
+      matrixUserId: connection.config?.userId || '',
+      matrixAccessToken: '',
+      matrixSyncTimeoutSeconds: connection.config?.syncTimeoutSeconds || 30,
       discordToken: '',
       botToken: '',
       appToken: '',
@@ -371,6 +395,36 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
                 ? {}
                 : { secrets: { token: values.token } }),
           }
+        : values.platform === QQ_PLATFORM
+          ? {
+              platform: values.platform,
+              name: values.name,
+              connectionMode: values.connectionMode,
+              config: {
+                appId: values.qqAppId,
+              },
+              ...(values.qqAppSecret
+                ? { secrets: { appSecret: values.qqAppSecret } }
+                : editingConnection
+                  ? {}
+                  : { secrets: { appSecret: values.qqAppSecret } }),
+            }
+        : values.platform === MATRIX_PLATFORM
+          ? {
+              platform: values.platform,
+              name: values.name,
+              connectionMode: values.connectionMode,
+              config: {
+                homeserver: values.matrixHomeserver,
+                userId: values.matrixUserId,
+                syncTimeoutSeconds: values.matrixSyncTimeoutSeconds,
+              },
+              ...(values.matrixAccessToken
+                ? { secrets: { accessToken: values.matrixAccessToken } }
+                : editingConnection
+                  ? {}
+                  : { secrets: { accessToken: values.matrixAccessToken } }),
+            }
         : values.platform === DISCORD_PLATFORM
           ? {
               platform: values.platform,
@@ -858,6 +912,10 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
                           ? `通道：${selectedConnection.config?.channel || 'web_chat'}`
                           : selectedConnection.platform === TELEGRAM_PLATFORM
                             ? `轮询超时：${selectedConnection.config?.pollTimeoutSeconds || 30}s`
+                            : selectedConnection.platform === QQ_PLATFORM
+                              ? `App ID：${selectedConnection.config?.appId || '-'}`
+                            : selectedConnection.platform === MATRIX_PLATFORM
+                              ? `Homeserver：${selectedConnection.config?.homeserver || '-'}`
                             : selectedConnection.platform === DISCORD_PLATFORM
                               ? '模式：Gateway'
                             : selectedConnection.platform === SLACK_PLATFORM
@@ -997,6 +1055,8 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
               disabled={Boolean(editingConnection)}
               options={[
                 { label: 'Telegram', value: TELEGRAM_PLATFORM },
+                { label: 'QQ', value: QQ_PLATFORM },
+                { label: 'Matrix', value: MATRIX_PLATFORM },
                 { label: 'Discord', value: DISCORD_PLATFORM },
                 { label: 'Slack', value: SLACK_PLATFORM },
                 { label: 'Feishu', value: FEISHU_PLATFORM },
@@ -1029,6 +1089,42 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
                 <Input.Password placeholder="例如：123456:ABCDEF..." />
               </Form.Item>
               <Form.Item label="轮询超时（秒）" name="pollTimeoutSeconds" rules={[{ required: true, message: '请输入轮询超时' }]}>
+                <InputNumber min={10} max={60} style={{ width: '100%' }} />
+              </Form.Item>
+            </>
+          ) : connectionFormPlatform === QQ_PLATFORM ? (
+            <>
+              <Alert
+                type="info"
+                showIcon
+                message="QQ 连接"
+                description="QQ 官方 Bot 使用 Gateway WebSocket 接收消息，出站通过 OpenAPI 发送。首版优先支持单聊和群 @ 机器人消息。"
+              />
+              <Form.Item label="App ID" name="qqAppId" rules={[{ required: true, message: '请输入 App ID' }]}>
+                <Input placeholder="QQ Bot App ID" />
+              </Form.Item>
+              <Form.Item label={editingConnection ? 'App Secret（留空表示保持不变）' : 'App Secret'} name="qqAppSecret" rules={editingConnection ? [] : [{ required: true, message: '请输入 App Secret' }]}>
+                <Input.Password placeholder="QQ Bot App Secret" />
+              </Form.Item>
+            </>
+          ) : connectionFormPlatform === MATRIX_PLATFORM ? (
+            <>
+              <Alert
+                type="info"
+                showIcon
+                message="Matrix 连接"
+                description="Matrix 使用 Client-Server API 的 /sync 长轮询接收消息，不需要公网 webhook。"
+              />
+              <Form.Item label="Homeserver" name="matrixHomeserver" rules={[{ required: true, message: '请输入 Homeserver' }]}>
+                <Input placeholder="例如：https://matrix.org" />
+              </Form.Item>
+              <Form.Item label="User ID" name="matrixUserId" rules={[{ required: true, message: '请输入 User ID' }]}>
+                <Input placeholder="例如：@bot:matrix.org" />
+              </Form.Item>
+              <Form.Item label={editingConnection ? 'Access Token（留空表示保持不变）' : 'Access Token'} name="matrixAccessToken" rules={editingConnection ? [] : [{ required: true, message: '请输入 Access Token' }]}>
+                <Input.Password placeholder="Matrix Access Token" />
+              </Form.Item>
+              <Form.Item label="Sync 超时（秒）" name="matrixSyncTimeoutSeconds" rules={[{ required: true, message: '请输入 Sync 超时' }]}>
                 <InputNumber min={10} max={60} style={{ width: '100%' }} />
               </Form.Item>
             </>

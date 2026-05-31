@@ -174,7 +174,7 @@ const LandingPage: React.FC = () => {
         <div style={{ maxWidth: 1180, margin: '0 auto' }}>
           <Row gutter={[48, 48]} align="middle">
             <Col xs={24} lg={14}>
-              <Space direction="vertical" size={20} style={{ width: '100%' }}>
+              <Space orientation="vertical" size={20} style={{ width: '100%' }}>
                 <Space wrap size={[12, 12]}>
                   <Tag color="blue" style={{ borderRadius: 999, padding: '6px 14px', marginInlineEnd: 0 }}>
                     {t('hero_tagline')}
@@ -236,7 +236,7 @@ const LandingPage: React.FC = () => {
             </Col>
             <Col xs={24} lg={10}>
               <Card
-                bordered={false}
+                variant="borderless"
                 style={{
                   borderRadius: 28,
                   background: 'linear-gradient(180deg, #ffffff 0%, #f7fbff 100%)',
@@ -244,13 +244,13 @@ const LandingPage: React.FC = () => {
                 }}
                 styles={{ body: { padding: 28 } }}
               >
-                <Space direction="vertical" size={18} style={{ width: '100%' }}>
+                <Space orientation="vertical" size={18} style={{ width: '100%' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <Text strong style={{ fontSize: 16 }}>{t('assistants_panel_title')}</Text>
                     <Tag color="processing" style={{ marginInlineEnd: 0 }}>{t('assistants_panel_badge')}</Tag>
                   </div>
                   <div style={{ borderRadius: 20, padding: 20, background: 'linear-gradient(135deg, rgba(22,119,255,0.08), rgba(54,207,201,0.12))', border: '1px solid rgba(22,119,255,0.12)' }}>
-                    <Space direction="vertical" size={10} style={{ width: '100%' }}>
+                    <Space orientation="vertical" size={10} style={{ width: '100%' }}>
                       <Text type="secondary">{t('assistants_panel_label')}</Text>
                       <Title level={4} style={{ margin: 0 }}>{t('assistants_panel_featured_title')}</Title>
                       <Paragraph style={{ margin: 0, color: '#5b6673' }}>{t('assistants_panel_featured_desc')}</Paragraph>
@@ -319,7 +319,7 @@ const LandingPage: React.FC = () => {
               <Col xs={24} md={12} xl={6} key={assistant.title}>
                 <Card
                   hoverable
-                  bordered={false}
+                  variant="borderless"
                   style={{
                     height: '100%',
                     borderRadius: 22,
@@ -328,7 +328,7 @@ const LandingPage: React.FC = () => {
                   }}
                   styles={{ body: { padding: 24 } }}
                 >
-                  <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                  <Space orientation="vertical" size={16} style={{ width: '100%' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
                       <div style={{ width: 48, height: 48, borderRadius: 14, background: `${assistant.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         {React.cloneElement(assistant.icon as StyledIconElement, { style: { fontSize: 22, color: assistant.color } })}
@@ -358,7 +358,7 @@ const LandingPage: React.FC = () => {
           {highlights.map((item) => (
             <Col xs={24} md={12} xl={8} key={item.title}>
               <Card
-                bordered={false}
+                variant="borderless"
                 hoverable
                 style={{
                   height: '100%',
@@ -368,7 +368,7 @@ const LandingPage: React.FC = () => {
                 }}
                 styles={{ body: { padding: 28 } }}
               >
-                <Space direction="vertical" size={18} style={{ width: '100%' }}>
+                <Space orientation="vertical" size={18} style={{ width: '100%' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
                     <div style={{ width: 52, height: 52, borderRadius: 16, background: `${item.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       {React.cloneElement(item.icon as StyledIconElement, { style: { fontSize: 24, color: item.color } })}
@@ -397,7 +397,7 @@ const LandingPage: React.FC = () => {
         <Row gutter={[24, 24]} justify="center" style={{ maxWidth: 1180, margin: '0 auto' }}>
           {features.map((feature) => (
             <Col xs={24} sm={12} lg={8} key={feature.title}>
-              <Card hoverable bordered={false} style={{ height: '100%', borderRadius: 20 }} styles={{ body: { padding: 28 } }}>
+              <Card hoverable variant="borderless" style={{ height: '100%', borderRadius: 20 }} styles={{ body: { padding: 28 } }}>
                 <div style={{
                   width: 48, height: 48, borderRadius: 12,
                   background: `${feature.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -428,7 +428,7 @@ const LandingPage: React.FC = () => {
           {plans.map((plan) => (
             <Col xs={24} md={12} xl={8} key={plan.name}>
               <Card
-                bordered={plan.popular}
+                variant={plan.popular ? 'outlined' : 'borderless'}
                 style={{
                   height: '100%',
                   borderRadius: 24,

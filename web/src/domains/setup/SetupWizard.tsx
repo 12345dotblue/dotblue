@@ -124,7 +124,7 @@ const SetupWizard: React.FC = () => {
           <Text type="secondary">{t('setup_subtitle')}</Text>
         </div>
 
-        <Card bordered={false} style={{ borderRadius: 12 }}>
+        <Card variant="borderless" style={{ borderRadius: 12 }}>
           <Typography.Paragraph type="secondary" style={{ marginBottom: 24 }}>
             {t('setup_admin_desc')}
           </Typography.Paragraph>

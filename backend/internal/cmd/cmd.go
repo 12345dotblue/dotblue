@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"strings"
 
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
@@ -18,6 +19,7 @@ import (
 	"dotblue/internal/domains/metering"
 	"dotblue/internal/domains/model"
 	"dotblue/internal/domains/setup"
+	"dotblue/internal/domains/skill"
 	"dotblue/internal/infrastructure/dbschema"
 )
 
@@ -57,7 +59,7 @@ var (
 			s.Use(func(r *ghttp.Request) {
 				r.Response.Header().Set("Access-Control-Allow-Origin", "*")
 				r.Response.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-				r.Response.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+				r.Response.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Enterprise-ID")
 				if r.Method == "OPTIONS" {
 					r.Response.WriteStatus(204)
 					r.ExitAll()
@@ -78,6 +80,21 @@ var (
 			s.Group("/api", func(group *ghttp.RouterGroup) {
 				group.Middleware(identity.Middleware)
 				group.POST("/invitations/{code}/accept", enterprise.AcceptInvitationHandler)
+			})
+
+			// Unified admin skill routes are shared by platform and enterprise admins.
+			s.Group("/api", func(group *ghttp.RouterGroup) {
+				group.Middleware(identity.Middleware)
+				group.Middleware(adminSkillContextMiddleware)
+				group.Middleware(adminSkillAccessMiddleware)
+				group.GET("/admin/skills", skill.ListEnterpriseSkillsHandler)
+				group.POST("/admin/skills", skill.CreateSkillHandler)
+				group.GET("/admin/skills/{id}", skill.GetSkillDetailHandler)
+				group.POST("/admin/skills/{id}/versions", skill.CreateSkillVersionHandler)
+				group.GET("/admin/skills/{id}/versions/{versionId}/references", skill.ListSkillVersionReferencesHandler)
+				group.POST("/admin/skills/{id}/references", skill.UpdateSkillVersionReferencesHandler)
+				group.POST("/admin/skills/{id}/submit-review", skill.SubmitSkillReviewHandler)
+				group.POST("/admin/skills/{id}/publish", skill.PublishSkillHandler)
 			})
 
 			// 平台管理员路由（平台级设置）
@@ -101,6 +118,19 @@ var (
 				group.POST("/admin/platform/usage-limit-policies", metering.CreatePlatformPolicyHandler)
 				group.PUT("/admin/platform/usage-limit-policies/{id}", metering.UpdatePlatformPolicyHandler)
 				group.DELETE("/admin/platform/usage-limit-policies/{id}", metering.DeletePlatformPolicyHandler)
+				group.GET("/admin/platform/skills", skill.ListPlatformSkillsHandler)
+				group.POST("/admin/platform/skills", skill.CreateSkillHandler)
+				group.GET("/admin/platform/skills/{id}", skill.GetSkillDetailHandler)
+				group.POST("/admin/platform/skills/{id}/versions", skill.CreateSkillVersionHandler)
+				group.GET("/admin/platform/skills/{id}/versions/{versionId}/references", skill.ListSkillVersionReferencesHandler)
+				group.POST("/admin/platform/skills/{id}/references", skill.UpdateSkillVersionReferencesHandler)
+				group.POST("/admin/platform/skills/{id}/submit-review", skill.SubmitSkillReviewHandler)
+				group.POST("/admin/platform/skills/{id}/publish", skill.PublishSkillHandler)
+				group.GET("/admin/platform/skill-hubs", skill.ListSkillHubsHandler)
+				group.POST("/admin/platform/skill-hubs", skill.UpsertSkillHubHandler)
+				group.PUT("/admin/platform/skill-hubs/{id}", skill.UpsertSkillHubHandler)
+				group.GET("/admin/platform/skill-import-jobs", skill.ListSkillImportJobsHandler)
+				group.POST("/admin/platform/skill-import-jobs", skill.ImportSkillHandler)
 			})
 
 			// 企业管理员路由
@@ -149,6 +179,11 @@ var (
 				group.GET("/admin/im/bindings/{bindingId}", im.GetBindingHandler)
 				group.PUT("/admin/im/bindings/{bindingId}", im.UpdateBindingHandler)
 				group.DELETE("/admin/im/bindings/{bindingId}", im.DeleteBindingHandler)
+				group.POST("/admin/skills/{skillId}/enable", skill.EnableSkillHandler)
+				group.POST("/admin/skills/{skillId}/disable", skill.DisableSkillHandler)
+				group.GET("/admin/agents/{agentId}/skills", skill.ListAgentSkillsHandler)
+				group.POST("/admin/agents/{agentId}/skills/install", skill.InstallSkillOnAgentHandler)
+				group.POST("/admin/agents/{agentId}/skills/{skillId}/uninstall", skill.UninstallSkillFromAgentHandler)
 			})
 
 			// 普通用户路由（需要认证 + 企业上下文）
@@ -164,6 +199,7 @@ var (
 				group.GET("/agents/model-options", agent.ModelOptionsHandler)
 				group.POST("/agents", agent.CreateHandler)
 				group.GET("/agents/{id}", agent.GetHandler)
+				group.GET("/agents/{id}/skills", skill.ListAgentSkillsForMemberHandler)
 				group.GET("/agents/{id}/usage/overview", metering.AgentUsageOverviewHandler)
 				group.GET("/agents/{id}/usage/trends", metering.AgentUsageTrendsHandler)
 				group.PUT("/agents/{id}", agent.UpdateHandler)
@@ -196,4 +232,24 @@ var (
 
 func init() {
 	_ = Main.AddCommand(&Worker)
+}
+
+func adminSkillContextMiddleware(r *ghttp.Request) {
+	requestedEnterpriseId := strings.TrimSpace(r.Header.Get("X-Enterprise-ID"))
+	if requestedEnterpriseId == "" {
+		requestedEnterpriseId = strings.TrimSpace(r.Get("enterpriseId").String())
+	}
+	if identity.IsAdmin(r) && requestedEnterpriseId == "" {
+		r.Middleware.Next()
+		return
+	}
+	enterprise.MemberContextMiddleware(r)
+}
+
+func adminSkillAccessMiddleware(r *ghttp.Request) {
+	if identity.IsAdmin(r) {
+		r.Middleware.Next()
+		return
+	}
+	enterprise.AdminMiddleware(r)
 }

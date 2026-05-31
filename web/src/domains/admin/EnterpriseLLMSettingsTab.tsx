@@ -58,32 +58,30 @@ const EnterpriseLLMSettingsTab: React.FC<Props> = ({ createSignal = 0 }) => {
   useEffect(() => {
     if (createSignal > 0) {
       setEditingModel(null);
-      form.setFieldsValue({
-        displayName: '',
-        type: 'openai',
-        apiBase: 'https://api.openai.com/v1',
-        apiKey: '',
-        model: '',
-      });
       setModalOpen(true);
     }
-  }, [createSignal, form]);
+  }, [createSignal]);
 
-  const openCreate = () => {
-    setEditingModel(null);
-    form.setFieldsValue({
+  useEffect(() => {
+    if (!modalOpen) {
+      return;
+    }
+    form.setFieldsValue(editingModel || {
       displayName: '',
       type: 'openai',
       apiBase: 'https://api.openai.com/v1',
       apiKey: '',
       model: '',
     });
+  }, [modalOpen, editingModel, form]);
+
+  const openCreate = () => {
+    setEditingModel(null);
     setModalOpen(true);
   };
 
   const openEdit = (item: EnterpriseLLMModel) => {
     setEditingModel(item);
-    form.setFieldsValue(item);
     setModalOpen(true);
   };
 
@@ -125,7 +123,7 @@ const EnterpriseLLMSettingsTab: React.FC<Props> = ({ createSignal = 0 }) => {
   };
 
   return (
-    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+    <Space orientation="vertical" size={16} style={{ width: '100%' }}>
       {contextHolder}
       <Card variant="borderless" style={{ borderRadius: 20 }}>
         <Paragraph type="secondary" style={{ marginBottom: 0 }}>
@@ -150,7 +148,7 @@ const EnterpriseLLMSettingsTab: React.FC<Props> = ({ createSignal = 0 }) => {
               dataIndex: 'displayName',
               key: 'displayName',
               render: (value: string, item: EnterpriseLLMModel) => (
-                <Space direction="vertical" size={0}>
+                <Space orientation="vertical" size={0}>
                   <Text strong>{value}</Text>
                   <Text type="secondary">{item.model}</Text>
                 </Space>
@@ -201,7 +199,7 @@ const EnterpriseLLMSettingsTab: React.FC<Props> = ({ createSignal = 0 }) => {
         onCancel={() => setModalOpen(false)}
         confirmLoading={saving}
         okText={editingModel ? t('agent_save') : t('enterprise_admin_llm_create')}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form
           form={form}

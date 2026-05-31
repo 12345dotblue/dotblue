@@ -14,6 +14,7 @@ Local all-in-one startup for DotBlue, an enterprise-grade self-hosted AI assista
 - `prepare-config.sh`: Linux/macOS config generator
 - `prepare-config.ps1`: Windows PowerShell config generator
 - `smoke-test.sh`: WSL/Linux post-start health check
+- `platform-skills-e2e.py`: real UI E2E for the platform skill reference-cycle flow
 - `runtime-doctor.sh`: WSL/Linux runtime diagnostics for Docker dual-mode wiring
 - `runtime-doctor.ps1`: Windows runtime diagnostics for Docker dual-mode wiring
 - `docker-compose.yml`: local one-command stack
@@ -70,7 +71,21 @@ docker compose up -d --build
 ./smoke-test.sh
 ```
 
-6. If agent containers do not start, run runtime diagnostics:
+6. Run the platform skill UI E2E when you need a real login + reference edit + publish-cycle regression check:
+
+```powershell
+python .\platform-skills-e2e.py
+```
+
+Notes:
+
+- Start compose in WSL first, then run this script from Windows so Playwright can open `http://172.22.3.181:<port>` directly.
+- The script reads `DOTBLUE_PUBLIC_URL`, `DOTBLUE_BACKEND_PUBLIC_URL`, `CASDOOR_PUBLIC_URL`, and admin credentials from `.env`.
+- It reads the generated Casdoor OAuth client from `.generated/dotblue/config.yaml`.
+- It saves HTML and screenshot artifacts under `.tmp/webapp-testing/platform-skills-e2e/`.
+- It resets the edited skill references in a `finally` block so repeated runs start from a clean state.
+
+7. If agent containers do not start, run runtime diagnostics:
 
 ```bash
 ./runtime-doctor.sh
@@ -101,6 +116,8 @@ or on Windows:
 - `postgres:18-alpine` expects the data volume to be mounted at `/var/lib/postgresql`
 - The generated DotBlue config enables `worker.embedded=true`, so local async chat works without a second app role
 - When accessing from another machine or via host IP, set `CASDOOR_PUBLIC_URL`, `DOTBLUE_PUBLIC_URL`, and `DOTBLUE_BACKEND_PUBLIC_URL` to that reachable IP or domain instead of `localhost`
+- The prepare scripts register multiple Casdoor OAuth callbacks by default: `${DOTBLUE_PUBLIC_URL}/callback`, `http://localhost:9000/callback`, and `http://127.0.0.1:9000/callback`
+- Add more callbacks with `DOTBLUE_CASDOOR_EXTRA_REDIRECT_URIS`, using a comma-separated list in `.env`
 - Container runtime mode auto-detects the host `docker.sock` group id during `prepare-config` and injects it into the `dotblue` service so non-root app processes can talk to Docker
 - If auto-detection is unavailable in your environment, set `DOTBLUE_ENGINE_DOCKER_SOCKET_GID` manually in `.env` before running the prepare script
 - `runtime-doctor` checks the effective runtime mode, dotblue container group wiring, `docker.sock` metadata, compose status, and currently running `hermes_*` containers

@@ -237,7 +237,7 @@ const EnterpriseUsageSettingsTab: React.FC = () => {
   };
 
   return (
-    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+    <Space orientation="vertical" size={16} style={{ width: '100%' }}>
       {contextHolder}
       <Card variant="borderless" style={{ borderRadius: 20 }} loading={loading}>
         <Paragraph type="secondary" style={{ marginBottom: 16 }}>
@@ -357,7 +357,7 @@ const EnterpriseUsageSettingsTab: React.FC = () => {
         onOk={savePrice}
         onCancel={() => setPriceModalOpen(false)}
         confirmLoading={saving}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={priceForm} layout="vertical">
           <Form.Item label="模型" name="modelId" rules={[{ required: true, message: '请选择模型' }]}>
@@ -387,7 +387,7 @@ const EnterpriseUsageSettingsTab: React.FC = () => {
         onOk={savePolicy}
         onCancel={() => setPolicyModalOpen(false)}
         confirmLoading={saving}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={policyForm} layout="vertical">
           <Form.Item label="作用域" name="scopeType" rules={[{ required: true, message: '请选择作用域' }]}>
