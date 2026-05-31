@@ -28,6 +28,114 @@
     <priority>0.9</priority>
   </url>
   <url>
+    <loc>https://dotblue.ai/en/docs/getting-started/dotblue-overview</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://dotblue.ai/en/docs/getting-started/dotblue-overview" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://dotblue.ai/zh-CN/docs/getting-started/dotblue-overview" />
+    <xhtml:link rel="alternate" hreflang="ja" href="https://dotblue.ai/ja/docs/getting-started/dotblue-overview" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://dotblue.ai/ko/docs/getting-started/dotblue-overview" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://dotblue.ai/fr/docs/getting-started/dotblue-overview" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://dotblue.ai/es/docs/getting-started/dotblue-overview" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://dotblue.ai/docs/getting-started/dotblue-overview" />
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://dotblue.ai/en/docs/getting-started/quick-start</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://dotblue.ai/en/docs/getting-started/quick-start" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://dotblue.ai/zh-CN/docs/getting-started/quick-start" />
+    <xhtml:link rel="alternate" hreflang="ja" href="https://dotblue.ai/ja/docs/getting-started/quick-start" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://dotblue.ai/ko/docs/getting-started/quick-start" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://dotblue.ai/fr/docs/getting-started/quick-start" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://dotblue.ai/es/docs/getting-started/quick-start" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://dotblue.ai/docs/getting-started/quick-start" />
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://dotblue.ai/en/docs/getting-started/login-and-authentication</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://dotblue.ai/en/docs/getting-started/login-and-authentication" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://dotblue.ai/zh-CN/docs/getting-started/login-and-authentication" />
+    <xhtml:link rel="alternate" hreflang="ja" href="https://dotblue.ai/ja/docs/getting-started/login-and-authentication" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://dotblue.ai/ko/docs/getting-started/login-and-authentication" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://dotblue.ai/fr/docs/getting-started/login-and-authentication" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://dotblue.ai/es/docs/getting-started/login-and-authentication" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://dotblue.ai/docs/getting-started/login-and-authentication" />
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://dotblue.ai/en/docs/use-dotblue/assistants-and-workspaces</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://dotblue.ai/en/docs/use-dotblue/assistants-and-workspaces" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://dotblue.ai/zh-CN/docs/use-dotblue/assistants-and-workspaces" />
+    <xhtml:link rel="alternate" hreflang="ja" href="https://dotblue.ai/ja/docs/use-dotblue/assistants-and-workspaces" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://dotblue.ai/ko/docs/use-dotblue/assistants-and-workspaces" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://dotblue.ai/fr/docs/use-dotblue/assistants-and-workspaces" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://dotblue.ai/es/docs/use-dotblue/assistants-and-workspaces" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://dotblue.ai/docs/use-dotblue/assistants-and-workspaces" />
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://dotblue.ai/en/docs/use-dotblue/providers-and-models</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://dotblue.ai/en/docs/use-dotblue/providers-and-models" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://dotblue.ai/zh-CN/docs/use-dotblue/providers-and-models" />
+    <xhtml:link rel="alternate" hreflang="ja" href="https://dotblue.ai/ja/docs/use-dotblue/providers-and-models" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://dotblue.ai/ko/docs/use-dotblue/providers-and-models" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://dotblue.ai/fr/docs/use-dotblue/providers-and-models" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://dotblue.ai/es/docs/use-dotblue/providers-and-models" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://dotblue.ai/docs/use-dotblue/providers-and-models" />
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://dotblue.ai/en/docs/use-dotblue/chat-and-operations</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://dotblue.ai/en/docs/use-dotblue/chat-and-operations" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://dotblue.ai/zh-CN/docs/use-dotblue/chat-and-operations" />
+    <xhtml:link rel="alternate" hreflang="ja" href="https://dotblue.ai/ja/docs/use-dotblue/chat-and-operations" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://dotblue.ai/ko/docs/use-dotblue/chat-and-operations" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://dotblue.ai/fr/docs/use-dotblue/chat-and-operations" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://dotblue.ai/es/docs/use-dotblue/chat-and-operations" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://dotblue.ai/docs/use-dotblue/chat-and-operations" />
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://dotblue.ai/en/docs/advanced/deployment-architecture</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://dotblue.ai/en/docs/advanced/deployment-architecture" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://dotblue.ai/zh-CN/docs/advanced/deployment-architecture" />
+    <xhtml:link rel="alternate" hreflang="ja" href="https://dotblue.ai/ja/docs/advanced/deployment-architecture" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://dotblue.ai/ko/docs/advanced/deployment-architecture" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://dotblue.ai/fr/docs/advanced/deployment-architecture" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://dotblue.ai/es/docs/advanced/deployment-architecture" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://dotblue.ai/docs/advanced/deployment-architecture" />
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://dotblue.ai/en/docs/advanced/production-rollout</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://dotblue.ai/en/docs/advanced/production-rollout" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://dotblue.ai/zh-CN/docs/advanced/production-rollout" />
+    <xhtml:link rel="alternate" hreflang="ja" href="https://dotblue.ai/ja/docs/advanced/production-rollout" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://dotblue.ai/ko/docs/advanced/production-rollout" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://dotblue.ai/fr/docs/advanced/production-rollout" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://dotblue.ai/es/docs/advanced/production-rollout" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://dotblue.ai/docs/advanced/production-rollout" />
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://dotblue.ai/en/docs/advanced/troubleshooting-and-ops</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://dotblue.ai/en/docs/advanced/troubleshooting-and-ops" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://dotblue.ai/zh-CN/docs/advanced/troubleshooting-and-ops" />
+    <xhtml:link rel="alternate" hreflang="ja" href="https://dotblue.ai/ja/docs/advanced/troubleshooting-and-ops" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://dotblue.ai/ko/docs/advanced/troubleshooting-and-ops" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://dotblue.ai/fr/docs/advanced/troubleshooting-and-ops" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://dotblue.ai/es/docs/advanced/troubleshooting-and-ops" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://dotblue.ai/docs/advanced/troubleshooting-and-ops" />
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://dotblue.ai/en/terms</loc>
     <xhtml:link rel="alternate" hreflang="en" href="https://dotblue.ai/en/terms" />
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://dotblue.ai/zh-CN/terms" />

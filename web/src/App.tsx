@@ -173,6 +173,7 @@ function App() {
             <Route path="/callback" element={<LoginCallback />} />
             <Route path="/" element={<RedirectToLocalized path="/" />} />
             <Route path="/docs" element={<RedirectToLocalized path="/docs" />} />
+            <Route path="/docs/:sectionSlug/:docSlug" element={<RedirectToLocalized />} />
             <Route path="/terms" element={<RedirectToLocalized path="/terms" />} />
             <Route path="/privacy" element={<RedirectToLocalized path="/privacy" />} />
             <Route path="/refund" element={<RedirectToLocalized path="/refund" />} />
@@ -192,6 +193,7 @@ function App() {
             <Route path="/:lng" element={<LocalizedRouteGuard />}>
               <Route index element={<LandingLayout><LandingPage /></LandingLayout>} />
               <Route path="docs" element={<LandingLayout><ProductDocsPage /></LandingLayout>} />
+              <Route path="docs/:sectionSlug/:docSlug" element={<LandingLayout><ProductDocsPage /></LandingLayout>} />
               <Route path="terms" element={<LandingLayout><Terms /></LandingLayout>} />
               <Route path="privacy" element={<LandingLayout><Privacy /></LandingLayout>} />
               <Route path="refund" element={<LandingLayout><Refund /></LandingLayout>} />

@@ -1100,17 +1100,23 @@ const ChatPage: React.FC = () => {
     <Layout style={{ height: '100vh', background: '#fff' }}>
       {/* Top bar */}
       <Layout.Header style={{
-        height: 56, padding: '0 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        height: 64, padding: '0 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         background: '#fff', borderBottom: '1px solid #f0f0f0', zIndex: 10,
       }}>
-        <Space>
+        <Space size={12} style={{ minWidth: 0 }}>
           <Button type="text" icon={sidebarCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)} />
-          <img
-            src="/brand/dotblue-logo.png"
-            alt="dotblue"
-            style={{ width: 84, height: 28, objectFit: 'contain' }}
-          />
+          <div className="chat-header-brand">
+            <img
+              src="/brand/dotblue-logo.png"
+              alt="dotblue"
+              className="chat-header-brand-logo"
+            />
+            <div className="chat-header-brand-copy">
+              <Text className="chat-header-brand-title">{t('brand_header_badge')}</Text>
+              <Text className="chat-header-brand-subtitle">{t('brand_header_subtitle')}</Text>
+            </div>
+          </div>
         </Space>
         <Space size="middle">
           <Space size={6}>
@@ -1122,6 +1128,7 @@ const ChatPage: React.FC = () => {
           <Button
             type="default"
             size="small"
+            className="chat-header-dashboard-button"
             icon={<AppstoreOutlined />}
             onClick={() => navigate(getLocalizedPath('/dashboard', currentLanguage))}
           >
@@ -1157,7 +1164,7 @@ const ChatPage: React.FC = () => {
         {/* Sidebar — Conversations */}
         {!sidebarCollapsed && (
           <Layout.Sider width={280} theme="light" style={{
-            borderRight: '1px solid #f0f0f0', height: 'calc(100vh - 56px)', overflow: 'hidden',
+            borderRight: '1px solid #f0f0f0', height: 'calc(100vh - 64px)', overflow: 'hidden',
             display: 'flex', flexDirection: 'column',
           }}>
             <div style={{ padding: '12px 12px 8px' }}>
@@ -1237,6 +1244,59 @@ const ChatPage: React.FC = () => {
           />
         </Layout.Content>
       </Layout>
+      <style>
+        {`
+          .chat-header-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+          }
+
+          .chat-header-brand-logo {
+            width: 118px;
+            height: 36px;
+            object-fit: contain;
+            flex-shrink: 0;
+          }
+
+          .chat-header-brand-copy {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+            min-width: 0;
+          }
+
+          .chat-header-brand-title {
+            color: #0f172a !important;
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 1.2;
+            white-space: nowrap;
+          }
+
+          .chat-header-brand-subtitle {
+            color: #64748b !important;
+            font-size: 11px;
+            line-height: 1.2;
+            white-space: nowrap;
+          }
+
+          @media (max-width: 900px) {
+            .chat-header-brand-copy,
+            .chat-header-dashboard-button {
+              display: none !important;
+            }
+          }
+
+          @media (max-width: 640px) {
+            .chat-header-brand-logo {
+              width: 108px;
+              height: 34px;
+            }
+          }
+        `}
+      </style>
     </Layout>
   );
 };

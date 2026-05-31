@@ -213,29 +213,17 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
   const sideContent = (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#001529' }}>
-      <div style={{
-        height: 64,
-        display: 'flex',
-        alignItems: 'center',
-        padding: '0 24px',
-        justifyContent: collapsed && !mobileVisible ? 'center' : 'flex-start',
-        overflow: 'hidden',
-        transition: 'all 0.2s',
-      }}>
+      <div className={`app-sider-brand ${collapsed && !mobileVisible ? 'app-sider-brand--collapsed' : ''}`}>
         <img
           src="/brand/dotblue-logo.png"
           alt="dotblue"
-          style={{
-            width: collapsed && !mobileVisible ? 32 : 92,
-            height: 32,
-            objectFit: 'contain',
-            flexShrink: 0,
-          }}
+          className="app-sider-brand-logo"
         />
         {(!collapsed || mobileVisible) && (
-          <Title level={4} style={{ margin: '0 0 0 12px', color: '#fff', letterSpacing: 1, whiteSpace: 'nowrap' }}>
-            dotblue
-          </Title>
+          <div className="app-sider-brand-copy">
+            <Text className="app-sider-brand-title">{t('brand_header_badge')}</Text>
+            <Text className="app-sider-brand-subtitle">{t('brand_header_subtitle')}</Text>
+          </div>
         )}
       </div>
       <Menu
@@ -401,6 +389,55 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
       <style>
         {`
+          .app-sider-brand {
+            min-height: 72px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 14px 20px 10px;
+            overflow: hidden;
+            transition: all 0.2s ease;
+          }
+
+          .app-sider-brand--collapsed {
+            justify-content: center;
+            padding-inline: 12px;
+          }
+
+          .app-sider-brand-logo {
+            width: 124px;
+            height: 40px;
+            object-fit: contain;
+            flex-shrink: 0;
+          }
+
+          .app-sider-brand--collapsed .app-sider-brand-logo {
+            width: 38px;
+            height: 38px;
+          }
+
+          .app-sider-brand-copy {
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+          }
+
+          .app-sider-brand-title {
+            color: #f8fafc !important;
+            font-size: 13px;
+            line-height: 1.2;
+            font-weight: 600;
+            white-space: nowrap;
+          }
+
+          .app-sider-brand-subtitle {
+            color: rgba(226, 232, 240, 0.72) !important;
+            font-size: 11px;
+            line-height: 1.2;
+            white-space: nowrap;
+          }
+
           .desktop-sider .ant-menu-item-selected {
             background: rgba(22, 119, 255, 0.15) !important;
             border-radius: 8px !important;

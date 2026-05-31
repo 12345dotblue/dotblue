@@ -64,7 +64,7 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               <img
                 src="/brand/dotblue-logo.png"
                 alt="dotblue"
-                style={{ width: 118, height: 40, objectFit: 'contain', flexShrink: 0 }}
+                style={{ width: 132, height: 42, objectFit: 'contain', flexShrink: 0 }}
               />
               <div
                 style={{
@@ -181,7 +181,7 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               <img
                 src="/brand/dotblue-logo.png"
                 alt="dotblue"
-                style={{ width: 88, height: 28, objectFit: 'contain', marginRight: 10 }}
+                style={{ width: 104, height: 32, objectFit: 'contain', marginRight: 10 }}
               />
             </div>
             <Paragraph type="secondary">{t('footer_desc')}</Paragraph>
