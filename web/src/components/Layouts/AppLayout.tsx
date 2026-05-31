@@ -124,6 +124,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
   const currentEnterprise = enterpriseList.find((item) => item.enterpriseId === currentEnterpriseId);
   const canManageEnterprise = ['owner', 'admin'].includes((currentEnterprise?.role || '').toLowerCase());
+  const selectedMenuKey = useMemo(() => {
+    if (normalizedPath.startsWith('/admin/platform/skills/create')) return '/admin/platform/skills/new';
+    if (normalizedPath.startsWith('/admin/platform/skills/import')) return '/admin/platform/skill-market';
+    if (normalizedPath.startsWith('/admin/platform/skill-market')) return '/admin/platform/skill-market';
+    if (normalizedPath.startsWith('/admin/platform/skill-hubs')) return '/admin/platform/skills';
+    if (normalizedPath.startsWith('/dashboard/agents/') && normalizedPath.endsWith('/skills')) return '/dashboard';
+    return normalizedPath;
+  }, [normalizedPath]);
 
   const menuItems = useMemo(() => {
     const base = [
@@ -158,8 +166,16 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             label: t('platform_settings_nav'),
           },
           {
+            key: '/admin/platform/skill-market',
+            label: t('platform_skill_market_nav'),
+          },
+          {
+            key: '/admin/platform/skills/new',
+            label: t('platform_skill_builder_nav'),
+          },
+          {
             key: '/admin/platform/skills',
-            label: t('platform_skills_title'),
+            label: t('platform_skill_governance_nav'),
           },
         ],
       });
@@ -173,6 +189,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     if (normalizedPath === '/chat') return t('chat');
     if (normalizedPath === '/admin/settings' || normalizedPath === '/admin/enterprise') return t('enterprise_admin_nav');
     if (normalizedPath === '/admin/platform') return t('platform_settings_nav');
+    if (normalizedPath === '/admin/platform/skill-market') return t('platform_skill_market_title');
+    if (normalizedPath === '/admin/platform/skills/new') return t('platform_skill_builder_title');
+    if (normalizedPath.startsWith('/dashboard/agents/') && normalizedPath.endsWith('/skills')) return t('agent_skill_page_title');
+    if (normalizedPath.startsWith('/admin/platform/skills/create')) return t('platform_skill_builder_title');
+    if (normalizedPath.startsWith('/admin/platform/skills/import')) return t('platform_skill_market_title');
+    if (normalizedPath.startsWith('/admin/platform/skill-hubs')) return t('platform_skill_governance_title');
     if (normalizedPath.startsWith('/admin/platform/skills')) return t('platform_skills_title');
     return '';
   };
@@ -220,7 +242,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         theme="dark"
         mode="inline"
         inlineCollapsed={collapsed}
-        selectedKeys={[normalizedPath]}
+        selectedKeys={[selectedMenuKey]}
         openKeys={collapsed || mobileVisible ? openKeys : openKeys}
         onOpenChange={(keys) => setOpenKeys(keys as string[])}
         items={menuItems}

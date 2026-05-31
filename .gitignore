@@ -25,6 +25,11 @@ bin/
 *.log
 logs/
 
+# Temporary debug artifacts
+.tmp/
+**/__pycache__/
+tmp_webapp_*.py
+
 # Frontend temporary files
 web/node_modules/
 web/.vite/

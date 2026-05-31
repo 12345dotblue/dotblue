@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Button, Empty, Form, Input, Modal, Select, Space, Table, Tag, Typography, message } from 'antd';
+import { Button, Card, Empty, Form, Input, Modal, Select, Space, Table, Tag, Typography, message } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import axios from 'axios';
+import { useTranslation } from 'react-i18next';
 import { BACKEND_URL } from '../../config';
 
 const { Paragraph, Text } = Typography;
@@ -35,9 +36,12 @@ interface InstallSkillFormValues {
 interface AgentSkillsPanelProps {
   agentId: string;
   authHeaders: Record<string, string | undefined>;
+  marketHref?: string;
+  builderHref?: string;
 }
 
-const AgentSkillsPanel: React.FC<AgentSkillsPanelProps> = ({ agentId, authHeaders }) => {
+const AgentSkillsPanel: React.FC<AgentSkillsPanelProps> = ({ agentId, authHeaders, marketHref, builderHref }) => {
+  const { t } = useTranslation();
   const [messageApi, contextHolder] = message.useMessage();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -75,10 +79,23 @@ const AgentSkillsPanel: React.FC<AgentSkillsPanelProps> = ({ agentId, authHeader
     loadData();
   }, [agentId]);
 
+  useEffect(() => {
+    if (!installOpen) {
+      return;
+    }
+    installForm.resetFields();
+    installForm.setFieldsValue({ invokeVisibility: 'auto' });
+  }, [installOpen, installForm]);
+
   const installableSkills = useMemo(() => {
     const installedIds = new Set(installedSkills.map((item) => item.skillId));
     return publishedSkills.filter((item) => item.enablementStatus === 'enabled' && !installedIds.has(item.id));
   }, [installedSkills, publishedSkills]);
+
+  const enabledSkillsCount = useMemo(
+    () => publishedSkills.filter((item) => item.enablementStatus === 'enabled').length,
+    [publishedSkills],
+  );
 
   const handleInstall = async () => {
     const values = await installForm.validateFields();
@@ -120,23 +137,98 @@ const AgentSkillsPanel: React.FC<AgentSkillsPanelProps> = ({ agentId, authHeader
     <div>
       {contextHolder}
       <Space orientation="vertical" size={16} style={{ width: '100%' }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            gap: 12,
+          }}
+        >
+          <Card size="small" style={{ borderRadius: 16 }}>
+            <Text type="secondary">{t('agent_skill_panel_summary_installed')}</Text>
+            <Paragraph style={{ fontSize: 24, fontWeight: 600, margin: '8px 0 0' }}>{installedSkills.length}</Paragraph>
+          </Card>
+          <Card size="small" style={{ borderRadius: 16 }}>
+            <Text type="secondary">{t('agent_skill_panel_summary_installable')}</Text>
+            <Paragraph style={{ fontSize: 24, fontWeight: 600, margin: '8px 0 0' }}>{installableSkills.length}</Paragraph>
+          </Card>
+          <Card size="small" style={{ borderRadius: 16 }}>
+            <Text type="secondary">{t('agent_skill_panel_summary_enabled')}</Text>
+            <Paragraph style={{ fontSize: 24, fontWeight: 600, margin: '8px 0 0' }}>{enabledSkillsCount}</Paragraph>
+          </Card>
+        </div>
+        <Card
+          size="small"
+          style={{
+            borderRadius: 20,
+            background: 'linear-gradient(135deg, rgba(22,119,255,0.08), rgba(22,119,255,0.02))',
+            border: '1px solid rgba(22,119,255,0.12)',
+          }}
+        >
+          <Space direction="vertical" size={10} style={{ width: '100%' }}>
+            <Text strong>{t('agent_skill_panel_guide_title')}</Text>
+            <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+              {t('agent_skill_panel_guide_desc')}
+            </Paragraph>
+            <Space wrap size={[8, 8]}>
+              <Tag color={enabledSkillsCount > 0 ? 'processing' : 'default'}>{t('agent_skill_panel_step_enable')}</Tag>
+              <Tag color={installableSkills.length > 0 ? 'success' : 'default'}>{t('agent_skill_panel_step_install')}</Tag>
+              <Tag>{t('agent_skill_panel_step_verify')}</Tag>
+            </Space>
+            <Space wrap>
+              <Button icon={<PlusOutlined />} type="primary" onClick={() => setInstallOpen(true)}>
+                {t('agent_skill_panel_action_install')}
+              </Button>
+              {marketHref ? (
+                <Button href={marketHref}>{t('agent_skill_panel_action_market')}</Button>
+              ) : null}
+              {builderHref ? (
+                <Button href={builderHref}>{t('agent_skill_panel_action_builder')}</Button>
+              ) : null}
+            </Space>
+          </Space>
+        </Card>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            已安装技能会在当前 Agent 上生效。企业未启用的 Skill 不可安装。
+          <Paragraph type="secondary" style={{ marginBottom: 0, maxWidth: 720 }}>
+            {t('agent_skill_panel_helper_text')}
           </Paragraph>
-          <Button icon={<PlusOutlined />} type="primary" onClick={() => {
-            installForm.setFieldsValue({ invokeVisibility: 'auto' });
-            setInstallOpen(true);
-          }}>
-            安装 Skill
+          <Button icon={<PlusOutlined />} type="primary" onClick={() => setInstallOpen(true)}>
+            {t('agent_skill_panel_action_install')}
           </Button>
         </div>
+        {!installedSkills.length ? (
+          <Card size="small" style={{ borderRadius: 16 }}>
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description={
+                <Space direction="vertical" size={4}>
+                  <Text strong>{t('agent_skill_panel_empty_title')}</Text>
+                  <Text type="secondary">{t('agent_skill_panel_empty_desc')}</Text>
+                </Space>
+              }
+            >
+              <Space wrap>
+                {installableSkills.length ? (
+                  <Button type="primary" onClick={() => setInstallOpen(true)}>
+                    {t('agent_skill_panel_action_install')}
+                  </Button>
+                ) : null}
+                {marketHref ? (
+                  <Button href={marketHref}>{t('agent_skill_panel_action_market')}</Button>
+                ) : null}
+                {builderHref ? (
+                  <Button href={builderHref}>{t('agent_skill_panel_action_builder')}</Button>
+                ) : null}
+              </Space>
+            </Empty>
+          </Card>
+        ) : null}
         <Table
           rowKey="id"
           loading={loading}
           dataSource={installedSkills}
           locale={{
-            emptyText: <Empty description="当前 Agent 暂未安装 Skill" image={Empty.PRESENTED_IMAGE_SIMPLE} />,
+            emptyText: <Empty description={t('agent_skill_panel_table_empty')} image={Empty.PRESENTED_IMAGE_SIMPLE} />,
           }}
           pagination={false}
           columns={[
@@ -179,34 +271,35 @@ const AgentSkillsPanel: React.FC<AgentSkillsPanelProps> = ({ agentId, authHeader
       </Space>
 
       <Modal
-        title="安装 Skill"
+        title={t('agent_skill_panel_modal_title')}
         open={installOpen}
         onCancel={() => setInstallOpen(false)}
         onOk={handleInstall}
         confirmLoading={saving}
-        okText="安装"
+        okText={t('agent_skill_panel_action_install')}
         destroyOnHidden
       >
         <Form form={installForm} layout="vertical" initialValues={{ invokeVisibility: 'auto' }}>
-          <Form.Item label="Skill" name="skillId" rules={[{ required: true, message: '请选择 Skill' }]}>
+          <Form.Item label={t('agent_skill_panel_form_skill')} name="skillId" rules={[{ required: true, message: t('agent_skill_panel_form_skill_required') }]}>
             <Select
               showSearch
               optionFilterProp="label"
+              notFoundContent={t('agent_skill_panel_form_skill_empty')}
               options={installableSkills.map((item) => ({
                 label: `${item.code} · ${item.name}`,
                 value: item.id,
               }))}
             />
           </Form.Item>
-          <Form.Item label="Agent 内显示别名" name="entryAlias">
-            <Input placeholder="可选，例如：知识助手" />
+          <Form.Item label={t('agent_skill_panel_form_alias')} name="entryAlias">
+            <Input placeholder={t('agent_skill_panel_form_alias_placeholder')} />
           </Form.Item>
-          <Form.Item label="调用方式" name="invokeVisibility">
+          <Form.Item label={t('agent_skill_panel_form_visibility')} name="invokeVisibility">
             <Select
               options={[
-                { label: '自动', value: 'auto' },
-                { label: '建议调用', value: 'suggested' },
-                { label: '手动', value: 'manual' },
+                { label: t('agent_skill_panel_visibility_auto'), value: 'auto' },
+                { label: t('agent_skill_panel_visibility_suggested'), value: 'suggested' },
+                { label: t('agent_skill_panel_visibility_manual'), value: 'manual' },
               ]}
             />
           </Form.Item>

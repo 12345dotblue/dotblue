@@ -1,6 +1,8 @@
 import { AbstractChatProvider, XRequest, type XRequestOptions } from '@ant-design/x-sdk';
 import { BACKEND_URL } from '../../config';
 
+const CURRENT_ENTERPRISE_STORAGE_KEY = 'dotblue_current_enterprise_id';
+
 export interface ToolCallItem {
   tool: string;
   emoji: string;
@@ -275,8 +277,10 @@ const providerCache = new Map<string, SSEChatProvider>();
 // Custom fetch that injects the latest JWT on every request
 function authFetch(url: Parameters<typeof fetch>[0], options?: RequestInit): Promise<Response> {
   const jwt = localStorage.getItem('casdoor_token');
+  const enterpriseId = localStorage.getItem(CURRENT_ENTERPRISE_STORAGE_KEY)?.trim();
   const headers = new Headers(options?.headers);
   if (jwt) headers.set('Authorization', `Bearer ${jwt}`);
+  if (enterpriseId) headers.set('X-Enterprise-ID', enterpriseId);
   headers.set('Content-Type', 'application/json');
   const method = (options?.method || 'GET').toUpperCase();
   const bodyLen = typeof options?.body === 'string' ? options.body.length : undefined;

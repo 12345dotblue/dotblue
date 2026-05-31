@@ -38,6 +38,9 @@ func (n *NanobotEngine) PrepareVolume(_ context.Context, volPath string, agent *
 	if err := os.WriteFile(configPath, payload, 0644); err != nil {
 		return fmt.Errorf("failed to write config.json: %w", err)
 	}
+	if err := writeManagedSkills(filepath.Join(volPath, "api-workspace", "skills"), agent.Skills); err != nil {
+		return fmt.Errorf("failed to write managed skills: %w", err)
+	}
 	return nil
 }
 

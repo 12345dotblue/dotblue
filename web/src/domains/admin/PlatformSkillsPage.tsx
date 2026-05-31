@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Button,
   Card,
@@ -14,15 +14,18 @@ import {
   Typography,
   message,
 } from 'antd';
-import { CloudDownloadOutlined, PlusOutlined, SafetyOutlined } from '@ant-design/icons';
+import { ArrowRightOutlined, CloudDownloadOutlined, PlusOutlined, SafetyOutlined, SearchOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { BACKEND_URL } from '../../config';
+import { getLocalizedPath, resolveSupportedLanguage } from '../../i18n/config';
 import { casdoorService } from '../identity/CasdoorService';
 
 const { Title, Paragraph, Text } = Typography;
 const { TextArea } = Input;
 const ADMIN_SKILLS_API_BASE = `${BACKEND_URL}/api/admin/skills`;
+const CURRENT_ENTERPRISE_STORAGE_KEY = 'dotblue_current_enterprise_id';
 const scrollableModalStyles = {
   body: {
     maxHeight: '70vh',
@@ -32,6 +35,18 @@ const scrollableModalStyles = {
 };
 
 type PlatformTabKey = 'skills' | 'hubs' | 'imports';
+type PlatformSkillsExperience = 'governance' | 'market';
+
+interface PlatformSkillsPageProps {
+  defaultTab?: PlatformTabKey;
+  experience?: PlatformSkillsExperience;
+  openFlow?: 'skill' | 'hub' | 'import';
+}
+
+interface MarketFilterOption {
+  label: string;
+  value: string;
+}
 
 interface SkillItem {
   id: string;
@@ -152,9 +167,45 @@ interface ImportJobFormValues {
   sourceVersion: string;
 }
 
+interface AgentInstallTarget {
+  id: string;
+  agentName: string;
+  engineType: 'hermes' | 'nanobot';
+  modelName?: string;
+}
+
+interface InstallToAgentFormValues {
+  agentId: string;
+  entryAlias?: string;
+  invokeVisibility: 'auto' | 'suggested' | 'manual';
+}
+
+interface InstallSuccessState {
+  agentId: string;
+  agentName: string;
+  skillName: string;
+}
+
+interface QuickImportTemplate {
+  key: string;
+  label: string;
+  description: string;
+  locator: string;
+  namespace?: string;
+  version?: string;
+}
+
 function getAuthHeaders() {
   const token = casdoorService.getToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  const enterpriseId = localStorage.getItem(CURRENT_ENTERPRISE_STORAGE_KEY)?.trim();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  if (enterpriseId) {
+    headers['X-Enterprise-ID'] = enterpriseId;
+  }
+  return headers;
 }
 
 function formatDateTime(value?: string, locale?: string) {
@@ -249,10 +300,16 @@ function renderSummaryCards(items: Array<{ label: string; value: number }>) {
   );
 }
 
-const PlatformSkillsPage: React.FC = () => {
+const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
+  defaultTab = 'skills',
+  experience = 'governance',
+  openFlow,
+}) => {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
+  const currentLanguage = resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language);
   const [messageApi, contextHolder] = message.useMessage();
-  const [activeTab, setActiveTab] = useState<PlatformTabKey>('skills');
+  const [activeTab, setActiveTab] = useState<PlatformTabKey>(defaultTab);
   const [skills, setSkills] = useState<SkillItem[]>([]);
   const [hubs, setHubs] = useState<SkillHubItem[]>([]);
   const [importJobs, setImportJobs] = useState<SkillImportJobItem[]>([]);
@@ -265,17 +322,30 @@ const PlatformSkillsPage: React.FC = () => {
   const [detailOpen, setDetailOpen] = useState(false);
   const [hubOpen, setHubOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [installToAgentOpen, setInstallToAgentOpen] = useState(false);
+  const [installSuccess, setInstallSuccess] = useState<InstallSuccessState | null>(null);
   const [saving, setSaving] = useState(false);
   const [referenceLoading, setReferenceLoading] = useState(false);
   const [publishingId, setPublishingId] = useState<string>('');
   const [selectedSkill, setSelectedSkill] = useState<SkillDetail | null>(null);
+  const [installSkill, setInstallSkill] = useState<SkillItem | null>(null);
+  const [installTargets, setInstallTargets] = useState<AgentInstallTarget[]>([]);
+  const [installTargetsLoading, setInstallTargetsLoading] = useState(false);
   const [editingHub, setEditingHub] = useState<SkillHubItem | null>(null);
   const [createForm] = Form.useForm<SkillFormValues>();
   const [versionForm] = Form.useForm<SkillVersionFormValues>();
   const [referenceEditorForm] = Form.useForm<ReferenceEditorFormValues>();
   const [hubForm] = Form.useForm<SkillHubFormValues>();
   const [importForm] = Form.useForm<ImportJobFormValues>();
+  const [installToAgentForm] = Form.useForm<InstallToAgentFormValues>();
   const [editingVersion, setEditingVersion] = useState<SkillVersionItem | null>(null);
+  const [searchText, setSearchText] = useState('');
+  const [skillSourceFilter, setSkillSourceFilter] = useState<string>('all');
+  const [skillStatusFilter, setSkillStatusFilter] = useState<string>('all');
+  const [hubTypeFilter, setHubTypeFilter] = useState<string>('all');
+  const [importStatusFilter, setImportStatusFilter] = useState<string>('all');
+  const initialRouteBehaviorApplied = useRef(false);
+  const selectedImportHubId = Form.useWatch('hubId', importForm);
 
   const translateStatus = (status?: string) => {
     if (!status) {
@@ -394,6 +464,25 @@ const PlatformSkillsPage: React.FC = () => {
     void Promise.all([fetchSkills(), fetchHubs(), fetchImportJobs()]);
   }, [t]);
 
+  useEffect(() => {
+    if (initialRouteBehaviorApplied.current) {
+      return;
+    }
+
+    setActiveTab(defaultTab);
+    if (openFlow === 'skill') {
+      openCreateSkill();
+    } else if (openFlow === 'hub') {
+      setActiveTab('hubs');
+      openCreateHub();
+    } else if (openFlow === 'import') {
+      setActiveTab('imports');
+      openImportJob();
+    }
+
+    initialRouteBehaviorApplied.current = true;
+  }, [defaultTab, openFlow]);
+
   const skillSummary = useMemo(() => ({
     total: skills.length,
     published: skills.filter((item) => item.status === 'published').length,
@@ -421,6 +510,95 @@ const PlatformSkillsPage: React.FC = () => {
       return acc;
     }, {});
   }, [hubs]);
+
+  const normalizedSearch = searchText.trim().toLowerCase();
+  const matchesSearch = (...values: Array<string | undefined>) => {
+    if (!normalizedSearch) {
+      return true;
+    }
+    return values.some((value) => (value || '').toLowerCase().includes(normalizedSearch));
+  };
+
+  const filteredSkills = useMemo(() => skills.filter((item) => {
+    const matchesKeyword = matchesSearch(
+      item.code,
+      item.name,
+      item.description,
+      item.sourceType,
+      item.providerType,
+      item.status,
+      item.trustLevel,
+    );
+    const matchesSource = skillSourceFilter === 'all' || item.sourceType === skillSourceFilter;
+    const matchesStatus = skillStatusFilter === 'all' || item.status === skillStatusFilter;
+    return matchesKeyword && matchesSource && matchesStatus;
+  }), [skills, normalizedSearch, skillSourceFilter, skillStatusFilter]);
+
+  const filteredHubs = useMemo(() => hubs.filter((item) => {
+    const matchesKeyword = matchesSearch(
+      item.hubCode,
+      item.name,
+      item.hubType,
+      item.baseUrl,
+      item.status,
+      item.trustLevel,
+    );
+    const matchesType = hubTypeFilter === 'all' || item.hubType === hubTypeFilter;
+    return matchesKeyword && matchesType;
+  }), [hubs, normalizedSearch, hubTypeFilter]);
+
+  const filteredImportJobs = useMemo(() => importJobs.filter((item) => {
+    const matchesKeyword = matchesSearch(
+      hubNameMap[item.hubId],
+      item.sourceLocator,
+      item.sourceNamespace,
+      item.sourceVersion,
+      item.jobStatus,
+      item.errorMessage,
+    );
+    const matchesStatus = importStatusFilter === 'all' || item.jobStatus === importStatusFilter;
+    return matchesKeyword && matchesStatus;
+  }), [hubNameMap, importJobs, normalizedSearch, importStatusFilter]);
+
+  const skillSourceOptions = useMemo<MarketFilterOption[]>(() => (
+    [
+      { label: t('platform_skill_market_filter_all'), value: 'all' },
+      ...Array.from(new Set(skills.map((item) => item.sourceType).filter(Boolean))).map((value) => ({
+        label: translateSourceType(value),
+        value,
+      })),
+    ]
+  ), [skills, t]);
+
+  const skillStatusOptions = useMemo<MarketFilterOption[]>(() => (
+    [
+      { label: t('platform_skill_market_filter_all_status'), value: 'all' },
+      ...Array.from(new Set(skills.map((item) => item.status).filter(Boolean))).map((value) => ({
+        label: translateStatus(value),
+        value,
+      })),
+    ]
+  ), [skills, t]);
+
+  const hubTypeOptions = useMemo<MarketFilterOption[]>(() => (
+    [
+      { label: t('platform_skill_market_filter_all_sources'), value: 'all' },
+      ...Array.from(new Set(hubs.map((item) => item.hubType).filter(Boolean))).map((value) => ({
+        label: translateHubType(value),
+        value,
+      })),
+    ]
+  ), [hubs, t]);
+
+  const importStatusOptions = useMemo<MarketFilterOption[]>(() => (
+    [
+      { label: t('platform_skill_market_filter_all_imports'), value: 'all' },
+      ...Array.from(new Set(importJobs.map((item) => item.jobStatus).filter(Boolean))).map((value) => ({
+        label: translateStatus(value),
+        value,
+      })),
+    ]
+  ), [importJobs, t]);
 
   const openCreateSkill = () => {
     createForm.resetFields();
@@ -450,8 +628,14 @@ const PlatformSkillsPage: React.FC = () => {
     setHubOpen(true);
   };
 
-  const openImportJob = () => {
+  const openImportJob = (preset?: Partial<ImportJobFormValues>) => {
     importForm.resetFields();
+    importForm.setFieldsValue({
+      sourceLocator: '',
+      sourceNamespace: '',
+      sourceVersion: '',
+      ...preset,
+    });
     setImportOpen(true);
   };
 
@@ -680,6 +864,191 @@ const PlatformSkillsPage: React.FC = () => {
     }
   };
 
+  const fetchInstallTargets = async () => {
+    setInstallTargetsLoading(true);
+    try {
+      const res = await axios.get(`${BACKEND_URL}/api/agents`, {
+        headers: getAuthHeaders(),
+      });
+      setInstallTargets(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      messageApi.error(t('platform_skill_install_agent_targets_load_failed'));
+      setInstallTargets([]);
+    } finally {
+      setInstallTargetsLoading(false);
+    }
+  };
+
+  const openInstallToAgent = async (skill: SkillItem) => {
+    setInstallSkill(skill);
+    setInstallToAgentOpen(true);
+    installToAgentForm.resetFields();
+    installToAgentForm.setFieldsValue({ invokeVisibility: 'auto' });
+    await fetchInstallTargets();
+  };
+
+  const handleInstallToAgent = async () => {
+    if (!installSkill?.id) {
+      return;
+    }
+    const values = await installToAgentForm.validateFields();
+    setSaving(true);
+    try {
+      await axios.post(`${BACKEND_URL}/api/admin/agents/${values.agentId}/skills/install`, {
+        skillId: installSkill.id,
+        entryAlias: values.entryAlias,
+        invokeVisibility: values.invokeVisibility,
+      }, {
+        headers: getAuthHeaders(),
+      });
+      const targetAgent = installTargets.find((item) => item.id === values.agentId);
+      messageApi.success(t('platform_skill_install_agent_success', { name: installSkill.name }));
+      setInstallToAgentOpen(false);
+      setInstallSuccess({
+        agentId: values.agentId,
+        agentName: targetAgent?.agentName || values.agentId,
+        skillName: installSkill.name,
+      });
+    } catch (error: any) {
+      const errorText = error?.response?.data;
+      messageApi.error(
+        translatePlatformSkillError(errorText, t('platform_skill_install_agent_failed'), t),
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const selectedImportHub = useMemo(
+    () => hubs.find((item) => item.id === selectedImportHubId) || null,
+    [hubs, selectedImportHubId],
+  );
+
+  const quickImportTemplates = useMemo<QuickImportTemplate[]>(() => {
+    const hubType = selectedImportHub?.hubType || '';
+    const tencentLocator = 'https://skillhub.cn/skills/weather';
+    const openapiLocator = 'petstore/openapi.yaml';
+    const privateLocator = 'internal/knowledge-search';
+
+    if (hubType === 'tencent_skillhub') {
+      return [
+        {
+          key: 'weather',
+          label: t('platform_skill_import_template_weather_title'),
+          description: t('platform_skill_import_template_weather_desc'),
+          locator: tencentLocator,
+          namespace: 'weather',
+          version: 'latest',
+        },
+        {
+          key: 'knowledge',
+          label: t('platform_skill_import_template_knowledge_title'),
+          description: t('platform_skill_import_template_knowledge_desc'),
+          locator: 'https://skillhub.cn/skills/knowledge-search',
+          namespace: 'knowledge-search',
+          version: 'latest',
+        },
+      ];
+    }
+
+    if (hubType === 'enterprise_private_hub') {
+      return [
+        {
+          key: 'private-knowledge',
+          label: t('platform_skill_import_template_private_title'),
+          description: t('platform_skill_import_template_private_desc'),
+          locator: privateLocator,
+          namespace: 'internal.knowledge',
+          version: 'v1',
+        },
+      ];
+    }
+
+    return [
+      {
+        key: 'openapi-petstore',
+        label: t('platform_skill_import_template_openapi_title'),
+        description: t('platform_skill_import_template_openapi_desc'),
+        locator: openapiLocator,
+        namespace: 'partner.petstore',
+        version: '1.0.0',
+      },
+      {
+        key: 'weather',
+        label: t('platform_skill_import_template_weather_title'),
+        description: t('platform_skill_import_template_weather_desc'),
+        locator: selectedImportHub ? tencentLocator : 'weather',
+        namespace: 'weather',
+        version: 'latest',
+      },
+    ];
+  }, [selectedImportHub, t]);
+
+  const applyImportTemplate = (template: QuickImportTemplate) => {
+    importForm.setFieldsValue({
+      sourceLocator: template.locator,
+      sourceNamespace: template.namespace,
+      sourceVersion: template.version,
+    });
+  };
+
+  const renderImportGuideCard = () => (
+    <Card
+      size="small"
+      style={{
+        marginBottom: 16,
+        borderRadius: 20,
+        background: 'linear-gradient(135deg, rgba(22,119,255,0.08), rgba(22,119,255,0.02))',
+        border: '1px solid rgba(22,119,255,0.12)',
+      }}
+    >
+      <Space direction="vertical" size={10} style={{ width: '100%' }}>
+        <Text strong>{t('platform_skill_import_guide_title')}</Text>
+        <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+          {t('platform_skill_import_guide_desc')}
+        </Paragraph>
+        <Space wrap size={[8, 8]}>
+          <Tag color={hubSummary.total > 0 ? 'success' : 'default'}>{t('platform_skill_import_guide_step_hub')}</Tag>
+          <Tag color="processing">{t('platform_skill_import_guide_step_search')}</Tag>
+          <Tag>{t('platform_skill_import_guide_step_import')}</Tag>
+        </Space>
+        <Text type="secondary">
+          {selectedImportHub
+            ? t('platform_skill_import_guide_selected_hub', {
+              name: selectedImportHub.name,
+              type: translateHubType(selectedImportHub.hubType),
+            })
+            : t('platform_skill_import_guide_pick_hub')}
+        </Text>
+        {selectedImportHub ? (
+          <Space wrap size={[8, 8]}>
+            <Tag>{translateHubType(selectedImportHub.hubType)}</Tag>
+            {renderTrustTag(selectedImportHub.trustLevel, translateTrustLevel(selectedImportHub.trustLevel))}
+            {selectedImportHub.baseUrl ? <Tag>{selectedImportHub.baseUrl}</Tag> : null}
+          </Space>
+        ) : null}
+        <Space wrap>
+          {quickImportTemplates.map((template) => (
+            <Button key={template.key} onClick={() => applyImportTemplate(template)}>
+              {template.label}
+            </Button>
+          ))}
+          <Button
+            type="link"
+            style={{ paddingInline: 0 }}
+            onClick={() => {
+              setImportOpen(false);
+              setActiveTab('hubs');
+              openCreateHub();
+            }}
+          >
+            {t('platform_skill_import_guide_action_manage_sources')}
+          </Button>
+        </Space>
+      </Space>
+    </Card>
+  );
+
   const actionButton = activeTab === 'skills'
     ? (
       <Button type="primary" icon={<PlusOutlined />} onClick={openCreateSkill}>
@@ -693,10 +1062,314 @@ const PlatformSkillsPage: React.FC = () => {
         </Button>
       )
       : (
-        <Button type="primary" icon={<CloudDownloadOutlined />} onClick={openImportJob}>
+        <Button type="primary" icon={<CloudDownloadOutlined />} onClick={() => openImportJob()}>
           {t('platform_skills_import_start')}
         </Button>
       );
+
+  const isMarketExperience = experience === 'market';
+  const pageTitle = isMarketExperience ? t('platform_skill_market_title') : t('platform_skill_governance_title');
+  const pageDescription = isMarketExperience ? t('platform_skill_market_desc') : t('platform_skill_governance_desc');
+  const searchPlaceholder = isMarketExperience
+    ? t('platform_skill_market_search_placeholder')
+    : t('platform_skill_governance_search_placeholder');
+  const tabItems = isMarketExperience
+    ? [
+      { key: 'skills', label: `${t('platform_skill_market_tab_catalog')} (${skillSummary.total})` },
+      { key: 'hubs', label: `${t('platform_skill_market_tab_sources')} (${hubSummary.total})` },
+      { key: 'imports', label: `${t('platform_skill_market_tab_imports')} (${importSummary.total})` },
+    ]
+    : [
+      { key: 'skills', label: `${t('platform_skills_tab_skills')} (${skillSummary.total})` },
+      { key: 'hubs', label: `${t('platform_skills_tab_hubs')} (${hubSummary.total})` },
+      { key: 'imports', label: `${t('platform_skills_tab_imports')} (${importSummary.total})` },
+    ];
+
+  const renderMarketEmpty = (
+    title: string,
+    description: string,
+    actionLabel: string,
+    action: () => void,
+  ) => (
+    <Card style={{ borderRadius: 20 }}>
+      <Empty
+        image={Empty.PRESENTED_IMAGE_SIMPLE}
+        description={
+          <Space direction="vertical" size={4}>
+            <Text strong>{title}</Text>
+            <Text type="secondary">{description}</Text>
+          </Space>
+        }
+      >
+        <Button type="primary" onClick={action}>{actionLabel}</Button>
+      </Empty>
+    </Card>
+  );
+
+  const renderMarketSkillCards = () => {
+    if (!filteredSkills.length) {
+      return renderMarketEmpty(
+        t('platform_skill_market_empty_skills_title'),
+        t('platform_skill_market_empty_skills_desc'),
+        t('platform_skill_market_action_import'),
+        openImportJob,
+      );
+    }
+
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+        {filteredSkills.map((item) => (
+          <Card key={item.id} hoverable style={{ borderRadius: 20 }}>
+            <Space direction="vertical" size={14} style={{ width: '100%' }}>
+              <Space align="start" style={{ width: '100%', justifyContent: 'space-between' }}>
+                <div>
+                  <Text type="secondary">{item.code}</Text>
+                  <Title level={5} style={{ margin: '6px 0 0' }}>{item.name}</Title>
+                </div>
+                {renderStatusTag(item.status, translateStatus(item.status))}
+              </Space>
+              <Paragraph
+                type="secondary"
+                ellipsis={{ rows: 3, expandable: false }}
+                style={{ minHeight: 66, marginBottom: 0 }}
+              >
+                {item.description || t('platform_skill_detail_no_description')}
+              </Paragraph>
+              <Space wrap size={[8, 8]}>
+                {renderTrustTag(item.trustLevel, translateTrustLevel(item.trustLevel))}
+                <Tag>{translateSourceType(item.sourceType)}</Tag>
+                <Tag>{translateProviderType(item.providerType)}</Tag>
+              </Space>
+              <Text type="secondary">
+                {t('platform_skill_market_card_updated_at', {
+                  value: formatDateTime(item.updatedAt, i18n.resolvedLanguage || i18n.language),
+                })}
+              </Text>
+              <Space wrap>
+                <Button
+                  type="primary"
+                  ghost
+                  disabled={item.status !== 'published'}
+                  onClick={() => void openInstallToAgent(item)}
+                >
+                  {t('platform_skill_market_card_action_install_agent')}
+                </Button>
+                <Button onClick={() => void fetchDetail(item.id)}>
+                  {t('platform_skills_view_detail')}
+                </Button>
+                <Button
+                  type="link"
+                  style={{ paddingInline: 0 }}
+                  onClick={() => {
+                    setActiveTab('imports');
+                    openImportJob({ sourceNamespace: item.code });
+                  }}
+                >
+                  {t('platform_skill_market_card_action_import_similar')}
+                </Button>
+              </Space>
+            </Space>
+          </Card>
+        ))}
+      </div>
+    );
+  };
+
+  const renderMarketHubCards = () => {
+    if (!filteredHubs.length) {
+      return renderMarketEmpty(
+        t('platform_skill_market_empty_sources_title'),
+        t('platform_skill_market_empty_sources_desc'),
+        t('platform_skill_market_action_manage_sources'),
+        () => openCreateHub(),
+      );
+    }
+
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
+        {filteredHubs.map((item) => (
+          <Card key={item.id} hoverable style={{ borderRadius: 20 }}>
+            <Space direction="vertical" size={14} style={{ width: '100%' }}>
+              <Space align="start" style={{ width: '100%', justifyContent: 'space-between' }}>
+                <div>
+                  <Text type="secondary">{item.hubCode}</Text>
+                  <Title level={5} style={{ margin: '6px 0 0' }}>{item.name}</Title>
+                </div>
+                {renderStatusTag(item.status, translateStatus(item.status))}
+              </Space>
+              <Space wrap size={[8, 8]}>
+                <Tag>{translateHubType(item.hubType)}</Tag>
+                {renderTrustTag(item.trustLevel, translateTrustLevel(item.trustLevel))}
+              </Space>
+              <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+                {item.baseUrl || '-'}
+              </Paragraph>
+              <Space direction="vertical" size={2}>
+                <Text type="secondary">{t('platform_skill_market_card_sync_mode', { value: translateSyncMode(item.syncMode) })}</Text>
+                <Text type="secondary">{t('platform_skill_market_card_auth_scheme', { value: translateAuthScheme(item.authScheme) })}</Text>
+              </Space>
+              <Space wrap>
+                <Button onClick={() => openCreateHub(item)}>{t('platform_skills_edit')}</Button>
+                <Button
+                  type="primary"
+                  ghost
+                  onClick={() => {
+                    setActiveTab('imports');
+                    openImportJob({ hubId: item.id });
+                  }}
+                >
+                  {t('platform_skill_market_card_action_import_from_source')}
+                </Button>
+              </Space>
+            </Space>
+          </Card>
+        ))}
+      </div>
+    );
+  };
+
+  const renderMarketImportCards = () => {
+    if (!filteredImportJobs.length) {
+      return renderMarketEmpty(
+        t('platform_skill_market_empty_imports_title'),
+        t('platform_skill_market_empty_imports_desc'),
+        t('platform_skill_market_action_import'),
+        openImportJob,
+      );
+    }
+
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
+        {filteredImportJobs.map((item) => (
+          <Card key={item.id} hoverable style={{ borderRadius: 20 }}>
+            <Space direction="vertical" size={14} style={{ width: '100%' }}>
+              <Space align="start" style={{ width: '100%', justifyContent: 'space-between' }}>
+                <div>
+                  <Text type="secondary">{hubNameMap[item.hubId] || '-'}</Text>
+                  <Title level={5} style={{ margin: '6px 0 0' }}>{item.sourceLocator || '-'}</Title>
+                </div>
+                {renderStatusTag(item.jobStatus, translateStatus(item.jobStatus))}
+              </Space>
+              <Space direction="vertical" size={2}>
+                <Text type="secondary">{t('platform_skill_import_jobs_column_source_namespace')}: {item.sourceNamespace || '-'}</Text>
+                <Text type="secondary">{t('platform_skill_import_jobs_column_source_version')}: {item.sourceVersion || '-'}</Text>
+                <Text type="secondary">{t('platform_skill_import_jobs_column_target_skill')}: {item.targetSkillId || '-'}</Text>
+              </Space>
+              {item.errorMessage ? (
+                <Paragraph type="danger" style={{ marginBottom: 0 }}>
+                  {item.errorMessage}
+                </Paragraph>
+              ) : (
+                <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+                  {t('platform_skill_market_card_finished_at', {
+                    value: formatDateTime(item.finishedAt || item.startedAt || item.createdAt, i18n.resolvedLanguage || i18n.language),
+                  })}
+                </Paragraph>
+              )}
+              <Space wrap>
+                <Button
+                  onClick={() => openImportJob({
+                    hubId: item.hubId,
+                    sourceLocator: item.sourceLocator,
+                    sourceNamespace: item.sourceNamespace,
+                    sourceVersion: item.sourceVersion,
+                  })}
+                >
+                  {t('platform_skill_market_card_action_retry_import')}
+                </Button>
+                {item.targetSkillId ? (
+                  <Button type="link" style={{ paddingInline: 0 }} onClick={() => void fetchDetail(item.targetSkillId!)}>
+                    {t('platform_skill_market_card_action_view_skill')}
+                  </Button>
+                ) : null}
+              </Space>
+            </Space>
+          </Card>
+        ))}
+      </div>
+    );
+  };
+
+  const renderMarketRecommendationCard = () => {
+    const hasHubs = hubSummary.total > 0;
+    const hasImports = importSummary.total > 0;
+    const hasPublishedSkills = skillSummary.published > 0;
+
+    let title = t('platform_skill_market_recommended_connect_title');
+    let description = t('platform_skill_market_recommended_connect_desc');
+    let primaryActionLabel = t('platform_skill_market_action_manage_sources');
+    let primaryAction = () => {
+      setActiveTab('hubs');
+      openCreateHub();
+    };
+    let secondaryActionLabel = t('platform_skill_market_action_create');
+    let secondaryAction = openCreateSkill;
+
+    if (hasHubs && !hasImports) {
+      title = t('platform_skill_market_recommended_import_title');
+      description = t('platform_skill_market_recommended_import_desc');
+      primaryActionLabel = t('platform_skill_market_action_import');
+      primaryAction = () => {
+        setActiveTab('imports');
+        openImportJob();
+      };
+      secondaryActionLabel = t('platform_skill_market_action_manage_sources');
+      secondaryAction = () => setActiveTab('hubs');
+    } else if (hasImports && !hasPublishedSkills) {
+      title = t('platform_skill_market_recommended_govern_title');
+      description = t('platform_skill_market_recommended_govern_desc');
+      primaryActionLabel = t('platform_skill_builder_next_steps_governance');
+      primaryAction = () => setActiveTab('skills');
+      secondaryActionLabel = t('platform_skill_market_tab_imports');
+      secondaryAction = () => setActiveTab('imports');
+    } else if (hasPublishedSkills) {
+      title = t('platform_skill_market_recommended_install_title');
+      description = t('platform_skill_market_recommended_install_desc');
+      primaryActionLabel = t('platform_skill_market_tab_catalog');
+      primaryAction = () => setActiveTab('skills');
+      secondaryActionLabel = t('platform_skill_market_action_import');
+      secondaryAction = () => {
+        setActiveTab('imports');
+        openImportJob();
+      };
+    }
+
+    return (
+      <Card
+        style={{
+          marginBottom: 16,
+          borderRadius: 24,
+          background: 'linear-gradient(135deg, rgba(22,119,255,0.08), rgba(22,119,255,0.02))',
+          border: '1px solid rgba(22,119,255,0.12)',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 16,
+            flexWrap: 'wrap',
+          }}
+        >
+          <Space direction="vertical" size={8} style={{ maxWidth: 760 }}>
+            <Text strong>{t('platform_skill_market_recommended_title')}</Text>
+            <Title level={4} style={{ margin: 0 }}>{title}</Title>
+            <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+              {description}
+            </Paragraph>
+            <Text type="secondary">{t('platform_skill_market_search_hint')}</Text>
+          </Space>
+          <Space wrap>
+            <Button onClick={secondaryAction}>{secondaryActionLabel}</Button>
+            <Button type="primary" icon={<ArrowRightOutlined />} onClick={primaryAction}>
+              {primaryActionLabel}
+            </Button>
+          </Space>
+        </div>
+      </Card>
+    );
+  };
 
   return (
     <div style={{ animation: 'fadeIn 0.5s ease-out' }}>
@@ -705,30 +1378,99 @@ const PlatformSkillsPage: React.FC = () => {
         <div>
           <Title level={3} style={{ marginBottom: 8 }}>
             <SafetyOutlined style={{ marginRight: 8 }} />
-            {t('platform_skills_title')}
+            {pageTitle}
           </Title>
           <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            {t('platform_skills_desc')}
+            {pageDescription}
           </Paragraph>
         </div>
-        {actionButton}
+        <Space wrap>
+          {isMarketExperience ? (
+            <>
+              <Button icon={<CloudDownloadOutlined />} onClick={() => openImportJob()}>
+                {t('platform_skill_market_action_import')}
+              </Button>
+              <Button onClick={() => openCreateHub()}>
+                {t('platform_skill_market_action_manage_sources')}
+              </Button>
+              <Button type="primary" icon={<PlusOutlined />} onClick={openCreateSkill}>
+                {t('platform_skill_market_action_create')}
+              </Button>
+            </>
+          ) : actionButton}
+        </Space>
       </div>
 
-      <Card size="small" style={{ marginBottom: 16, borderRadius: 16 }}>
-        <Space wrap size={12}>
-          {[
-            { key: 'skills', label: `${t('platform_skills_tab_skills')} (${skillSummary.total})` },
-            { key: 'hubs', label: `${t('platform_skills_tab_hubs')} (${hubSummary.total})` },
-            { key: 'imports', label: `${t('platform_skills_tab_imports')} (${importSummary.total})` },
-          ].map((item) => (
-            <Button
-              key={item.key}
-              type={activeTab === item.key ? 'primary' : 'default'}
-              onClick={() => setActiveTab(item.key as PlatformTabKey)}
-            >
-              {item.label}
+      {isMarketExperience ? (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: 16,
+            marginBottom: 16,
+          }}
+        >
+          <Card size="small" style={{ borderRadius: 16 }}>
+            <Text strong>{t('platform_skill_market_quick_import_title')}</Text>
+            <Paragraph type="secondary" style={{ margin: '8px 0 12px' }}>
+              {t('platform_skill_market_quick_import_desc')}
+            </Paragraph>
+            <Button type="link" style={{ paddingInline: 0 }} onClick={() => openImportJob()}>
+              {t('platform_skill_market_action_import')}
             </Button>
-          ))}
+          </Card>
+          <Card size="small" style={{ borderRadius: 16 }}>
+            <Text strong>{t('platform_skill_market_quick_create_title')}</Text>
+            <Paragraph type="secondary" style={{ margin: '8px 0 12px' }}>
+              {t('platform_skill_market_quick_create_desc')}
+            </Paragraph>
+            <Button type="link" style={{ paddingInline: 0 }} onClick={openCreateSkill}>
+              {t('platform_skill_market_action_create')}
+            </Button>
+          </Card>
+          <Card size="small" style={{ borderRadius: 16 }}>
+            <Text strong>{t('platform_skill_market_quick_hub_title')}</Text>
+            <Paragraph type="secondary" style={{ margin: '8px 0 12px' }}>
+              {t('platform_skill_market_quick_hub_desc')}
+            </Paragraph>
+            <Button type="link" style={{ paddingInline: 0 }} onClick={() => {
+              setActiveTab('hubs');
+              openCreateHub();
+            }}>
+              {t('platform_skill_market_action_manage_sources')}
+            </Button>
+          </Card>
+        </div>
+      ) : null}
+
+      {isMarketExperience ? renderMarketRecommendationCard() : null}
+
+      <Card size="small" style={{ marginBottom: 16, borderRadius: 16 }}>
+        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <Space wrap size={12}>
+            {tabItems.map((item) => (
+              <Button
+                key={item.key}
+                type={activeTab === item.key ? 'primary' : 'default'}
+                onClick={() => setActiveTab(item.key as PlatformTabKey)}
+              >
+                {item.label}
+              </Button>
+            ))}
+            </Space>
+            <Input
+              allowClear
+              value={searchText}
+              onChange={(event) => setSearchText(event.target.value)}
+              prefix={<SearchOutlined />}
+              placeholder={searchPlaceholder}
+              style={{ width: 320, maxWidth: '100%' }}
+            />
+          </div>
+          {isMarketExperience ? (
+            <Text type="secondary">{t('platform_skill_market_search_hint')}</Text>
+          ) : null}
         </Space>
       </Card>
 
@@ -741,85 +1483,97 @@ const PlatformSkillsPage: React.FC = () => {
             { label: t('platform_skills_summary_disabled'), value: skillSummary.disabled },
           ])}
 
-          <Card variant="borderless" style={{ borderRadius: 20 }}>
-            <Table
-              rowKey="id"
-              loading={skillsLoading}
-              dataSource={skills}
-              onRow={(record) => ({
-                onClick: () => fetchDetail(record.id),
-                style: { cursor: 'pointer' },
-              })}
-              pagination={{ pageSize: 10 }}
-              scroll={{ x: 1480 }}
-              locale={{
-                emptyText: <Empty description={t('platform_skills_empty')} image={Empty.PRESENTED_IMAGE_SIMPLE} />,
-              }}
-              columns={[
-                { title: t('platform_skills_column_code'), dataIndex: 'code', key: 'code', width: 220, ellipsis: true },
-                { title: t('platform_skills_column_name'), dataIndex: 'name', key: 'name', width: 220 },
-                {
-                  title: t('platform_skills_column_source'),
-                  dataIndex: 'sourceType',
-                  key: 'sourceType',
-                  width: 150,
-                  render: (value: string) => translateSourceType(value),
-                },
-                {
-                  title: t('platform_skills_column_provider'),
-                  dataIndex: 'providerType',
-                  key: 'providerType',
-                  width: 150,
-                  render: (value: string) => translateProviderType(value),
-                },
-                {
-                  title: t('platform_skills_column_trust_level'),
-                  dataIndex: 'trustLevel',
-                  key: 'trustLevel',
-                  width: 150,
-                  render: (value: string) => renderTrustTag(value, translateTrustLevel(value)),
-                },
-                {
-                  title: t('platform_skills_column_status'),
-                  dataIndex: 'status',
-                  key: 'status',
-                  width: 120,
-                  render: (value: string) => renderStatusTag(value, translateStatus(value)),
-                },
-                {
-                  title: t('platform_skills_column_latest_stable'),
-                  dataIndex: 'latestStableVersionId',
-                  key: 'latestStableVersionId',
-                  width: 220,
-                  ellipsis: true,
-                  render: (value?: string) => value || '-',
-                },
-                {
-                  title: t('platform_skills_column_updated_at'),
-                  dataIndex: 'updatedAt',
-                  key: 'updatedAt',
-                  width: 200,
-                  render: (value: string) => formatDateTime(value, i18n.resolvedLanguage || i18n.language),
-                },
-                {
-                  title: t('platform_skills_column_actions'),
-                  key: 'actions',
-                  width: 140,
-                  render: (_: unknown, record: SkillItem) => (
-                    <Button
-                      size="small"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        void fetchDetail(record.id);
-                      }}
-                    >
-                      {t('platform_skills_view_detail')}
-                    </Button>
-                  ),
-                },
-              ]}
-            />
-          </Card>
+          {isMarketExperience ? (
+            <>
+              <Card size="small" style={{ marginBottom: 16, borderRadius: 16 }}>
+                <Space wrap>
+                  <Select value={skillSourceFilter} onChange={setSkillSourceFilter} options={skillSourceOptions} style={{ minWidth: 180 }} />
+                  <Select value={skillStatusFilter} onChange={setSkillStatusFilter} options={skillStatusOptions} style={{ minWidth: 180 }} />
+                </Space>
+              </Card>
+              {skillsLoading ? <Card loading style={{ borderRadius: 20 }} /> : renderMarketSkillCards()}
+            </>
+          ) : (
+            <Card variant="borderless" style={{ borderRadius: 20 }}>
+              <Table
+                rowKey="id"
+                loading={skillsLoading}
+                dataSource={filteredSkills}
+                onRow={(record) => ({
+                  onClick: () => fetchDetail(record.id),
+                  style: { cursor: 'pointer' },
+                })}
+                pagination={{ pageSize: 10 }}
+                scroll={{ x: 1480 }}
+                locale={{
+                  emptyText: <Empty description={t('platform_skills_empty')} image={Empty.PRESENTED_IMAGE_SIMPLE} />,
+                }}
+                columns={[
+                  { title: t('platform_skills_column_code'), dataIndex: 'code', key: 'code', width: 220, ellipsis: true },
+                  { title: t('platform_skills_column_name'), dataIndex: 'name', key: 'name', width: 220 },
+                  {
+                    title: t('platform_skills_column_source'),
+                    dataIndex: 'sourceType',
+                    key: 'sourceType',
+                    width: 150,
+                    render: (value: string) => translateSourceType(value),
+                  },
+                  {
+                    title: t('platform_skills_column_provider'),
+                    dataIndex: 'providerType',
+                    key: 'providerType',
+                    width: 150,
+                    render: (value: string) => translateProviderType(value),
+                  },
+                  {
+                    title: t('platform_skills_column_trust_level'),
+                    dataIndex: 'trustLevel',
+                    key: 'trustLevel',
+                    width: 150,
+                    render: (value: string) => renderTrustTag(value, translateTrustLevel(value)),
+                  },
+                  {
+                    title: t('platform_skills_column_status'),
+                    dataIndex: 'status',
+                    key: 'status',
+                    width: 120,
+                    render: (value: string) => renderStatusTag(value, translateStatus(value)),
+                  },
+                  {
+                    title: t('platform_skills_column_latest_stable'),
+                    dataIndex: 'latestStableVersionId',
+                    key: 'latestStableVersionId',
+                    width: 220,
+                    ellipsis: true,
+                    render: (value?: string) => value || '-',
+                  },
+                  {
+                    title: t('platform_skills_column_updated_at'),
+                    dataIndex: 'updatedAt',
+                    key: 'updatedAt',
+                    width: 200,
+                    render: (value: string) => formatDateTime(value, i18n.resolvedLanguage || i18n.language),
+                  },
+                  {
+                    title: t('platform_skills_column_actions'),
+                    key: 'actions',
+                    width: 140,
+                    render: (_: unknown, record: SkillItem) => (
+                      <Button
+                        size="small"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void fetchDetail(record.id);
+                        }}
+                      >
+                        {t('platform_skills_view_detail')}
+                      </Button>
+                    ),
+                  },
+                ]}
+              />
+            </Card>
+          )}
         </>
       ) : null}
 
@@ -832,68 +1586,79 @@ const PlatformSkillsPage: React.FC = () => {
             { label: t('platform_skill_hubs_summary_mcp'), value: hubSummary.mcp },
           ])}
 
-          <Card variant="borderless" style={{ borderRadius: 20 }}>
-            <Table
-              rowKey="id"
-              loading={hubsLoading}
-              dataSource={hubs}
-              pagination={{ pageSize: 10 }}
-              scroll={{ x: 1500 }}
-              locale={{
-                emptyText: <Empty description={t('platform_skill_hubs_empty')} image={Empty.PRESENTED_IMAGE_SIMPLE} />,
-              }}
-              columns={[
-                { title: t('platform_skills_column_code'), dataIndex: 'hubCode', key: 'hubCode', width: 200, ellipsis: true },
-                { title: t('platform_skills_column_name'), dataIndex: 'name', key: 'name', width: 220 },
-                {
-                  title: t('platform_skill_hubs_column_type'),
-                  dataIndex: 'hubType',
-                  key: 'hubType',
-                  width: 180,
-                  render: (value: string) => translateHubType(value),
-                },
-                {
-                  title: t('platform_skill_hubs_column_base_url'),
-                  dataIndex: 'baseUrl',
-                  key: 'baseUrl',
-                  width: 320,
-                  ellipsis: true,
-                  render: (value: string) => value || '-',
-                },
-                {
-                  title: t('platform_skills_column_trust_level'),
-                  dataIndex: 'trustLevel',
-                  key: 'trustLevel',
-                  width: 150,
-                  render: (value: string) => renderTrustTag(value, translateTrustLevel(value)),
-                },
-                {
-                  title: t('platform_skills_column_status'),
-                  dataIndex: 'status',
-                  key: 'status',
-                  width: 120,
-                  render: (value: string) => renderStatusTag(value, translateStatus(value)),
-                },
-                {
-                  title: t('platform_skills_column_updated_at'),
-                  dataIndex: 'updatedAt',
-                  key: 'updatedAt',
-                  width: 180,
-                  render: (value: string) => formatDateTime(value, i18n.resolvedLanguage || i18n.language),
-                },
-                {
-                  title: t('platform_skills_column_actions'),
-                  key: 'actions',
-                  width: 120,
-                  render: (_: unknown, record: SkillHubItem) => (
-                    <Button size="small" onClick={() => openCreateHub(record)}>
-                      {t('platform_skills_edit')}
-                    </Button>
-                  ),
-                },
-              ]}
-            />
-          </Card>
+          {isMarketExperience ? (
+            <>
+              <Card size="small" style={{ marginBottom: 16, borderRadius: 16 }}>
+                <Space wrap>
+                  <Select value={hubTypeFilter} onChange={setHubTypeFilter} options={hubTypeOptions} style={{ minWidth: 220 }} />
+                </Space>
+              </Card>
+              {hubsLoading ? <Card loading style={{ borderRadius: 20 }} /> : renderMarketHubCards()}
+            </>
+          ) : (
+            <Card variant="borderless" style={{ borderRadius: 20 }}>
+              <Table
+                rowKey="id"
+                loading={hubsLoading}
+                dataSource={filteredHubs}
+                pagination={{ pageSize: 10 }}
+                scroll={{ x: 1500 }}
+                locale={{
+                  emptyText: <Empty description={t('platform_skill_hubs_empty')} image={Empty.PRESENTED_IMAGE_SIMPLE} />,
+                }}
+                columns={[
+                  { title: t('platform_skills_column_code'), dataIndex: 'hubCode', key: 'hubCode', width: 200, ellipsis: true },
+                  { title: t('platform_skills_column_name'), dataIndex: 'name', key: 'name', width: 220 },
+                  {
+                    title: t('platform_skill_hubs_column_type'),
+                    dataIndex: 'hubType',
+                    key: 'hubType',
+                    width: 180,
+                    render: (value: string) => translateHubType(value),
+                  },
+                  {
+                    title: t('platform_skill_hubs_column_base_url'),
+                    dataIndex: 'baseUrl',
+                    key: 'baseUrl',
+                    width: 320,
+                    ellipsis: true,
+                    render: (value: string) => value || '-',
+                  },
+                  {
+                    title: t('platform_skills_column_trust_level'),
+                    dataIndex: 'trustLevel',
+                    key: 'trustLevel',
+                    width: 150,
+                    render: (value: string) => renderTrustTag(value, translateTrustLevel(value)),
+                  },
+                  {
+                    title: t('platform_skills_column_status'),
+                    dataIndex: 'status',
+                    key: 'status',
+                    width: 120,
+                    render: (value: string) => renderStatusTag(value, translateStatus(value)),
+                  },
+                  {
+                    title: t('platform_skills_column_updated_at'),
+                    dataIndex: 'updatedAt',
+                    key: 'updatedAt',
+                    width: 180,
+                    render: (value: string) => formatDateTime(value, i18n.resolvedLanguage || i18n.language),
+                  },
+                  {
+                    title: t('platform_skills_column_actions'),
+                    key: 'actions',
+                    width: 120,
+                    render: (_: unknown, record: SkillHubItem) => (
+                      <Button size="small" onClick={() => openCreateHub(record)}>
+                        {t('platform_skills_edit')}
+                      </Button>
+                    ),
+                  },
+                ]}
+              />
+            </Card>
+          )}
         </>
       ) : null}
 
@@ -906,79 +1671,91 @@ const PlatformSkillsPage: React.FC = () => {
             { label: t('platform_skill_import_jobs_summary_failed'), value: importSummary.failed },
           ])}
 
-          <Card variant="borderless" style={{ borderRadius: 20 }}>
-            <Table
-              rowKey="id"
-              loading={importsLoading}
-              dataSource={importJobs}
-              pagination={{ pageSize: 10 }}
-              scroll={{ x: 1800 }}
-              locale={{
-                emptyText: <Empty description={t('platform_skill_import_jobs_empty')} image={Empty.PRESENTED_IMAGE_SIMPLE} />,
-              }}
-              columns={[
-                {
-                  title: t('platform_skill_import_jobs_column_hub'),
-                  dataIndex: 'hubId',
-                  key: 'hubId',
-                  width: 180,
-                  render: (value: string) => hubNameMap[value] || value || '-',
-                },
-                {
-                  title: t('platform_skill_import_jobs_column_source_locator'),
-                  dataIndex: 'sourceLocator',
-                  key: 'sourceLocator',
-                  width: 280,
-                  ellipsis: true,
-                  render: (value: string) => value || '-',
-                },
-                {
-                  title: t('platform_skill_import_jobs_column_source_namespace'),
-                  dataIndex: 'sourceNamespace',
-                  key: 'sourceNamespace',
-                  width: 180,
-                  render: (value: string) => value || '-',
-                },
-                { title: t('platform_skill_import_jobs_column_source_version'), dataIndex: 'sourceVersion', key: 'sourceVersion', width: 120, render: (value: string) => value || '-' },
-                {
-                  title: t('platform_skills_column_status'),
-                  dataIndex: 'jobStatus',
-                  key: 'jobStatus',
-                  width: 120,
-                  render: (value: string) => renderStatusTag(value, translateStatus(value)),
-                },
-                {
-                  title: t('platform_skill_import_jobs_column_target_skill'),
-                  dataIndex: 'targetSkillId',
-                  key: 'targetSkillId',
-                  width: 160,
-                  render: (value?: string) => value || '-',
-                },
-                {
-                  title: t('platform_skill_import_jobs_column_target_version'),
-                  dataIndex: 'targetSkillVersionId',
-                  key: 'targetSkillVersionId',
-                  width: 160,
-                  render: (value?: string) => value || '-',
-                },
-                {
-                  title: t('platform_skill_import_jobs_column_finished_at'),
-                  dataIndex: 'finishedAt',
-                  key: 'finishedAt',
-                  width: 180,
-                  render: (value?: string) => formatDateTime(value, i18n.resolvedLanguage || i18n.language),
-                },
-                {
-                  title: t('platform_skill_import_jobs_column_error_message'),
-                  dataIndex: 'errorMessage',
-                  key: 'errorMessage',
-                  width: 280,
-                  ellipsis: true,
-                  render: (value?: string) => value || '-',
-                },
-              ]}
-            />
-          </Card>
+          {isMarketExperience ? (
+            <>
+              {renderImportGuideCard()}
+              <Card size="small" style={{ marginBottom: 16, borderRadius: 16 }}>
+                <Space wrap>
+                  <Select value={importStatusFilter} onChange={setImportStatusFilter} options={importStatusOptions} style={{ minWidth: 220 }} />
+                </Space>
+              </Card>
+              {importsLoading ? <Card loading style={{ borderRadius: 20 }} /> : renderMarketImportCards()}
+            </>
+          ) : (
+            <Card variant="borderless" style={{ borderRadius: 20 }}>
+              <Table
+                rowKey="id"
+                loading={importsLoading}
+                dataSource={filteredImportJobs}
+                pagination={{ pageSize: 10 }}
+                scroll={{ x: 1800 }}
+                locale={{
+                  emptyText: <Empty description={t('platform_skill_import_jobs_empty')} image={Empty.PRESENTED_IMAGE_SIMPLE} />,
+                }}
+                columns={[
+                  {
+                    title: t('platform_skill_import_jobs_column_hub'),
+                    dataIndex: 'hubId',
+                    key: 'hubId',
+                    width: 180,
+                    render: (value: string) => hubNameMap[value] || value || '-',
+                  },
+                  {
+                    title: t('platform_skill_import_jobs_column_source_locator'),
+                    dataIndex: 'sourceLocator',
+                    key: 'sourceLocator',
+                    width: 280,
+                    ellipsis: true,
+                    render: (value: string) => value || '-',
+                  },
+                  {
+                    title: t('platform_skill_import_jobs_column_source_namespace'),
+                    dataIndex: 'sourceNamespace',
+                    key: 'sourceNamespace',
+                    width: 180,
+                    render: (value: string) => value || '-',
+                  },
+                  { title: t('platform_skill_import_jobs_column_source_version'), dataIndex: 'sourceVersion', key: 'sourceVersion', width: 120, render: (value: string) => value || '-' },
+                  {
+                    title: t('platform_skills_column_status'),
+                    dataIndex: 'jobStatus',
+                    key: 'jobStatus',
+                    width: 120,
+                    render: (value: string) => renderStatusTag(value, translateStatus(value)),
+                  },
+                  {
+                    title: t('platform_skill_import_jobs_column_target_skill'),
+                    dataIndex: 'targetSkillId',
+                    key: 'targetSkillId',
+                    width: 160,
+                    render: (value?: string) => value || '-',
+                  },
+                  {
+                    title: t('platform_skill_import_jobs_column_target_version'),
+                    dataIndex: 'targetSkillVersionId',
+                    key: 'targetSkillVersionId',
+                    width: 160,
+                    render: (value?: string) => value || '-',
+                  },
+                  {
+                    title: t('platform_skill_import_jobs_column_finished_at'),
+                    dataIndex: 'finishedAt',
+                    key: 'finishedAt',
+                    width: 180,
+                    render: (value?: string) => formatDateTime(value, i18n.resolvedLanguage || i18n.language),
+                  },
+                  {
+                    title: t('platform_skill_import_jobs_column_error_message'),
+                    dataIndex: 'errorMessage',
+                    key: 'errorMessage',
+                    width: 280,
+                    ellipsis: true,
+                    render: (value?: string) => value || '-',
+                  },
+                ]}
+              />
+            </Card>
+          )}
         </>
       ) : null}
 
@@ -1057,6 +1834,7 @@ const PlatformSkillsPage: React.FC = () => {
               options={[
                 { label: translateHubType('openapi_hub'), value: 'openapi_hub' },
                 { label: translateHubType('mcp_hub'), value: 'mcp_hub' },
+                { label: translateHubType('tencent_skillhub'), value: 'tencent_skillhub' },
                 { label: translateHubType('builtin_hub'), value: 'builtin_hub' },
                 { label: translateHubType('enterprise_private_hub'), value: 'enterprise_private_hub' },
               ]}
@@ -1137,8 +1915,11 @@ const PlatformSkillsPage: React.FC = () => {
         destroyOnHidden
       >
         <Form layout="vertical" form={importForm}>
+          {renderImportGuideCard()}
           <Form.Item label={t('platform_skill_import_jobs_form_hub')} name="hubId" rules={[{ required: true, message: t('platform_skill_import_jobs_form_hub_required') }]}>
             <Select
+              showSearch
+              optionFilterProp="label"
               placeholder={t('platform_skill_import_jobs_form_hub_placeholder')}
               options={hubs.map((item) => ({
                 label: `${item.name} (${item.hubCode})`,
@@ -1147,15 +1928,171 @@ const PlatformSkillsPage: React.FC = () => {
             />
           </Form.Item>
           <Form.Item label={t('platform_skill_import_jobs_form_source_locator')} name="sourceLocator" rules={[{ required: true, message: t('platform_skill_import_jobs_form_source_locator_required') }]}>
-            <Input placeholder="petstore/openapi.yaml" />
+            <Input placeholder={t('platform_skill_import_jobs_form_source_locator_placeholder')} />
           </Form.Item>
           <Form.Item label={t('platform_skill_import_jobs_form_source_namespace')} name="sourceNamespace">
-            <Input placeholder="partner.petstore" />
+            <Input placeholder={t('platform_skill_import_jobs_form_source_namespace_placeholder')} />
           </Form.Item>
           <Form.Item label={t('platform_skill_import_jobs_form_source_version')} name="sourceVersion">
-            <Input placeholder="1.0.0" />
+            <Input placeholder={t('platform_skill_import_jobs_form_source_version_placeholder')} />
           </Form.Item>
+          <Card size="small" style={{ borderRadius: 16 }}>
+            <Space direction="vertical" size={8} style={{ width: '100%' }}>
+              <Text strong>{t('platform_skill_import_examples_title')}</Text>
+              <Text type="secondary">{t('platform_skill_import_examples_desc')}</Text>
+              <Space direction="vertical" size={6} style={{ width: '100%' }}>
+                {quickImportTemplates.map((template) => (
+                  <Card key={template.key} size="small" style={{ borderRadius: 12 }}>
+                    <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                      <Space wrap style={{ justifyContent: 'space-between', width: '100%' }}>
+                        <Text strong>{template.label}</Text>
+                        <Button size="small" onClick={() => applyImportTemplate(template)}>
+                          {t('platform_skill_import_examples_use')}
+                        </Button>
+                      </Space>
+                      <Text type="secondary">{template.description}</Text>
+                      <Text type="secondary">
+                        {t('platform_skill_import_examples_locator', { value: template.locator })}
+                      </Text>
+                      {template.namespace ? (
+                        <Text type="secondary">
+                          {t('platform_skill_import_examples_namespace', { value: template.namespace })}
+                        </Text>
+                      ) : null}
+                    </Space>
+                  </Card>
+                ))}
+              </Space>
+            </Space>
+          </Card>
         </Form>
+      </Modal>
+
+      <Modal
+        title={t('platform_skill_install_agent_modal_title')}
+        open={installToAgentOpen}
+        onCancel={() => {
+          setInstallToAgentOpen(false);
+          setInstallSkill(null);
+        }}
+        onOk={handleInstallToAgent}
+        confirmLoading={saving}
+        okText={t('platform_skill_market_card_action_install_agent')}
+        cancelText={t('agent_cancel')}
+        destroyOnHidden
+      >
+        <Space direction="vertical" size={16} style={{ width: '100%' }}>
+          <Card
+            size="small"
+            style={{
+              borderRadius: 16,
+              background: 'linear-gradient(135deg, rgba(22,119,255,0.08), rgba(22,119,255,0.02))',
+              border: '1px solid rgba(22,119,255,0.12)',
+            }}
+          >
+            <Space direction="vertical" size={6} style={{ width: '100%' }}>
+              <Text strong>{t('platform_skill_install_agent_selected_skill')}</Text>
+              <Text>{installSkill ? `${installSkill.name} (${installSkill.code})` : '-'}</Text>
+              <Text type="secondary">{t('platform_skill_install_agent_modal_desc')}</Text>
+            </Space>
+          </Card>
+
+          {installTargets.length === 0 && !installTargetsLoading ? (
+            <Card size="small" style={{ borderRadius: 16 }}>
+              <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description={t('platform_skill_install_agent_modal_empty')}
+              >
+                <Button onClick={() => navigate(getLocalizedPath('/dashboard', currentLanguage))}>
+                  {t('agent_create')}
+                </Button>
+              </Empty>
+            </Card>
+          ) : (
+            <Form form={installToAgentForm} layout="vertical" initialValues={{ invokeVisibility: 'auto' }}>
+              <Form.Item
+                label={t('platform_skill_install_agent_form_agent')}
+                name="agentId"
+                rules={[{ required: true, message: t('platform_skill_install_agent_form_agent_required') }]}
+              >
+                <Select
+                  loading={installTargetsLoading}
+                  showSearch
+                  optionFilterProp="label"
+                  placeholder={t('platform_skill_install_agent_form_agent_placeholder')}
+                  options={installTargets.map((item) => ({
+                    label: `${item.agentName} · ${item.engineType}${item.modelName ? ` · ${item.modelName}` : ''}`,
+                    value: item.id,
+                  }))}
+                />
+              </Form.Item>
+              <Form.Item label={t('platform_skill_install_agent_form_alias')} name="entryAlias">
+                <Input placeholder={t('platform_skill_install_agent_form_alias_placeholder')} />
+              </Form.Item>
+              <Form.Item label={t('platform_skill_install_agent_form_visibility')} name="invokeVisibility">
+                <Select
+                  options={[
+                    { label: t('agent_skill_panel_visibility_auto'), value: 'auto' },
+                    { label: t('agent_skill_panel_visibility_suggested'), value: 'suggested' },
+                    { label: t('agent_skill_panel_visibility_manual'), value: 'manual' },
+                  ]}
+                />
+              </Form.Item>
+              <Text type="secondary">{t('platform_skill_install_agent_helper')}</Text>
+            </Form>
+          )}
+        </Space>
+      </Modal>
+
+      <Modal
+        title={t('platform_skill_install_success_modal_title')}
+        open={!!installSuccess}
+        onCancel={() => setInstallSuccess(null)}
+        footer={installSuccess ? [
+          <Button key="close" onClick={() => setInstallSuccess(null)}>
+            {t('agent_cancel')}
+          </Button>,
+          <Button
+            key="agent-skills"
+            onClick={() => {
+              navigate(getLocalizedPath(`/dashboard/agents/${installSuccess.agentId}/skills`, currentLanguage));
+              setInstallSuccess(null);
+            }}
+          >
+            {t('platform_skill_install_success_action_agent')}
+          </Button>,
+          <Button
+            key="chat-verify"
+            type="primary"
+            onClick={() => {
+              navigate(getLocalizedPath('/chat', currentLanguage), {
+                state: {
+                  verifyAgentId: installSuccess.agentId,
+                  verifyAgentName: installSuccess.agentName,
+                  verifySkillName: installSuccess.skillName,
+                  source: 'skill-market-install',
+                },
+              });
+              setInstallSuccess(null);
+            }}
+          >
+            {t('platform_skill_install_success_action_chat')}
+          </Button>,
+        ] : undefined}
+        destroyOnHidden
+      >
+        {installSuccess ? (
+          <Space direction="vertical" size={12} style={{ width: '100%' }}>
+            <Text strong>{t('platform_skill_install_success_selected_skill')}</Text>
+            <Text>{installSuccess.skillName}</Text>
+            <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+              {t('platform_skill_install_success_modal_desc', {
+                agentName: installSuccess.agentName,
+                skillName: installSuccess.skillName,
+              })}
+            </Paragraph>
+          </Space>
+        ) : null}
       </Modal>
 
       <Drawer

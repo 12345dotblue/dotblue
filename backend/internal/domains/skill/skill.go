@@ -87,6 +87,7 @@ const (
 	HubTypeOpenAPI    = "openapi_hub"
 	HubTypeMCP        = "mcp_hub"
 	HubTypePrivate    = "enterprise_private_hub"
+	HubTypeTencent    = "tencent_skillhub"
 	HubStatusEnabled  = "enabled"
 	HubStatusDisabled = "disabled"
 )

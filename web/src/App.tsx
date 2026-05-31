@@ -14,8 +14,10 @@ import ChatPage from './domains/chat/ChatPage'
 import AdminSettings from './domains/admin/AdminSettings'
 import PlatformSettingsPage from './domains/admin/PlatformSettingsPage'
 import PlatformSkillsPage from './domains/admin/PlatformSkillsPage'
+import PlatformSkillBuilderPage from './domains/admin/PlatformSkillBuilderPage'
 import InviteAcceptPage from './domains/admin/InviteAcceptPage'
 import SetupWizard from './domains/setup/SetupWizard'
+import AgentSkillManagementPage from './domains/agent/AgentSkillManagementPage'
 
 import LandingLayout from './components/Layouts/LandingLayout'
 import AppLayout from './components/Layouts/AppLayout'
@@ -183,6 +185,9 @@ function App() {
             <Route path="/admin/enterprise" element={<RedirectToLocalized path="/admin/enterprise" />} />
             <Route path="/admin/platform" element={<RedirectToLocalized path="/admin/platform" />} />
             <Route path="/admin/platform/skills" element={<RedirectToLocalized path="/admin/platform/skills" />} />
+            <Route path="/admin/platform/skill-market" element={<RedirectToLocalized path="/admin/platform/skill-market" />} />
+            <Route path="/admin/platform/skills/new" element={<RedirectToLocalized path="/admin/platform/skills/new" />} />
+            <Route path="/dashboard/agents/:agentId/skills" element={<RedirectToLocalized />} />
 
             <Route path="/:lng" element={<LocalizedRouteGuard />}>
               <Route index element={<LandingLayout><LandingPage /></LandingLayout>} />
@@ -201,6 +206,18 @@ function App() {
                     <PrivateRoute>
                       <AppLayout>
                         <AgentList />
+                      </AppLayout>
+                    </PrivateRoute>
+                  </SetupGuard>
+                }
+              />
+              <Route
+                path="dashboard/agents/:agentId/skills"
+                element={
+                  <SetupGuard>
+                    <PrivateRoute>
+                      <AppLayout>
+                        <AgentSkillManagementPage />
                       </AppLayout>
                     </PrivateRoute>
                   </SetupGuard>
@@ -243,12 +260,72 @@ function App() {
                 }
               />
               <Route
+                path="admin/platform/skill-market"
+                element={
+                  <SetupGuard>
+                    <PlatformAdminRoute>
+                      <AppLayout>
+                        <PlatformSkillsPage experience="market" />
+                      </AppLayout>
+                    </PlatformAdminRoute>
+                  </SetupGuard>
+                }
+              />
+              <Route
+                path="admin/platform/skills/new"
+                element={
+                  <SetupGuard>
+                    <PlatformAdminRoute>
+                      <AppLayout>
+                        <PlatformSkillBuilderPage />
+                      </AppLayout>
+                    </PlatformAdminRoute>
+                  </SetupGuard>
+                }
+              />
+              <Route
                 path="admin/platform/skills"
                 element={
                   <SetupGuard>
                     <PlatformAdminRoute>
                       <AppLayout>
                         <PlatformSkillsPage />
+                      </AppLayout>
+                    </PlatformAdminRoute>
+                  </SetupGuard>
+                }
+              />
+              <Route
+                path="admin/platform/skills/create"
+                element={
+                  <SetupGuard>
+                    <PlatformAdminRoute>
+                      <AppLayout>
+                        <PlatformSkillsPage experience="market" defaultTab="skills" openFlow="skill" />
+                      </AppLayout>
+                    </PlatformAdminRoute>
+                  </SetupGuard>
+                }
+              />
+              <Route
+                path="admin/platform/skills/import"
+                element={
+                  <SetupGuard>
+                    <PlatformAdminRoute>
+                      <AppLayout>
+                        <PlatformSkillsPage experience="market" defaultTab="imports" openFlow="import" />
+                      </AppLayout>
+                    </PlatformAdminRoute>
+                  </SetupGuard>
+                }
+              />
+              <Route
+                path="admin/platform/skill-hubs"
+                element={
+                  <SetupGuard>
+                    <PlatformAdminRoute>
+                      <AppLayout>
+                        <PlatformSkillsPage defaultTab="hubs" />
                       </AppLayout>
                     </PlatformAdminRoute>
                   </SetupGuard>

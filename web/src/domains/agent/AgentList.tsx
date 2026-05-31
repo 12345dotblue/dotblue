@@ -74,8 +74,23 @@ interface AgentFormValues {
   engineType: 'hermes' | 'nanobot';
 }
 
+const CURRENT_ENTERPRISE_STORAGE_KEY = 'dotblue_current_enterprise_id';
+
 function formatEngineLabel(engineType: string, t: (key: string) => string): string {
   return engineType === 'nanobot' ? t('agent_engine_nanobot') : t('agent_engine_hermes');
+}
+
+function getAgentAuthHeaders() {
+  const token = casdoorService.getToken();
+  const enterpriseId = localStorage.getItem(CURRENT_ENTERPRISE_STORAGE_KEY)?.trim();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  if (enterpriseId) {
+    headers['X-Enterprise-ID'] = enterpriseId;
+  }
+  return headers;
 }
 
 const AgentList: React.FC = () => {
@@ -98,11 +113,10 @@ const AgentList: React.FC = () => {
   const [saving, setSaving] = useState(false);
 
   const fetchAgentOverviews = async (items: AgentItem[]) => {
-    const token = localStorage.getItem('casdoor_token');
     try {
       const results = await Promise.all(items.map(async (item) => {
         const res = await axios.get(`${BACKEND_URL}/api/agents/${item.id}/usage/overview`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: getAgentAuthHeaders(),
         });
         return [item.id, res.data || null] as const;
       }));
@@ -113,9 +127,8 @@ const AgentList: React.FC = () => {
   };
 
   const fetchAgents = () => {
-    const token = localStorage.getItem('casdoor_token');
     axios.get(`${BACKEND_URL}/api/agents`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: getAgentAuthHeaders(),
     }).then(res => {
       const list = res.data || [];
       setAgents(list);
@@ -133,9 +146,8 @@ const AgentList: React.FC = () => {
   const defaultRuntimeEngine = () => resolvedRuntimeOptions[0]?.value || 'hermes';
 
   const fetchAgentOptions = () => {
-    const token = localStorage.getItem('casdoor_token');
     axios.get(`${BACKEND_URL}/api/agents/model-options`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: getAgentAuthHeaders(),
     }).then(res => {
       const data: AgentOptionsResponse | ModelOptionGroup[] = res.data;
       if (Array.isArray(data)) {
@@ -187,22 +199,37 @@ const AgentList: React.FC = () => {
     fetchAgentOptions();
   }, []);
 
+  useEffect(() => {
+    if (!modalOpen) {
+      return;
+    }
+
+    if (editingAgent) {
+      form.setFieldsValue({
+        agentName: editingAgent.agentName,
+        systemPrompt: editingAgent.systemPrompt,
+        modelSelection: toModelSelection(editingAgent),
+        engineType: editingAgent.engineType || 'hermes',
+      });
+      return;
+    }
+
+    form.resetFields();
+    form.setFieldsValue({
+      agentName: '',
+      systemPrompt: '',
+      modelSelection: getDefaultModelSelection(),
+      engineType: defaultRuntimeEngine(),
+    });
+  }, [modalOpen, editingAgent, form, modelOptions, runtimeOptions]);
+
   const openCreate = () => {
     setEditingAgent(null);
-    form.resetFields();
-    form.setFieldValue('modelSelection', getDefaultModelSelection());
-    form.setFieldValue('engineType', defaultRuntimeEngine());
     setModalOpen(true);
   };
 
   const openEdit = (agent: AgentItem) => {
     setEditingAgent(agent);
-    form.setFieldsValue({
-      agentName: agent.agentName,
-      systemPrompt: agent.systemPrompt,
-      modelSelection: toModelSelection(agent),
-      engineType: agent.engineType || 'hermes',
-    });
     setModalOpen(true);
   };
 
@@ -211,7 +238,6 @@ const AgentList: React.FC = () => {
       const values = await form.validateFields();
       const { modelScope, modelId } = parseModelSelection(values.modelSelection);
       setSaving(true);
-      const token = localStorage.getItem('casdoor_token');
       const payload = {
         agentName: values.agentName,
         systemPrompt: values.systemPrompt,
@@ -222,12 +248,12 @@ const AgentList: React.FC = () => {
 
       if (editingAgent) {
         await axios.put(`${BACKEND_URL}/api/agents/${editingAgent.id}`, payload, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: getAgentAuthHeaders(),
         });
         message.success(t('agent_update_success'));
       } else {
         await axios.post(`${BACKEND_URL}/api/agents`, payload, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: getAgentAuthHeaders(),
         });
         message.success(t('agent_create_success'));
       }
@@ -243,9 +269,8 @@ const AgentList: React.FC = () => {
 
   const handleDelete = async (agentId: string) => {
     try {
-      const token = localStorage.getItem('casdoor_token');
       await axios.delete(`${BACKEND_URL}/api/agents/${agentId}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: getAgentAuthHeaders(),
       });
       message.success(t('agent_delete_success'));
       fetchAgents();
@@ -255,17 +280,16 @@ const AgentList: React.FC = () => {
   };
 
   const openUsage = async (agent: AgentItem) => {
-    const token = localStorage.getItem('casdoor_token');
     setUsageAgent(agent);
     setUsageModalOpen(true);
     setUsageLoading(true);
     try {
       const [overviewRes, trendsRes] = await Promise.all([
         axios.get(`${BACKEND_URL}/api/agents/${agent.id}/usage/overview`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: getAgentAuthHeaders(),
         }),
         axios.get(`${BACKEND_URL}/api/agents/${agent.id}/usage/trends?days=7`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: getAgentAuthHeaders(),
         }),
       ]);
       setUsageOverview(overviewRes.data || null);
@@ -349,6 +373,9 @@ const AgentList: React.FC = () => {
                   </div>
                 </div>
                 <Space style={{ marginLeft: 16, flexShrink: 0 }}>
+                  <Button onClick={() => navigate(getLocalizedPath(`/dashboard/agents/${item.id}/skills`, currentLanguage))}>
+                    技能
+                  </Button>
                   <Button icon={<LineChartOutlined />} onClick={() => openUsage(item)}>
                     用量
                   </Button>
@@ -442,10 +469,7 @@ const AgentList: React.FC = () => {
               children: editingAgent ? (
                 <AgentSkillsPanel
                   agentId={editingAgent.id}
-                  authHeaders={(() => {
-                    const token = casdoorService.getToken();
-                    return token ? { Authorization: `Bearer ${token}` } : {};
-                  })()}
+                  authHeaders={getAgentAuthHeaders()}
                 />
               ) : (
                 <Empty description="请先创建 Agent，再安装 Skill" image={Empty.PRESENTED_IMAGE_SIMPLE} />

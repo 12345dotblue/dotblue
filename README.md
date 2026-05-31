@@ -62,6 +62,13 @@ Keywords: enterprise AI assistant platform, AI assistant governance platform, se
 - Bind IM channels to agents
 - Includes Feishu-related integration as an external message entry point
 
+### 6. Skill Management
+
+- Create platform skills from scratch, import external skills from connected hubs, and govern the full lifecycle in one place
+- Separate the skill experience into Skill Market, Create Skill, Skill Governance, and Agent Skill Management instead of hiding everything in a single admin table
+- Install enterprise-enabled skills directly to a target agent and verify the result in the chat page
+- Support runtime skill injection for both Hermes and Nanobot so installed skills are actually exposed inside the agent runtime
+
 ## Who It Is For
 
 - Product and platform teams that want to deliver AI agents to real users
@@ -101,6 +108,7 @@ The recommended way to get started is Docker Compose. It gives you the most comp
 Important reminder:
 
 - If you update the platform-level LLM provider in the admin UI after agent containers have already started, recycle or restart the existing `hermes_*` agent containers before re-testing. Running agent containers keep their existing runtime config until they are recreated.
+- For skill-related end-to-end checks, prefer the local Compose environment and real browser verification first. Typical local validation flow is: import or create a skill -> install it to an agent -> open the chat page and confirm the assistant really uses the installed skill.
 
 ### Option 1: Docker Compose
 
@@ -259,6 +267,7 @@ The frontend includes:
 - Chat page
 - Enterprise admin console
 - Platform settings page
+- Skill market, skill builder, skill governance, and dedicated agent skill management pages
 
 The backend exposes:
 
@@ -268,6 +277,8 @@ The backend exposes:
 - `/api/chat`: chat interface
 - `/api/admin/settings`: platform settings
 - `/api/admin/*`: enterprise and IM administration
+- `/api/admin/skills*`, `/api/admin/platform/skill-hubs*`, `/api/admin/platform/skill-import-jobs*`: skill governance, connected hubs, and import workflows
+- `/api/admin/agents/:agentId/skills*`: install, list, and remove skills on a target agent
 
 Also available by default:
 

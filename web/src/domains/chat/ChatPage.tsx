@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Bubble, Sender, Welcome, Conversations, FileCard } from '@ant-design/x';
 import {
   Typography, Space, theme, Tooltip, Avatar, Button, Empty, Collapse,
-  Input, Dropdown, Layout, Tag,
+  Input, Dropdown, Layout, Tag, Alert,
 } from 'antd';
 import {
   RobotOutlined, UserOutlined, ThunderboltOutlined, PlusOutlined, BulbOutlined,
@@ -12,7 +12,7 @@ import {
 } from '@ant-design/icons';
 import Markdown from '@ant-design/x-markdown';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useXChat } from '@ant-design/x-sdk';
 import { BACKEND_URL } from '../../config';
@@ -46,6 +46,13 @@ interface ConversationItem {
   agentId: string;
   agentName: string;
   updatedAt: string;
+}
+
+interface VerifyChatState {
+  verifyAgentId?: string;
+  verifyAgentName?: string;
+  verifySkillName?: string;
+  source?: string;
 }
 
 interface PendingUpload {
@@ -107,10 +114,25 @@ function resolveBackendAssetUrl(url?: string): string | undefined {
   return /^https?:\/\//i.test(url) ? url : `${BACKEND_URL}${url}`;
 }
 
+const CURRENT_ENTERPRISE_STORAGE_KEY = 'dotblue_current_enterprise_id';
+
+function getChatAuthHeaderMap(tokenOverride?: string | null): Record<string, string> {
+  const token = tokenOverride ?? localStorage.getItem('casdoor_token');
+  const enterpriseId = localStorage.getItem(CURRENT_ENTERPRISE_STORAGE_KEY)?.trim();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  if (enterpriseId) {
+    headers['X-Enterprise-ID'] = enterpriseId;
+  }
+  return headers;
+}
+
 async function fetchAuthorizedBlob(url: string, token: string): Promise<Blob> {
   const response = await axios.get(url, {
     responseType: 'blob',
-    headers: { Authorization: `Bearer ${token}` },
+    headers: getChatAuthHeaderMap(token),
   });
   return response.data as Blob;
 }
@@ -364,7 +386,7 @@ interface ConversationPaneProps {
   selectedAgentName?: string;
   runtimeFooter: string;
   provider: ReturnType<typeof getOrCreateProvider> | undefined;
-  authHeaders: () => { headers: { Authorization: string } };
+  authHeaders: () => { headers: Record<string, string> };
   getJwt: () => string | null;
   t: any;
   bubbleRole: any;
@@ -384,12 +406,14 @@ const ConversationPane: React.FC<ConversationPaneProps> = ({
   const senderRef = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
+  const [reloadSeq, setReloadSeq] = useState(0);
+  const previousRequestingRef = useRef(false);
   const uploadingCount = pendingUploads.filter((item) => item.status === 'uploading').length;
   const assetToken = getJwt();
 
   const { onRequest, isRequesting, abort, parsedMessages } = useXChat<ChatMessage, ChatMessage, ChatInput, SSEChunk>({
     provider,
-    conversationKey: conversationId,
+    conversationKey: `${conversationId}:${reloadSeq}`,
     defaultMessages: conversationId
       ? async () => {
           const jwt = getJwt();
@@ -422,6 +446,19 @@ const ConversationPane: React.FC<ConversationPaneProps> = ({
     setPendingUploads([]);
   }, [conversationId]);
 
+  useEffect(() => {
+    setReloadSeq(0);
+  }, [conversationId]);
+
+  useEffect(() => {
+    if (previousRequestingRef.current && !isRequesting && conversationId) {
+      // Reload persisted messages after each request so the UI converges
+      // even when the streaming transport closes without a clean finalize step.
+      setReloadSeq((value) => value + 1);
+    }
+    previousRequestingRef.current = isRequesting;
+  }, [conversationId, isRequesting]);
+
   const uploadFiles = useCallback(async (files: FileList | File[]) => {
     const list = Array.from(files || []);
     if (!conversationId || list.length === 0) return;
@@ -446,7 +483,7 @@ const ConversationPane: React.FC<ConversationPaneProps> = ({
       formData.append('kind', item.kind);
       try {
         const res = await axios.post(`${BACKEND_URL}/api/files`, formData, {
-          headers: { Authorization: `Bearer ${jwt}` },
+          headers: getChatAuthHeaderMap(jwt),
         });
         setPendingUploads((prev) => prev.map((upload) => (
           upload.uid === item.uid
@@ -612,6 +649,9 @@ const ChatPage: React.FC = () => {
   const { t, i18n } = useTranslation();
   const { token } = theme.useToken();
   const navigate = useNavigate();
+  const location = useLocation();
+  const currentLanguage = resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language);
+  const initialVerifyState = ((location.state as VerifyChatState | null) || null);
 
   // Agents
   const [agents, setAgents] = useState<AgentOption[]>([]);
@@ -624,10 +664,14 @@ const ChatPage: React.FC = () => {
   const [convLoading, setConvLoading] = useState(false);
   const [convHasMore, setConvHasMore] = useState(true);
   const [convNextCursor, setConvNextCursor] = useState('');
+  const [verifyHint, setVerifyHint] = useState<VerifyChatState | null>(
+    initialVerifyState?.verifyAgentId ? initialVerifyState : null,
+  );
+  const verifyFlowHandledRef = useRef(false);
 
   const getJwt = useCallback(() => localStorage.getItem('casdoor_token'), []);
   const authHeaders = useCallback(() => ({
-    headers: { Authorization: `Bearer ${getJwt()}` },
+    headers: getChatAuthHeaderMap(getJwt()),
   }), [getJwt]);
   const assetToken = getJwt();
 
@@ -640,6 +684,16 @@ const ChatPage: React.FC = () => {
       return placement === 'prepend' ? [conversation, ...next] : [...next, conversation];
     });
   }, []);
+
+  useEffect(() => {
+    const state = (location.state as VerifyChatState | null) || null;
+    if (!state?.verifyAgentId) {
+      return;
+    }
+    setVerifyHint(state);
+    verifyFlowHandledRef.current = false;
+    navigate(getLocalizedPath('/chat', currentLanguage), { replace: true, state: null });
+  }, [location.state, navigate, currentLanguage]);
 
   // Provider events — title updates from SSE stream
   const onTitleUpdated = useCallback((convId: string, title: string) => {
@@ -758,6 +812,20 @@ const ChatPage: React.FC = () => {
     }).catch(() => {});
   }, [getJwt, authHeaders, t, upsertConversation]);
 
+  useEffect(() => {
+    if (agentsLoading || !verifyHint?.verifyAgentId || verifyFlowHandledRef.current) {
+      return;
+    }
+    const targetAgent = agents.find((item) => item.id === verifyHint.verifyAgentId);
+    if (!targetAgent) {
+      verifyFlowHandledRef.current = true;
+      return;
+    }
+    verifyFlowHandledRef.current = true;
+    setSelectedAgentId(targetAgent.id);
+    handleNewConversation(targetAgent.id);
+  }, [agents, agentsLoading, handleNewConversation, verifyHint]);
+
   // --- Delete conversation ---
   const curConvIdRef = useRef(curConvId);
   curConvIdRef.current = curConvId;
@@ -807,8 +875,8 @@ const ChatPage: React.FC = () => {
       )
     : conversations;
 
-  const currentLanguage = resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language);
   const currentLanguageLabel = LANGUAGE_OPTIONS.find((option) => option.value === currentLanguage)?.shortLabel || 'EN';
+  const verifyAgent = verifyHint?.verifyAgentId ? agents.find((item) => item.id === verifyHint.verifyAgentId) : null;
 
   // --- No agents ---
   if (!agentsLoading && agents.length === 0) {
@@ -1138,6 +1206,23 @@ const ChatPage: React.FC = () => {
 
         {/* Chat area */}
         <Layout.Content style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 56px)', background: '#fff' }}>
+          {verifyHint ? (
+            <div style={{ padding: '16px 24px 0' }}>
+              <Alert
+                showIcon
+                closable
+                type="info"
+                message={t('chat_verify_banner_title', {
+                  skillName: verifyHint.verifySkillName || t('platform_skill_market_card_action_install_agent'),
+                })}
+                description={t('chat_verify_banner_desc', {
+                  agentName: verifyAgent?.agentName || verifyHint.verifyAgentName || t('chat_select_agent'),
+                  skillName: verifyHint.verifySkillName || t('platform_skill_market_card_action_install_agent'),
+                })}
+                onClose={() => setVerifyHint(null)}
+              />
+            </div>
+          ) : null}
           <ConversationPane
             key={curConvId || 'empty'}
             conversationId={curConvId}

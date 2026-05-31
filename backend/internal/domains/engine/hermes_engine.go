@@ -45,6 +45,10 @@ func (h *HermesEngine) PrepareVolume(_ context.Context, volPath string, agent *A
 		return fmt.Errorf("failed to write SOUL.md: %w", err)
 	}
 
+	if err := writeManagedSkills(filepath.Join(volPath, "skills"), agent.Skills); err != nil {
+		return fmt.Errorf("failed to write managed skills: %w", err)
+	}
+
 	return nil
 }
 

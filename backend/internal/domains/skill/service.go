@@ -1,6 +1,9 @@
 package skill
 
 import (
+	"errors"
+	"io"
+	"net/http"
 	"regexp"
 	"time"
 
@@ -19,6 +22,7 @@ type Service struct {
 	idGenerator func() string
 	now         func() time.Time
 	loadAgent   func(id string) (*agent.Agent, error)
+	fetchURL    func(url string) ([]byte, error)
 }
 
 func NewService(repo Repository) *Service {
@@ -27,5 +31,16 @@ func NewService(repo Repository) *Service {
 		idGenerator: uuid.NewString,
 		now:         time.Now,
 		loadAgent:   agent.GetById,
+		fetchURL: func(url string) ([]byte, error) {
+			resp, err := http.Get(url) // #nosec G107 - skill hub URLs are platform-admin managed.
+			if err != nil {
+				return nil, err
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+				return nil, errors.New(resp.Status)
+			}
+			return io.ReadAll(resp.Body)
+		},
 	}
 }

@@ -2,6 +2,9 @@ package engine
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -21,6 +24,7 @@ import (
 	"dotblue/internal/domains/agent"
 	"dotblue/internal/domains/model"
 	"dotblue/internal/domains/settings"
+	skilldomain "dotblue/internal/domains/skill"
 )
 
 var (
@@ -67,6 +71,10 @@ type runtimeEngineRegistry interface {
 	GetEngine(name string) (Engine, error)
 }
 
+type runtimeSkillReader interface {
+	ListForAgent(agentID, enterpriseID string) ([]RuntimeSkill, error)
+}
+
 type defaultRuntimeAgentReader struct{}
 
 func (defaultRuntimeAgentReader) GetById(id string) (*runtimeAgentInfo, error) {
@@ -110,11 +118,46 @@ func (defaultRuntimeEngineRegistry) GetEngine(name string) (Engine, error) {
 	return GetEngine(name)
 }
 
+type defaultRuntimeSkillReader struct{}
+
+func (defaultRuntimeSkillReader) ListForAgent(agentID, enterpriseID string) ([]RuntimeSkill, error) {
+	repo := skilldomain.NewGFRepository()
+	bindings, err := repo.ListAgentSkillBindings(agentID, enterpriseID)
+	if err != nil {
+		return nil, err
+	}
+
+	skills := make([]RuntimeSkill, 0, len(bindings))
+	for _, binding := range bindings {
+		if binding == nil || binding.BindingStatus != skilldomain.BindingStatusInstalled {
+			continue
+		}
+		skillItem, err := repo.GetSkillById(binding.SkillId)
+		if err != nil {
+			return nil, err
+		}
+		version, err := repo.GetSkillVersionById(binding.SkillVersionId)
+		if err != nil {
+			return nil, err
+		}
+		if skillItem == nil || version == nil {
+			continue
+		}
+		runtimeSkill, ok := buildRuntimeSkill(binding, skillItem, version)
+		if ok {
+			skills = append(skills, runtimeSkill)
+		}
+	}
+
+	return skills, nil
+}
+
 // DockerRuntime manages agent containers via Docker.
 type DockerRuntime struct {
 	agents      runtimeAgentReader
 	settings    runtimeSettingsReader
 	registry    runtimeEngineRegistry
+	skills      runtimeSkillReader
 	readyWaiter func(ctx context.Context, endpoint string) error
 }
 
@@ -149,6 +192,7 @@ func NewDockerRuntime() *DockerRuntime {
 		agents:      defaultRuntimeAgentReader{},
 		settings:    defaultRuntimeSettingsReader{},
 		registry:    defaultRuntimeEngineRegistry{},
+		skills:      defaultRuntimeSkillReader{},
 		readyWaiter: waitForReady,
 	}
 }
@@ -172,6 +216,14 @@ func (d *DockerRuntime) EnsureRunning(ctx context.Context, orgID, userID, agentI
 	}
 
 	name := containerName(agentID, plan.engineType)
+	agentCfg, err := d.buildAgentConfig(plan)
+	if err != nil {
+		return nil, err
+	}
+	desiredFingerprint, err := computeRuntimeFingerprint(plan, agentCfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to compute runtime fingerprint: %w", err)
+	}
 
 	cli, err := newDockerClient(plan.dockerEndpoint)
 	if err != nil {
@@ -186,20 +238,29 @@ func (d *DockerRuntime) EnsureRunning(ctx context.Context, orgID, userID, agentI
 		return nil, fmt.Errorf("failed to list containers: %w", err)
 	}
 	if len(containers) > 0 {
+		currentFingerprint, readErr := readRuntimeFingerprint(plan.workspacePath)
+		if readErr != nil {
+			return nil, fmt.Errorf("failed to read runtime fingerprint: %w", readErr)
+		}
+		if currentFingerprint == desiredFingerprint {
 		endpoint, err := d.resolveEndpoint(ctx, cli, containers[0].ID, name, plan.containerPort, plan.endpointMode, plan.apiKey)
 		if err != nil {
 			return nil, err
 		}
 		return endpoint, nil
+		}
+
+		g.Log().Infof(ctx, "Runtime config changed for agent %s (engine: %s), recreating container", agentID, plan.engineType)
+		if err := cli.ContainerRemove(ctx, containers[0].ID, container.RemoveOptions{Force: true}); err != nil {
+			return nil, fmt.Errorf("failed to remove stale container %s: %w", name, err)
+		}
 	}
 
-	agentCfg := &AgentConfig{
-		ID:           plan.agentRecord.ID,
-		SystemPrompt: plan.agentRecord.SystemPrompt,
-		APIKey:       plan.apiKey,
-	}
 	if err := plan.engineImpl.PrepareVolume(ctx, plan.workspacePath, agentCfg, plan.providerConfig); err != nil {
 		return nil, fmt.Errorf("failed to initialize volume: %w", err)
+	}
+	if err := writeRuntimeFingerprint(plan.workspacePath, desiredFingerprint); err != nil {
+		return nil, fmt.Errorf("failed to persist runtime fingerprint: %w", err)
 	}
 
 	spec, err := plan.engineImpl.ContainerSpec(agentID, plan.workspacePath, plan.containerPort)
@@ -241,6 +302,28 @@ func (d *DockerRuntime) EnsureRunning(ctx context.Context, orgID, userID, agentI
 
 	g.Log().Infof(ctx, "Container started for agent %s (engine: %s) at %s", agentID, plan.engineType, endpoint.URL)
 	return endpoint, nil
+}
+
+func (d *DockerRuntime) buildAgentConfig(plan *runtimePlan) (*AgentConfig, error) {
+	if plan == nil || plan.agentRecord == nil {
+		return nil, fmt.Errorf("runtime plan is incomplete")
+	}
+
+	agentCfg := &AgentConfig{
+		ID:           plan.agentRecord.ID,
+		SystemPrompt: plan.agentRecord.SystemPrompt,
+		APIKey:       plan.apiKey,
+	}
+	if d == nil || d.skills == nil {
+		return agentCfg, nil
+	}
+
+	skills, err := d.skills.ListForAgent(plan.agentRecord.ID, plan.agentRecord.GroupId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load installed skills: %w", err)
+	}
+	agentCfg.Skills = skills
+	return agentCfg, nil
 }
 
 func (d *DockerRuntime) resolveRuntimePlan(ctx context.Context, agentID string) (*runtimePlan, error) {
@@ -445,6 +528,152 @@ func resolveWorkspaceBasePath(cfg *runtimePlatformConfig) string {
 		return path
 	}
 	return strings.TrimSpace(cfg.DataBasePath)
+}
+
+type runtimeSkillManifest struct {
+	Code            string `json:"code"`
+	Name            string `json:"name"`
+	Summary         string `json:"summary"`
+	Description     string `json:"description"`
+	SkillDocMarkdown string `json:"skillDocMarkdown"`
+	RemoteSkill     struct {
+		Slug string `json:"slug"`
+	} `json:"remoteSkill"`
+}
+
+func buildRuntimeSkill(binding *skilldomain.AgentSkillBindingView, skillItem *skilldomain.Skill, version *skilldomain.SkillVersion) (RuntimeSkill, bool) {
+	manifest := runtimeSkillManifest{}
+	_ = json.Unmarshal([]byte(strings.TrimSpace(version.ManifestJSON)), &manifest)
+
+	description := strings.TrimSpace(firstNonEmpty(manifest.Description, manifest.Summary, skillItem.Description))
+	name := normalizeRuntimeSkillName(firstNonEmpty(
+		manifest.RemoteSkill.Slug,
+		extractFrontMatterValue(manifest.SkillDocMarkdown, "name"),
+		binding.EntryAlias,
+		manifest.Name,
+		skillItem.Name,
+		skillItem.Code,
+	))
+	if name == "" {
+		return RuntimeSkill{}, false
+	}
+
+	markdown := strings.TrimSpace(manifest.SkillDocMarkdown)
+	if markdown == "" {
+		body := strings.TrimSpace(firstNonEmpty(skillItem.Description, manifest.Summary, version.ChangeLog))
+		if body == "" {
+			body = "Use this skill when the task matches its description."
+		}
+		markdown = fmt.Sprintf("---\nname: %s\ndescription: %s\n---\n\n# %s\n\n%s\n", name, description, firstNonEmpty(skillItem.Name, manifest.Name, name), body)
+	} else if !hasSkillFrontMatter(markdown) {
+		markdown = fmt.Sprintf("---\nname: %s\ndescription: %s\n---\n\n%s\n", name, description, markdown)
+	}
+
+	return RuntimeSkill{
+		Name:        name,
+		Description: description,
+		Markdown:    markdown,
+	}, true
+}
+
+func normalizeRuntimeSkillName(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" {
+		return ""
+	}
+	var buf strings.Builder
+	lastDash := false
+	for _, r := range value {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			buf.WriteRune(r)
+			lastDash = false
+			continue
+		}
+		if !lastDash {
+			buf.WriteByte('-')
+			lastDash = true
+		}
+	}
+	result := strings.Trim(buf.String(), "-")
+	if result == "" {
+		return ""
+	}
+	if result[0] < 'a' || result[0] > 'z' {
+		result = "skill-" + result
+	}
+	return result
+}
+
+func extractFrontMatterValue(markdown, key string) string {
+	trimmed := strings.TrimSpace(markdown)
+	if !strings.HasPrefix(trimmed, "---") {
+		return ""
+	}
+	parts := strings.SplitN(trimmed, "---", 3)
+	if len(parts) < 3 {
+		return ""
+	}
+	prefix := strings.ToLower(strings.TrimSpace(key)) + ":"
+	for _, rawLine := range strings.Split(parts[1], "\n") {
+		line := strings.TrimSpace(rawLine)
+		if !strings.HasPrefix(strings.ToLower(line), prefix) {
+			continue
+		}
+		value := strings.TrimSpace(strings.TrimPrefix(line, rawLine[:len(rawLine)-len(strings.TrimLeft(rawLine, " \t"))]+strings.TrimSpace(key)+":"))
+		value = strings.Trim(strings.TrimSpace(value), `"'`)
+		if value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func hasSkillFrontMatter(markdown string) bool {
+	return strings.HasPrefix(strings.TrimSpace(markdown), "---")
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
+}
+
+func computeRuntimeFingerprint(plan *runtimePlan, agentCfg *AgentConfig) (string, error) {
+	payload, err := json.Marshal(struct {
+		Engine   string         `json:"engine"`
+		Agent    *AgentConfig   `json:"agent"`
+		Provider *ProviderConfig `json:"provider"`
+	}{
+		Engine:   plan.engineType,
+		Agent:    agentCfg,
+		Provider: plan.providerConfig,
+	})
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(payload)
+	return hex.EncodeToString(sum[:]), nil
+}
+
+func readRuntimeFingerprint(workspacePath string) (string, error) {
+	raw, err := os.ReadFile(filepath.Join(workspacePath, ".dotblue-runtime-fingerprint"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil
+		}
+		return "", err
+	}
+	return strings.TrimSpace(string(raw)), nil
+}
+
+func writeRuntimeFingerprint(workspacePath, fingerprint string) error {
+	if err := os.MkdirAll(workspacePath, 0755); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(workspacePath, ".dotblue-runtime-fingerprint"), []byte(strings.TrimSpace(fingerprint)), 0644)
 }
 
 func resolveContainerPort(cfg *runtimePlatformConfig, engineType string, eng Engine) string {

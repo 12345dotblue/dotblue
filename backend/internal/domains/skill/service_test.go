@@ -2,6 +2,7 @@ package skill
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -802,5 +803,118 @@ func TestImportSkillCreatesDraftSkillVersionAndCompletesJob(t *testing.T) {
 	}
 	if job == nil || job.TargetSkillId != "skill-1" || job.TargetSkillVersionId != "version-1" {
 		t.Fatalf("expected completed import job result, got %#v", job)
+	}
+}
+
+func TestImportSkillFromTencentSkillHubFetchesRemoteDescriptor(t *testing.T) {
+	var createdSkill *Skill
+	var createdVersion *SkillVersion
+	var updatedJob *SkillImportJob
+	repo := &stubRepository{
+		getSkillHubByIdFunc: func(id string) (*SkillHub, error) {
+			return &SkillHub{
+				Id:         id,
+				HubType:    HubTypeTencent,
+				BaseURL:    "https://skillhub.cn",
+				TrustLevel: TrustLevelPartnerVerified,
+				ConfigJSON: `{"apiBaseUrl":"https://api.skillhub.cn","fileBaseUrl":"https://skillhub-cdn.example.com"}`,
+			}, nil
+		},
+		createSkillImportJobFunc: func(job *SkillImportJob) error { return nil },
+		updateSkillImportJobFunc: func(job *SkillImportJob) error {
+			copied := *job
+			updatedJob = &copied
+			return nil
+		},
+		getSkillImportJobByIdFunc: func(id string) (*SkillImportJob, error) {
+			if updatedJob == nil {
+				return nil, nil
+			}
+			copied := *updatedJob
+			return &copied, nil
+		},
+		getSkillByCodeFunc: func(ownerScope, ownerEnterpriseId, code string) (*Skill, error) {
+			return nil, nil
+		},
+		createSkillFunc: func(skill *Skill) error {
+			copied := *skill
+			createdSkill = &copied
+			return nil
+		},
+		getSkillByIdFunc: func(id string) (*Skill, error) {
+			if createdSkill == nil || createdSkill.Id != id {
+				return nil, nil
+			}
+			copied := *createdSkill
+			return &copied, nil
+		},
+		listSkillVersionsFunc: func(skillId string) ([]*SkillVersion, error) {
+			return nil, nil
+		},
+		createSkillVersionFunc: func(version *SkillVersion) error {
+			copied := *version
+			createdVersion = &copied
+			return nil
+		},
+		getSkillVersionByIdFunc: func(id string) (*SkillVersion, error) {
+			if createdVersion == nil || createdVersion.Id != id {
+				return nil, nil
+			}
+			copied := *createdVersion
+			return &copied, nil
+		},
+		upsertSkillHubFunc: func(hub *SkillHub) error { return nil },
+	}
+	service := NewService(repo)
+	ids := []string{"job-tencent", "skill-tencent", "version-tencent"}
+	service.idGenerator = func() string {
+		next := ids[0]
+		ids = ids[1:]
+		return next
+	}
+	service.now = func() time.Time { return time.Date(2026, 5, 31, 9, 0, 0, 0, time.UTC) }
+	service.fetchURL = func(rawURL string) ([]byte, error) {
+		switch rawURL {
+		case "https://api.skillhub.cn/api/v1/skills/weather":
+			return []byte(`{"latestVersion":{"changelog":"Synced by skillhub pipeline","version":"1.0.0"},"owner":{"displayName":"steipete","handle":"steipete"},"securityReports":{"keen":{"reportUrl":"https://example.com/report","status":"benign","statusText":"安全，无风险"}},"skill":{"displayName":"Weather","slug":"weather","source":"clawhub","summary":"Get current weather and forecasts (no API key required).","summary_zh":"获取当前天气和预报（无需API密钥）","tags":{"latest":"1.0.0"}}}`), nil
+		case "https://api.skillhub.cn/api/v1/skills/weather/files?version=1.0.0":
+			return []byte(`{"count":2,"version":"1.0.0","files":[{"path":"SKILL.md","sha256":"abc","size":123},{"path":"_meta.json","sha256":"def","size":12}]}`), nil
+		case "https://skillhub-cdn.example.com/skills/weather/1.0.0/files/SKILL.md":
+			return []byte("---\nname: weather\ndescription: Get current weather and forecasts (no API key required).\nhomepage: https://wttr.in/:help\nmetadata:\n  clawdbot:\n    emoji: \"🌤️\"\n---\n\n# Weather\n\nUse wttr.in to query weather.\n"), nil
+		case "https://skillhub-cdn.example.com/skills/weather/1.0.0/files/_meta.json":
+			return []byte(`{"slug":"weather","version":"1.0.0"}`), nil
+		default:
+			t.Fatalf("unexpected fetch url %q", rawURL)
+			return nil, nil
+		}
+	}
+
+	job, err := service.ImportSkill(ActorContext{UserId: "admin", IsPlatformAdmin: true}, ImportSkillInput{
+		HubId:         "hub-tencent",
+		SourceLocator: "weather",
+	})
+	if err != nil {
+		t.Fatalf("ImportSkill() error = %v", err)
+	}
+	if createdSkill == nil || createdSkill.Code != "tencent.skillhub.weather" {
+		t.Fatalf("expected normalized tencent skill code, got %#v", createdSkill)
+	}
+	if createdSkill.Description != "获取当前天气和预报（无需API密钥）" {
+		t.Fatalf("expected zh summary to be imported, got %#v", createdSkill)
+	}
+	if createdVersion == nil || createdVersion.Version != "1.0.0" {
+		t.Fatalf("expected remote version to be imported, got %#v", createdVersion)
+	}
+	if !strings.Contains(createdVersion.ManifestJSON, "\"provider\":\"tencent_skillhub\"") {
+		t.Fatalf("expected manifest to capture tencent skill hub provider, got %s", createdVersion.ManifestJSON)
+	}
+	if !strings.Contains(createdVersion.ManifestJSON, "skillDocMarkdown") {
+		t.Fatalf("expected manifest to include remote skill markdown, got %s", createdVersion.ManifestJSON)
+	}
+	if updatedJob == nil || updatedJob.JobStatus != ImportJobStatusCompleted {
+		t.Fatalf("expected import job to complete, got %#v", updatedJob)
+	}
+	if job == nil || job.TargetSkillId != "skill-tencent" || job.TargetSkillVersionId != "version-tencent" {
+		t.Fatalf("expected completed tencent import result, got %#v", job)
 	}
 }

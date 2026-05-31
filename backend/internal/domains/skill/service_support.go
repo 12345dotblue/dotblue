@@ -254,7 +254,7 @@ func normalizeInvokeMode(value string) string {
 
 func normalizeHubType(value string) (string, error) {
 	switch strings.TrimSpace(strings.ToLower(value)) {
-	case HubTypeBuiltin, HubTypeOpenAPI, HubTypeMCP, HubTypePrivate:
+	case HubTypeBuiltin, HubTypeOpenAPI, HubTypeMCP, HubTypePrivate, HubTypeTencent:
 		return strings.TrimSpace(strings.ToLower(value)), nil
 	default:
 		return "", errors.New("skill hub type is invalid")
@@ -303,7 +303,7 @@ func inferSourceTypeFromHub(hubType string) string {
 		return SourceTypeOpenAPICatalog
 	case HubTypeMCP:
 		return SourceTypeMCPCatalog
-	case HubTypePrivate:
+	case HubTypePrivate, HubTypeTencent:
 		return SourceTypePackage
 	default:
 		return SourceTypeBuiltin
