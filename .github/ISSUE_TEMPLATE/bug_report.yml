@@ -1,0 +1,63 @@
+name: Bug report
+description: Report something that is broken or behaves incorrectly.
+labels: ['bug', 'triage']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. Please fill in the sections
+        below so we can reproduce and fix it quickly.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear and concise description of the bug.
+      placeholder: I ran `docker compose up -d --build` and the backend exited with ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps to reproduce the behavior.
+      placeholder: |
+        1. cd deploy/compose
+        2. cp .env.example .env
+        3. ./prepare-config.sh
+        4. docker compose up -d --build
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: |
+        Deployment mode (Docker Compose / local dev / k8s), OS, browser,
+        backend / web commit, anything else that matters.
+      placeholder: |
+        - Deployment: Docker Compose
+        - OS: Ubuntu 24.04
+        - Browser: Chrome 131
+        - Backend commit: abcdef
+        - Web commit: 123456
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs / screenshots
+      description: Paste logs or attach screenshots. Use a code block for logs.
+    validations:
+      required: false

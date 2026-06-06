@@ -1,5 +1,7 @@
+import { runtimeConfig } from './runtimeConfig';
+
 function resolveBackendUrl() {
-  const configuredBackendUrl = import.meta.env.VITE_BACKEND_URL?.trim();
+  const configuredBackendUrl = runtimeConfig.backendUrl;
   const isLocalBackendUrl = configuredBackendUrl === 'http://localhost:8000'
     || configuredBackendUrl === 'http://127.0.0.1:8000';
 

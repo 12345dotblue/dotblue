@@ -1,12 +1,13 @@
 import Sdk from 'casdoor-js-sdk';
+import { runtimeConfig } from '../../runtimeConfig';
 
-const configuredRedirect = (import.meta.env.VITE_CASDOOR_REDIRECT_URL ?? '').trim();
+const configuredRedirect = runtimeConfig.casdoorRedirectUrl;
 
 export const casdoorConfig = {
-  serverUrl: import.meta.env.VITE_CASDOOR_SERVER_URL,
-  clientId: import.meta.env.VITE_CASDOOR_CLIENT_ID,
-  organizationName: import.meta.env.VITE_CASDOOR_ORG_NAME,
-  appName: import.meta.env.VITE_CASDOOR_APP_NAME,
+  serverUrl: runtimeConfig.casdoorServerUrl,
+  clientId: runtimeConfig.casdoorClientId,
+  organizationName: runtimeConfig.casdoorOrgName,
+  appName: runtimeConfig.casdoorAppName,
   redirectPath: configuredRedirect || "/callback",
 };
 

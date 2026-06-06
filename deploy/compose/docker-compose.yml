@@ -98,15 +98,16 @@ services:
       dockerfile: Dockerfile
       args:
         NPM_REGISTRY: ${NPM_REGISTRY}
-        VITE_CASDOOR_SERVER_URL: ${CASDOOR_PUBLIC_URL}
-        VITE_CASDOOR_CLIENT_ID: ${DOTBLUE_CASDOOR_CLIENT_ID}
-        VITE_CASDOOR_ORG_NAME: ${CASDOOR_ORG_NAME}
-        VITE_CASDOOR_APP_NAME: ${CASDOOR_APP_NAME}
-        VITE_BACKEND_URL: ${DOTBLUE_BACKEND_PUBLIC_URL}
     restart: unless-stopped
     depends_on:
       dotblue:
         condition: service_started
+    environment:
+      VITE_CASDOOR_SERVER_URL: ${CASDOOR_PUBLIC_URL}
+      VITE_CASDOOR_CLIENT_ID: ${DOTBLUE_CASDOOR_CLIENT_ID}
+      VITE_CASDOOR_ORG_NAME: ${CASDOOR_ORG_NAME}
+      VITE_CASDOOR_APP_NAME: ${CASDOOR_APP_NAME}
+      VITE_BACKEND_URL: ${DOTBLUE_BACKEND_PUBLIC_URL}
     ports:
       - "${DOTBLUE_WEB_PORT}:80"
 

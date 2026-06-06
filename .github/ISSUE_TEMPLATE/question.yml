@@ -1,0 +1,18 @@
+name: Question
+description: Ask a usage question or request help.
+labels: ['question']
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: What is your question?
+      description: Be as specific as you can. Mention the deployment mode, the page or endpoint, and what you have already tried.
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+    validations:
+      required: false

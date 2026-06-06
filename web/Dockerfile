@@ -2,18 +2,7 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-ARG VITE_CASDOOR_SERVER_URL
-ARG VITE_CASDOOR_CLIENT_ID
-ARG VITE_CASDOOR_ORG_NAME
-ARG VITE_CASDOOR_APP_NAME
-ARG VITE_BACKEND_URL
 ARG NPM_REGISTRY=
-
-ENV VITE_CASDOOR_SERVER_URL=${VITE_CASDOOR_SERVER_URL}
-ENV VITE_CASDOOR_CLIENT_ID=${VITE_CASDOOR_CLIENT_ID}
-ENV VITE_CASDOOR_ORG_NAME=${VITE_CASDOOR_ORG_NAME}
-ENV VITE_CASDOOR_APP_NAME=${VITE_CASDOOR_APP_NAME}
-ENV VITE_BACKEND_URL=${VITE_BACKEND_URL}
 
 COPY package*.json ./
 RUN if [ -n "$NPM_REGISTRY" ]; then npm config set registry "$NPM_REGISTRY"; fi
@@ -27,5 +16,8 @@ FROM nginx:1.27-alpine
 
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/dist /usr/share/nginx/html
+COPY docker-entrypoint.d/40-runtime-config.sh /docker-entrypoint.d/40-runtime-config.sh
+
+RUN chmod +x /docker-entrypoint.d/40-runtime-config.sh
 
 EXPOSE 80

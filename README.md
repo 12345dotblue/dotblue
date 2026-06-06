@@ -291,6 +291,35 @@ Also available by default:
 - A usable product foundation, not just an SDK or API demo
 - Covers local development, automatic installation, and Compose deployment in one repository
 
+## CI and Container Images
+
+Every push and pull request runs the CI workflow at
+`.github/workflows/ci.yml`, which lints, type-checks, builds, and tests both
+the backend and the web app, and builds both Docker images as a smoke test.
+
+Cutting a tag of the form `vX.Y.Z` (for example `v0.1.0`) triggers
+`.github/workflows/release.yml`, which:
+
+- builds and pushes multi-arch-style tags of the backend and web images to
+  GitHub Container Registry, and
+- drafts a GitHub release with auto-generated notes.
+
+Once a tag is pushed, users can pull pre-built images directly instead of
+building from source. Replace `<owner>` with the GitHub owner of the repo:
+
+```bash
+docker pull ghcr.io/<owner>/dotblue:v0.1.0
+docker pull ghcr.io/<owner>/dotblue-web:v0.1.0
+```
+
+The backend image is published as `dotblue`, and the frontend image is
+published as `dotblue-web`.
+
+The frontend now reads its Casdoor and backend endpoints from
+`/runtime-config.js` at container startup, so private deployments can reuse the
+same `dotblue-web` image and override the runtime environment variables without
+rebuilding the image.
+
 ## Open Source Checklist
 
 If you plan to publish DotBlue as an open-source project, it is worth adding:

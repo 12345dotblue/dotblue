@@ -836,14 +836,14 @@ export const library: DocsLibrary = {
             },
             {
               "id": "web-build",
-              "title": "最后部署 web：构建参数必须怎么传",
+              "title": "最后部署 web：镜像可复用，配置在启动时注入",
               "paragraphs": [
-                "web 是静态站点，真正关键的是构建时把 `VITE_CASDOOR_SERVER_URL`、`VITE_CASDOOR_CLIENT_ID`、`VITE_CASDOOR_ORG_NAME`、`VITE_CASDOOR_APP_NAME`、`VITE_BACKEND_URL` 这几项传对。",
-                "也就是说，前端不是运行时再动态读后端地址，而是在构建镜像时把这些参数写进最终产物。"
+                "web 镜像现在会在容器启动时生成 `/runtime-config.js`，再由浏览器读取 `VITE_CASDOOR_SERVER_URL`、`VITE_CASDOOR_CLIENT_ID`、`VITE_CASDOOR_ORG_NAME`、`VITE_CASDOOR_APP_NAME`、`VITE_BACKEND_URL` 这些运行时配置。",
+                "也就是说，私有化部署时可以复用同一个 `dotblue-web` 镜像，只改容器环境变量，不需要为每个环境重新构建前端镜像。"
               ],
               "code": {
                 "language": "bash",
-                "value": "docker build -t dotblue-web:prod \\\n  --build-arg VITE_CASDOOR_SERVER_URL=https://auth.example.com \\\n  --build-arg VITE_CASDOOR_CLIENT_ID=replace-with-runtime-client-id \\\n  --build-arg VITE_CASDOOR_ORG_NAME=dotblue \\\n  --build-arg VITE_CASDOOR_APP_NAME=dotblue \\\n  --build-arg VITE_BACKEND_URL=https://api.example.com \\\n  /opt/src/dotblue/web"
+                "value": "docker build -t dotblue-web:prod /opt/src/dotblue/web"
               }
             },
             {
@@ -851,7 +851,7 @@ export const library: DocsLibrary = {
               "title": "web 启动命令示例",
               "code": {
                 "language": "bash",
-                "value": "docker run -d \\\n  --name dotblue-web \\\n  --restart unless-stopped \\\n  -p 127.0.0.1:19000:80 \\\n  dotblue-web:prod"
+                "value": "docker run -d \\\n  --name dotblue-web \\\n  --restart unless-stopped \\\n  -p 127.0.0.1:19000:80 \\\n  -e VITE_CASDOOR_SERVER_URL=https://auth.example.com \\\n  -e VITE_CASDOOR_CLIENT_ID=replace-with-runtime-client-id \\\n  -e VITE_CASDOOR_ORG_NAME=dotblue \\\n  -e VITE_CASDOOR_APP_NAME=dotblue \\\n  -e VITE_BACKEND_URL=https://api.example.com \\\n  dotblue-web:prod"
               }
             },
             {
