@@ -83,7 +83,7 @@ function getAuthHeaders() {
 
 function renderStatusTag(status?: string, t?: (key: string, defaultValue?: string) => string) {
   if (!status) {
-    return <Tag>{t ? t('enterprise_admin_skills_status_not_enabled', '未启用') : '未启用'}</Tag>;
+    return <Tag>{t ? t('enterprise_admin_skills_status_not_enabled') : 'enterprise_admin_skills_status_not_enabled'}</Tag>;
   }
   const normalized = status.toLowerCase();
   const color = normalized === 'enabled' || normalized === 'published'
@@ -110,6 +110,10 @@ function renderTrustTag(value?: string, t?: (key: string, defaultValue?: string)
         ? 'error'
         : 'default';
   return <Tag color={color}>{t ? t(`platform_skills_trust_${normalized}`, value) : value}</Tag>;
+}
+
+function getEnterpriseSkillErrorMessage(fallbackMessage: string) {
+  return fallbackMessage;
 }
 
 const EnterpriseSkillsTab: React.FC<EnterpriseSkillsTabProps> = ({ createSignal }) => {
@@ -234,8 +238,7 @@ const EnterpriseSkillsTab: React.FC<EnterpriseSkillsTabProps> = ({ createSignal 
       enableForm.resetFields();
       await fetchCatalogSkills();
     } catch (error: any) {
-      const errorText = error?.response?.data;
-      messageApi.error(typeof errorText === 'string' ? errorText : t('enterprise_admin_skills_enable_failed'));
+      messageApi.error(getEnterpriseSkillErrorMessage(t('enterprise_admin_skills_enable_failed')));
     } finally {
       setSaving(false);
     }
@@ -249,8 +252,7 @@ const EnterpriseSkillsTab: React.FC<EnterpriseSkillsTabProps> = ({ createSignal 
       messageApi.success(t('enterprise_admin_skills_disable_success'));
       await fetchCatalogSkills();
     } catch (error: any) {
-      const errorText = error?.response?.data;
-      messageApi.error(typeof errorText === 'string' ? errorText : t('enterprise_admin_skills_disable_failed'));
+      messageApi.error(getEnterpriseSkillErrorMessage(t('enterprise_admin_skills_disable_failed')));
     }
   };
 
@@ -266,8 +268,7 @@ const EnterpriseSkillsTab: React.FC<EnterpriseSkillsTabProps> = ({ createSignal 
       createForm.resetFields();
       await fetchGovernedSkills();
     } catch (error: any) {
-      const errorText = error?.response?.data;
-      messageApi.error(typeof errorText === 'string' ? errorText : t('enterprise_admin_skills_create_failed'));
+      messageApi.error(getEnterpriseSkillErrorMessage(t('enterprise_admin_skills_create_failed')));
     } finally {
       setSaving(false);
     }
@@ -294,8 +295,7 @@ const EnterpriseSkillsTab: React.FC<EnterpriseSkillsTabProps> = ({ createSignal 
         fetchGovernedSkills(),
       ]);
     } catch (error: any) {
-      const errorText = error?.response?.data;
-      messageApi.error(typeof errorText === 'string' ? errorText : t('enterprise_admin_skills_version_create_failed'));
+      messageApi.error(getEnterpriseSkillErrorMessage(t('enterprise_admin_skills_version_create_failed')));
     } finally {
       setSaving(false);
     }
@@ -317,8 +317,7 @@ const EnterpriseSkillsTab: React.FC<EnterpriseSkillsTabProps> = ({ createSignal 
         fetchGovernedSkills(),
       ]);
     } catch (error: any) {
-      const errorText = error?.response?.data;
-      messageApi.error(typeof errorText === 'string' ? errorText : t('enterprise_admin_skills_submit_review_failed'));
+      messageApi.error(getEnterpriseSkillErrorMessage(t('enterprise_admin_skills_submit_review_failed')));
     }
   };
 
@@ -341,8 +340,7 @@ const EnterpriseSkillsTab: React.FC<EnterpriseSkillsTabProps> = ({ createSignal 
         fetchCatalogSkills(),
       ]);
     } catch (error: any) {
-      const errorText = error?.response?.data;
-      messageApi.error(typeof errorText === 'string' ? errorText : t('enterprise_admin_skills_publish_failed'));
+      messageApi.error(getEnterpriseSkillErrorMessage(t('enterprise_admin_skills_publish_failed')));
     } finally {
       setPublishingId('');
     }
@@ -477,7 +475,7 @@ const EnterpriseSkillsTab: React.FC<EnterpriseSkillsTabProps> = ({ createSignal 
                 emptyText: <Empty description={t('enterprise_admin_skills_catalog_empty')} image={Empty.PRESENTED_IMAGE_SIMPLE} />,
               }}
               columns={[
-                { title: 'Code', dataIndex: 'code', key: 'code', width: 220 },
+                { title: t('platform_skills_column_code'), dataIndex: 'code', key: 'code', width: 220 },
                 { title: t('platform_skills_column_name'), dataIndex: 'name', key: 'name', width: 220 },
                 { title: t('platform_skills_column_source'), dataIndex: 'sourceType', key: 'sourceType', width: 140 },
                 {
@@ -551,9 +549,9 @@ const EnterpriseSkillsTab: React.FC<EnterpriseSkillsTabProps> = ({ createSignal 
               mode="multiple"
               placeholder={t('enterprise_admin_skills_channel_scope_placeholder')}
               options={[
-                { label: 'Web', value: 'web' },
-                { label: 'IM', value: 'im' },
-                { label: 'API', value: 'api' },
+                { label: t('enterprise_admin_skills_channel_web'), value: 'web' },
+                { label: t('enterprise_admin_skills_channel_im'), value: 'im' },
+                { label: t('enterprise_admin_skills_channel_api'), value: 'api' },
               ]}
             />
           </Form.Item>
@@ -579,7 +577,7 @@ const EnterpriseSkillsTab: React.FC<EnterpriseSkillsTabProps> = ({ createSignal 
           initialValues={{ sourceType: 'builtin', providerType: 'native' }}
         >
           <Form.Item label={t('platform_skills_form_code')} name="code" rules={[{ required: true, message: t('platform_skills_form_code_required') }]}>
-            <Input placeholder="enterprise.knowledge" />
+            <Input placeholder={t('enterprise_admin_skills_form_code_example')} />
           </Form.Item>
           <Form.Item label={t('platform_skills_form_name')} name="name" rules={[{ required: true, message: t('platform_skills_form_name_required') }]}>
             <Input placeholder={t('platform_skills_form_name_placeholder')} />
@@ -711,7 +709,7 @@ const EnterpriseSkillsTab: React.FC<EnterpriseSkillsTabProps> = ({ createSignal 
       >
         <Form layout="vertical" form={versionForm}>
           <Form.Item label={t('enterprise_admin_skills_column_version')} name="version" rules={[{ required: true, message: t('enterprise_admin_skills_version_required') }]}>
-            <Input placeholder="1.0.0" />
+            <Input placeholder={t('platform_skill_version_form_version_example')} />
           </Form.Item>
           <Form.Item label={t('enterprise_admin_skills_column_change_log')} name="changeLog">
             <TextArea rows={3} />

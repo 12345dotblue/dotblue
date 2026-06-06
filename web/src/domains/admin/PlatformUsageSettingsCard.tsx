@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { Button, Card, Form, InputNumber, Modal, Select, Space, Statistic, Switch, Table, Typography, message } from 'antd';
 import { DollarOutlined, LineChartOutlined, PlusOutlined } from '@ant-design/icons';
 import axios from 'axios';
+import { useTranslation } from 'react-i18next';
 import { BACKEND_URL } from '../../config';
 import { casdoorService } from '../identity/CasdoorService';
 
@@ -69,6 +70,7 @@ function getAuthHeaders() {
 }
 
 const PlatformUsageSettingsCard: React.FC = () => {
+  const { t } = useTranslation();
   const [messageApi, contextHolder] = message.useMessage();
   const [loading, setLoading] = useState(true);
   const [overview, setOverview] = useState<UsageOverview | null>(null);
@@ -110,7 +112,7 @@ const PlatformUsageSettingsCard: React.FC = () => {
       setPrices(Array.isArray(pricesRes.data) ? pricesRes.data : []);
       setPolicies(Array.isArray(policiesRes.data) ? policiesRes.data : []);
     } catch {
-      messageApi.error('加载平台用量数据失败');
+      messageApi.error(t('platform_usage_load_failed'));
     } finally {
       setLoading(false);
     }
@@ -145,15 +147,15 @@ const PlatformUsageSettingsCard: React.FC = () => {
     try {
       if (editingPrice) {
         await axios.put(`${BACKEND_URL}/api/admin/platform/model-prices/${editingPrice.id}`, values, { headers: getAuthHeaders() });
-        messageApi.success('平台模型价格已更新');
+        messageApi.success(t('platform_usage_price_updated'));
       } else {
         await axios.post(`${BACKEND_URL}/api/admin/platform/model-prices`, values, { headers: getAuthHeaders() });
-        messageApi.success('平台模型价格已创建');
+        messageApi.success(t('platform_usage_price_created'));
       }
       setPriceModalOpen(false);
       await loadData();
     } catch (error: any) {
-      messageApi.error(typeof error?.response?.data === 'string' ? error.response.data : '保存平台模型价格失败');
+      messageApi.error(t('platform_usage_price_save_failed'));
     } finally {
       setSaving(false);
     }
@@ -162,10 +164,10 @@ const PlatformUsageSettingsCard: React.FC = () => {
   const deletePrice = async (id: string) => {
     try {
       await axios.delete(`${BACKEND_URL}/api/admin/platform/model-prices/${id}`, { headers: getAuthHeaders() });
-      messageApi.success('平台模型价格已删除');
+      messageApi.success(t('platform_usage_price_deleted'));
       await loadData();
     } catch {
-      messageApi.error('删除平台模型价格失败');
+      messageApi.error(t('platform_usage_price_delete_failed'));
     }
   };
 
@@ -194,15 +196,15 @@ const PlatformUsageSettingsCard: React.FC = () => {
     try {
       if (editingPolicy) {
         await axios.put(`${BACKEND_URL}/api/admin/platform/usage-limit-policies/${editingPolicy.id}`, values, { headers: getAuthHeaders() });
-        messageApi.success('平台限额策略已更新');
+        messageApi.success(t('platform_usage_policy_updated'));
       } else {
         await axios.post(`${BACKEND_URL}/api/admin/platform/usage-limit-policies`, values, { headers: getAuthHeaders() });
-        messageApi.success('平台限额策略已创建');
+        messageApi.success(t('platform_usage_policy_created'));
       }
       setPolicyModalOpen(false);
       await loadData();
     } catch (error: any) {
-      messageApi.error(typeof error?.response?.data === 'string' ? error.response.data : '保存平台限额策略失败');
+      messageApi.error(t('platform_usage_policy_save_failed'));
     } finally {
       setSaving(false);
     }
@@ -211,10 +213,10 @@ const PlatformUsageSettingsCard: React.FC = () => {
   const deletePolicy = async (id: string) => {
     try {
       await axios.delete(`${BACKEND_URL}/api/admin/platform/usage-limit-policies/${id}`, { headers: getAuthHeaders() });
-      messageApi.success('平台限额策略已删除');
+      messageApi.success(t('platform_usage_policy_deleted'));
       await loadData();
     } catch {
-      messageApi.error('删除平台限额策略失败');
+      messageApi.error(t('platform_usage_policy_delete_failed'));
     }
   };
 
@@ -223,19 +225,19 @@ const PlatformUsageSettingsCard: React.FC = () => {
       {contextHolder}
       <Card variant="borderless" style={{ borderRadius: 20 }} loading={loading}>
         <Paragraph type="secondary" style={{ marginBottom: 16 }}>
-          平台用量审计、模型价格和消费限额统一在这里管理。
+          {t('platform_usage_summary_description')}
         </Paragraph>
         <Space size={16} wrap>
-          <Statistic title="今日请求" value={overview?.todayRequests || 0} />
-          <Statistic title="今日 Tokens" value={overview?.todayTokens || 0} />
-          <Statistic title="今日计费额" value={overview?.todayCharge || 0} precision={4} prefix={<DollarOutlined />} />
-          <Statistic title="本月计费额" value={overview?.monthCharge || 0} precision={4} prefix={<DollarOutlined />} />
+          <Statistic title={t('platform_usage_today_requests')} value={overview?.todayRequests || 0} />
+          <Statistic title={t('platform_usage_today_tokens')} value={overview?.todayTokens || 0} />
+          <Statistic title={t('platform_usage_today_charge')} value={overview?.todayCharge || 0} precision={4} prefix={<DollarOutlined />} />
+          <Statistic title={t('platform_usage_month_charge')} value={overview?.monthCharge || 0} precision={4} prefix={<DollarOutlined />} />
         </Space>
       </Card>
 
       <Card
         variant="borderless"
-        title={<Space><LineChartOutlined />近 7 天趋势</Space>}
+        title={<Space><LineChartOutlined />{t('platform_usage_seven_day_trend')}</Space>}
         style={{ borderRadius: 20 }}
         loading={loading}
       >
@@ -244,36 +246,36 @@ const PlatformUsageSettingsCard: React.FC = () => {
           pagination={false}
           dataSource={trends}
           columns={[
-            { title: '日期', dataIndex: 'date', key: 'date', width: 120 },
-            { title: '请求数', dataIndex: 'requestCount', key: 'requestCount', width: 100 },
-            { title: 'Tokens', dataIndex: 'totalTokens', key: 'totalTokens', width: 140 },
-            { title: '成本', dataIndex: 'costAmount', key: 'costAmount', width: 140, render: (value: number) => value.toFixed(4) },
-            { title: '计费额', dataIndex: 'chargeAmount', key: 'chargeAmount', width: 140, render: (value: number) => value.toFixed(4) },
+            { title: t('platform_usage_date'), dataIndex: 'date', key: 'date', width: 120 },
+            { title: t('platform_usage_request_count'), dataIndex: 'requestCount', key: 'requestCount', width: 100 },
+            { title: t('platform_usage_tokens_label'), dataIndex: 'totalTokens', key: 'totalTokens', width: 140 },
+            { title: t('platform_usage_cost'), dataIndex: 'costAmount', key: 'costAmount', width: 140, render: (value: number) => value.toFixed(4) },
+            { title: t('platform_usage_charge'), dataIndex: 'chargeAmount', key: 'chargeAmount', width: 140, render: (value: number) => value.toFixed(4) },
           ]}
         />
       </Card>
 
-      <Card variant="borderless" title="最近调用事件" style={{ borderRadius: 20 }} loading={loading}>
+      <Card variant="borderless" title={t('platform_usage_recent_events')} style={{ borderRadius: 20 }} loading={loading}>
         <Table
           rowKey="id"
           pagination={false}
           dataSource={events}
           scroll={{ x: 840 }}
           columns={[
-            { title: '时间', dataIndex: 'createdAt', key: 'createdAt', width: 180 },
-            { title: '模型', dataIndex: 'modelNameSnapshot', key: 'modelNameSnapshot', width: 220 },
-            { title: '来源', dataIndex: 'sourceType', key: 'sourceType', width: 100 },
-            { title: '状态', dataIndex: 'status', key: 'status', width: 110 },
-            { title: 'Tokens', dataIndex: 'totalTokens', key: 'totalTokens', width: 120 },
-            { title: '计费额', dataIndex: 'chargeAmount', key: 'chargeAmount', width: 120, render: (value: number) => value.toFixed(4) },
+            { title: t('platform_usage_time'), dataIndex: 'createdAt', key: 'createdAt', width: 180 },
+            { title: t('platform_usage_model'), dataIndex: 'modelNameSnapshot', key: 'modelNameSnapshot', width: 220 },
+            { title: t('platform_usage_source'), dataIndex: 'sourceType', key: 'sourceType', width: 100 },
+            { title: t('platform_usage_status'), dataIndex: 'status', key: 'status', width: 110 },
+            { title: t('platform_usage_tokens_label'), dataIndex: 'totalTokens', key: 'totalTokens', width: 120 },
+            { title: t('platform_usage_charge'), dataIndex: 'chargeAmount', key: 'chargeAmount', width: 120, render: (value: number) => value.toFixed(4) },
           ]}
         />
       </Card>
 
       <Card
         variant="borderless"
-        title="平台模型价格"
-        extra={<Button type="primary" icon={<PlusOutlined />} onClick={openCreatePrice}>新增价格</Button>}
+        title={t('platform_usage_platform_model_pricing')}
+        extra={<Button type="primary" icon={<PlusOutlined />} onClick={openCreatePrice}>{t('platform_usage_add_price')}</Button>}
         style={{ borderRadius: 20 }}
         loading={loading}
       >
@@ -284,24 +286,24 @@ const PlatformUsageSettingsCard: React.FC = () => {
           scroll={{ x: 980 }}
           columns={[
             {
-              title: '模型',
+              title: t('platform_usage_model'),
               dataIndex: 'modelId',
               key: 'modelId',
               render: (value: string) => modelNameMap.get(value) || value,
             },
-            { title: '币种', dataIndex: 'currency', key: 'currency', width: 100 },
-            { title: '输入成本价', dataIndex: 'costInputUnitPrice', key: 'costInputUnitPrice', width: 140 },
-            { title: '输出成本价', dataIndex: 'costOutputUnitPrice', key: 'costOutputUnitPrice', width: 140 },
-            { title: '输入计费价', dataIndex: 'chargeInputUnitPrice', key: 'chargeInputUnitPrice', width: 140 },
-            { title: '输出计费价', dataIndex: 'chargeOutputUnitPrice', key: 'chargeOutputUnitPrice', width: 140 },
+            { title: t('platform_usage_currency'), dataIndex: 'currency', key: 'currency', width: 100 },
+            { title: t('platform_usage_input_cost'), dataIndex: 'costInputUnitPrice', key: 'costInputUnitPrice', width: 140 },
+            { title: t('platform_usage_output_cost'), dataIndex: 'costOutputUnitPrice', key: 'costOutputUnitPrice', width: 140 },
+            { title: t('platform_usage_input_charge'), dataIndex: 'chargeInputUnitPrice', key: 'chargeInputUnitPrice', width: 140 },
+            { title: t('platform_usage_output_charge'), dataIndex: 'chargeOutputUnitPrice', key: 'chargeOutputUnitPrice', width: 140 },
             {
-              title: '操作',
+              title: t('platform_usage_actions'),
               key: 'actions',
               width: 160,
               render: (_: unknown, item: ModelPrice) => (
                 <Space>
-                  <Button onClick={() => openEditPrice(item)}>编辑</Button>
-                  <Button danger onClick={() => deletePrice(item.id)}>删除</Button>
+                  <Button onClick={() => openEditPrice(item)}>{t('platform_usage_edit')}</Button>
+                  <Button danger onClick={() => deletePrice(item.id)}>{t('platform_usage_delete')}</Button>
                 </Space>
               ),
             },
@@ -311,8 +313,8 @@ const PlatformUsageSettingsCard: React.FC = () => {
 
       <Card
         variant="borderless"
-        title="平台消费限额"
-        extra={<Button type="primary" icon={<PlusOutlined />} onClick={openCreatePolicy}>新增策略</Button>}
+        title={t('platform_usage_platform_limit_policy')}
+        extra={<Button type="primary" icon={<PlusOutlined />} onClick={openCreatePolicy}>{t('platform_usage_add_policy')}</Button>}
         style={{ borderRadius: 20 }}
         loading={loading}
       >
@@ -321,20 +323,20 @@ const PlatformUsageSettingsCard: React.FC = () => {
           pagination={false}
           dataSource={policies}
           columns={[
-            { title: '启用', dataIndex: 'enabled', key: 'enabled', width: 90, render: (value: boolean) => value ? '是' : '否' },
-            { title: '日 Token 限额', dataIndex: 'dailyTokenLimit', key: 'dailyTokenLimit', width: 140 },
-            { title: '月 Token 限额', dataIndex: 'monthlyTokenLimit', key: 'monthlyTokenLimit', width: 140 },
-            { title: '日计费限额', dataIndex: 'dailyChargeLimit', key: 'dailyChargeLimit', width: 140 },
-            { title: '月计费限额', dataIndex: 'monthlyChargeLimit', key: 'monthlyChargeLimit', width: 140 },
-            { title: '硬限制', dataIndex: 'hardLimit', key: 'hardLimit', width: 90, render: (value: boolean) => value ? '是' : '否' },
+            { title: t('platform_usage_enabled'), dataIndex: 'enabled', key: 'enabled', width: 90, render: (value: boolean) => value ? t('platform_usage_yes') : t('platform_usage_no') },
+            { title: t('platform_usage_daily_token_limit'), dataIndex: 'dailyTokenLimit', key: 'dailyTokenLimit', width: 140 },
+            { title: t('platform_usage_monthly_token_limit'), dataIndex: 'monthlyTokenLimit', key: 'monthlyTokenLimit', width: 140 },
+            { title: t('platform_usage_daily_charge_limit'), dataIndex: 'dailyChargeLimit', key: 'dailyChargeLimit', width: 140 },
+            { title: t('platform_usage_monthly_charge_limit'), dataIndex: 'monthlyChargeLimit', key: 'monthlyChargeLimit', width: 140 },
+            { title: t('platform_usage_hard_limit'), dataIndex: 'hardLimit', key: 'hardLimit', width: 90, render: (value: boolean) => value ? t('platform_usage_yes') : t('platform_usage_no') },
             {
-              title: '操作',
+              title: t('platform_usage_actions'),
               key: 'actions',
               width: 160,
               render: (_: unknown, item: LimitPolicy) => (
                 <Space>
-                  <Button onClick={() => openEditPolicy(item)}>编辑</Button>
-                  <Button danger onClick={() => deletePolicy(item.id)}>删除</Button>
+                  <Button onClick={() => openEditPolicy(item)}>{t('platform_usage_edit')}</Button>
+                  <Button danger onClick={() => deletePolicy(item.id)}>{t('platform_usage_delete')}</Button>
                 </Space>
               ),
             },
@@ -343,7 +345,7 @@ const PlatformUsageSettingsCard: React.FC = () => {
       </Card>
 
       <Modal
-        title={editingPrice ? '编辑平台模型价格' : '新增平台模型价格'}
+        title={editingPrice ? t('platform_usage_edit_model_price') : t('platform_usage_create_model_price')}
         open={priceModalOpen}
         onOk={savePrice}
         onCancel={() => setPriceModalOpen(false)}
@@ -351,29 +353,29 @@ const PlatformUsageSettingsCard: React.FC = () => {
         destroyOnHidden
       >
         <Form form={priceForm} layout="vertical">
-          <Form.Item label="模型" name="modelId" rules={[{ required: true, message: '请选择模型' }]}>
+          <Form.Item label={t('platform_usage_model')} name="modelId" rules={[{ required: true, message: t('platform_usage_select_model') }]}>
             <Select options={modelOptions} />
           </Form.Item>
-          <Form.Item label="币种" name="currency">
-            <Select options={[{ label: 'USD', value: 'USD' }, { label: 'CNY', value: 'CNY' }]} />
+          <Form.Item label={t('platform_usage_currency')} name="currency">
+            <Select options={[{ label: t('platform_usage_currency_usd'), value: 'USD' }, { label: t('platform_usage_currency_cny'), value: 'CNY' }]} />
           </Form.Item>
-          <Form.Item label="输入成本价 / 1M tokens" name="costInputUnitPrice">
-            <InputNumber style={{ width: '100%' }} min={0} />
+          <Form.Item label={`${t('platform_usage_input_cost')} ${t('platform_usage_per_million_tokens')}`} name="costInputUnitPrice">
+            <InputNumber controls={false} style={{ width: '100%' }} min={0} />
           </Form.Item>
-          <Form.Item label="输出成本价 / 1M tokens" name="costOutputUnitPrice">
-            <InputNumber style={{ width: '100%' }} min={0} />
+          <Form.Item label={`${t('platform_usage_output_cost')} ${t('platform_usage_per_million_tokens')}`} name="costOutputUnitPrice">
+            <InputNumber controls={false} style={{ width: '100%' }} min={0} />
           </Form.Item>
-          <Form.Item label="输入计费价 / 1M tokens" name="chargeInputUnitPrice">
-            <InputNumber style={{ width: '100%' }} min={0} />
+          <Form.Item label={`${t('platform_usage_input_charge')} ${t('platform_usage_per_million_tokens')}`} name="chargeInputUnitPrice">
+            <InputNumber controls={false} style={{ width: '100%' }} min={0} />
           </Form.Item>
-          <Form.Item label="输出计费价 / 1M tokens" name="chargeOutputUnitPrice">
-            <InputNumber style={{ width: '100%' }} min={0} />
+          <Form.Item label={`${t('platform_usage_output_charge')} ${t('platform_usage_per_million_tokens')}`} name="chargeOutputUnitPrice">
+            <InputNumber controls={false} style={{ width: '100%' }} min={0} />
           </Form.Item>
         </Form>
       </Modal>
 
       <Modal
-        title={editingPolicy ? '编辑平台限额策略' : '新增平台限额策略'}
+        title={editingPolicy ? t('platform_usage_edit_limit_policy') : t('platform_usage_create_limit_policy')}
         open={policyModalOpen}
         onOk={savePolicy}
         onCancel={() => setPolicyModalOpen(false)}
@@ -381,22 +383,22 @@ const PlatformUsageSettingsCard: React.FC = () => {
         destroyOnHidden
       >
         <Form form={policyForm} layout="vertical">
-          <Form.Item label="启用" name="enabled" valuePropName="checked">
+          <Form.Item label={t('platform_usage_enabled')} name="enabled" valuePropName="checked">
             <Switch />
           </Form.Item>
-          <Form.Item label="日 Token 限额" name="dailyTokenLimit">
-            <InputNumber style={{ width: '100%' }} min={0} />
+          <Form.Item label={t('platform_usage_daily_token_limit')} name="dailyTokenLimit">
+            <InputNumber controls={false} style={{ width: '100%' }} min={0} />
           </Form.Item>
-          <Form.Item label="月 Token 限额" name="monthlyTokenLimit">
-            <InputNumber style={{ width: '100%' }} min={0} />
+          <Form.Item label={t('platform_usage_monthly_token_limit')} name="monthlyTokenLimit">
+            <InputNumber controls={false} style={{ width: '100%' }} min={0} />
           </Form.Item>
-          <Form.Item label="日计费限额" name="dailyChargeLimit">
-            <InputNumber style={{ width: '100%' }} min={0} />
+          <Form.Item label={t('platform_usage_daily_charge_limit')} name="dailyChargeLimit">
+            <InputNumber controls={false} style={{ width: '100%' }} min={0} />
           </Form.Item>
-          <Form.Item label="月计费限额" name="monthlyChargeLimit">
-            <InputNumber style={{ width: '100%' }} min={0} />
+          <Form.Item label={t('platform_usage_monthly_charge_limit')} name="monthlyChargeLimit">
+            <InputNumber controls={false} style={{ width: '100%' }} min={0} />
           </Form.Item>
-          <Form.Item label="硬限制" name="hardLimit" valuePropName="checked">
+          <Form.Item label={t('platform_usage_hard_limit')} name="hardLimit" valuePropName="checked">
             <Switch />
           </Form.Item>
         </Form>
@@ -406,3 +408,5 @@ const PlatformUsageSettingsCard: React.FC = () => {
 };
 
 export default PlatformUsageSettingsCard;
+
+

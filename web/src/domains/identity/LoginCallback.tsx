@@ -1,4 +1,5 @@
-import React, { useEffect, useRef } from 'react';
+﻿import React, { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { casdoorService } from './CasdoorService';
 import { BACKEND_URL } from '../../config';
@@ -8,6 +9,7 @@ const PENDING_INVITE_CODE_KEY = 'pending_invite_code';
 
 const LoginCallback: React.FC = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const executed = useRef(false);  // Guard against StrictMode double-invoke
 
   useEffect(() => {
@@ -53,9 +55,10 @@ const LoginCallback: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-      <h2>Logging in...</h2>
+      <h2>{t('login_callback_loading')}</h2>
     </div>
   );
 };
 
 export default LoginCallback;
+

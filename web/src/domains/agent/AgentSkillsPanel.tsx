@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { Button, Card, Empty, Form, Input, Modal, Select, Space, Table, Tag, Typography, message } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import axios from 'axios';
@@ -64,9 +64,9 @@ const AgentSkillsPanel: React.FC<AgentSkillsPanelProps> = ({ agentId, authHeader
       setPublishedSkills(Array.isArray(publishedRes.data) ? publishedRes.data : []);
     } catch (error: any) {
       if (error?.response?.status === 403) {
-        messageApi.warning('只有企业管理员可以管理 Agent 技能安装');
+        messageApi.warning(t('agent_skills_panel_enterprise_admin_only'));
       } else {
-        messageApi.error('加载 Agent 技能失败');
+        messageApi.error(t('agent_skills_panel_load_failed'));
       }
       setInstalledSkills([]);
       setPublishedSkills([]);
@@ -108,13 +108,12 @@ const AgentSkillsPanel: React.FC<AgentSkillsPanelProps> = ({ agentId, authHeader
       }, {
         headers: authHeaders,
       });
-      messageApi.success('技能安装成功');
+      messageApi.success(t('agent_skills_panel_install_success'));
       setInstallOpen(false);
       installForm.resetFields();
       await loadData();
     } catch (error: any) {
-      const errorText = error?.response?.data;
-      messageApi.error(typeof errorText === 'string' ? errorText : '技能安装失败');
+      messageApi.error(t('agent_skills_panel_install_failed'));
     } finally {
       setSaving(false);
     }
@@ -125,11 +124,10 @@ const AgentSkillsPanel: React.FC<AgentSkillsPanelProps> = ({ agentId, authHeader
       await axios.post(`${BACKEND_URL}/api/admin/agents/${agentId}/skills/${skillId}/uninstall`, {}, {
         headers: authHeaders,
       });
-      messageApi.success('技能已卸载');
+      messageApi.success(t('agent_skills_panel_uninstall_success'));
       await loadData();
     } catch (error: any) {
-      const errorText = error?.response?.data;
-      messageApi.error(typeof errorText === 'string' ? errorText : '技能卸载失败');
+      messageApi.error(t('agent_skills_panel_uninstall_failed'));
     }
   };
 
@@ -232,37 +230,45 @@ const AgentSkillsPanel: React.FC<AgentSkillsPanelProps> = ({ agentId, authHeader
           }}
           pagination={false}
           columns={[
-            { title: 'Code', dataIndex: 'skillCode', key: 'skillCode', width: 220 },
-            { title: '名称', dataIndex: 'skillName', key: 'skillName', width: 220 },
-            { title: '版本', dataIndex: 'version', key: 'version', width: 140 },
+            { title: t('agent_skills_panel_code_column'), dataIndex: 'skillCode', key: 'skillCode', width: 220 },
+            { title: t('agent_skills_panel_name_column'), dataIndex: 'skillName', key: 'skillName', width: 220 },
+            { title: t('agent_skills_panel_version_column'), dataIndex: 'version', key: 'version', width: 140 },
             {
-              title: '调用方式',
+              title: t('agent_skills_panel_invoke_mode_column'),
               dataIndex: 'invokeVisibility',
               key: 'invokeVisibility',
               width: 120,
-              render: (value: string) => <Tag color={value === 'manual' ? 'default' : value === 'suggested' ? 'processing' : 'success'}>{value}</Tag>,
+              render: (value: string) => (
+                <Tag color={value === 'manual' ? 'default' : value === 'suggested' ? 'processing' : 'success'}>
+                  {value === 'manual'
+                    ? t('agent_skill_panel_visibility_manual')
+                    : value === 'suggested'
+                      ? t('agent_skill_panel_visibility_suggested')
+                      : t('agent_skill_panel_visibility_auto')}
+                </Tag>
+              ),
             },
             {
-              title: '别名',
+              title: t('agent_skills_panel_alias'),
               dataIndex: 'entryAlias',
               key: 'entryAlias',
               width: 160,
               render: (value?: string) => value || <Text type="secondary">-</Text>,
             },
             {
-              title: '状态',
+              title: t('agent_skills_panel_status_column'),
               dataIndex: 'bindingStatus',
               key: 'bindingStatus',
               width: 120,
-              render: (value: string) => <Tag color={value === 'installed' ? 'success' : 'default'}>{value}</Tag>,
+              render: (value: string) => <Tag color={value === 'installed' ? 'success' : 'default'}>{value === 'installed' ? t('agent_skills_panel_installed_status') : value}</Tag>,
             },
             {
-              title: '操作',
+              title: t('agent_skills_panel_actions_column'),
               key: 'actions',
               width: 120,
               render: (_: unknown, record: InstalledSkillItem) => (
                 <Button danger size="small" onClick={() => handleUninstall(record.skillId)}>
-                  卸载
+                  {t('agent_skills_panel_uninstall_action')}
                 </Button>
               ),
             },
@@ -310,3 +316,4 @@ const AgentSkillsPanel: React.FC<AgentSkillsPanelProps> = ({ agentId, authHeader
 };
 
 export default AgentSkillsPanel;
+

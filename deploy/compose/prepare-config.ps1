@@ -207,6 +207,24 @@ foreach ($key in $requiredKeys) {
 if (-not $envMap["COMPOSE_PROJECT_NAME"]) {
   $envMap["COMPOSE_PROJECT_NAME"] = "dotblue"
 }
+if (-not $envMap["DOTBLUE_FILES_DRIVER"]) {
+  $envMap["DOTBLUE_FILES_DRIVER"] = "local"
+}
+if (-not $envMap["DOTBLUE_FILES_LOCAL_ROOT"]) {
+  $envMap["DOTBLUE_FILES_LOCAL_ROOT"] = "/app/storage/chat-files"
+}
+if (-not $envMap["DOTBLUE_FILES_HOST_PATH"]) {
+  $envMap["DOTBLUE_FILES_HOST_PATH"] = "./.runtime/chat-files"
+}
+if (-not $envMap["DOTBLUE_S3_REGION"]) {
+  $envMap["DOTBLUE_S3_REGION"] = "us-east-1"
+}
+if (-not $envMap["DOTBLUE_S3_FORCE_PATH_STYLE"]) {
+  $envMap["DOTBLUE_S3_FORCE_PATH_STYLE"] = "false"
+}
+if (-not $envMap["DOTBLUE_S3_AUTO_CREATE_BUCKET"]) {
+  $envMap["DOTBLUE_S3_AUTO_CREATE_BUCKET"] = "false"
+}
 if (-not $envMap["DOTBLUE_ENGINE_HOST_DATA_PATH"]) {
   $envMap["DOTBLUE_ENGINE_HOST_DATA_PATH"] = "./.runtime/agents-host"
 }
@@ -226,6 +244,7 @@ if (-not $envMap["DOTBLUE_ENGINE_DOCKER_NETWORK"]) {
   $envMap["DOTBLUE_ENGINE_DOCKER_NETWORK"] = "$($envMap["COMPOSE_PROJECT_NAME"])_default"
 }
 $envMap["DOTBLUE_ENGINE_DOCKER_SOCKET_GID"] = Resolve-DockerSocketGid $envMap
+$dotblueFilesHostPathAbs = Resolve-HostPath $envMap["DOTBLUE_FILES_HOST_PATH"]
 $dotblueEngineHostDataPathAbs = Resolve-HostPath $envMap["DOTBLUE_ENGINE_HOST_DATA_PATH"]
 
 if (-not $envMap["DOTBLUE_CASDOOR_CLIENT_ID"]) {
@@ -243,6 +262,7 @@ Ensure-Directory $casdoorDir
 Ensure-Directory (Join-Path $casdoorDir "logs")
 Ensure-Directory (Join-Path $casdoorDir "certs")
 Ensure-Directory $dotblueDir
+Ensure-Directory $dotblueFilesHostPathAbs
 Ensure-Directory $dotblueEngineHostDataPathAbs
 
 $certPath = Join-Path (Join-Path $casdoorDir "certs") "$($envMap["DOTBLUE_CASDOOR_CERT_NAME"]).pem"
@@ -449,6 +469,19 @@ $certPemBlock
 
 setup:
   initDataPath: ""
+
+files:
+  driver: "$($envMap["DOTBLUE_FILES_DRIVER"])"
+  localRoot: "$($envMap["DOTBLUE_FILES_LOCAL_ROOT"])"
+  s3:
+    endpoint: "$($envMap["DOTBLUE_S3_ENDPOINT"])"
+    region: "$($envMap["DOTBLUE_S3_REGION"])"
+    bucket: "$($envMap["DOTBLUE_S3_BUCKET"])"
+    accessKey: "$($envMap["DOTBLUE_S3_ACCESS_KEY"])"
+    secretKey: "$($envMap["DOTBLUE_S3_SECRET_KEY"])"
+    sessionToken: "$($envMap["DOTBLUE_S3_SESSION_TOKEN"])"
+    forcePathStyle: $($envMap["DOTBLUE_S3_FORCE_PATH_STYLE"])
+    autoCreateBucket: $($envMap["DOTBLUE_S3_AUTO_CREATE_BUCKET"])
 
 logger:
   level: "all"

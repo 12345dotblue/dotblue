@@ -33,14 +33,11 @@ const LandingPage: React.FC = () => {
   const { token } = theme.useToken();
   const [yearly, setYearly] = useState(false);
   const isAuthenticated = useAuthState();
-  const currentLanguage = resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language);
+  const currentLanguage = resolveSupportedLanguage(i18n?.resolvedLanguage || i18n?.language);
   const primaryTarget = getLocalizedPath(isAuthenticated ? '/dashboard' : '/login', currentLanguage);
-  const homeTitle =
-    t('home_seo_title', 'dotblue | Enterprise AI Assistants, Deployment, and Governance');
-  const homeDescription = t(
-    'home_seo_description',
-    'Launch enterprise-ready AI assistants with productized templates, secure deployment, Casdoor login, and governed runtime operations.',
-  );
+  const homeTitle = t('home_seo_title');
+  const homeDescription = t('home_seo_description');
+  const homeKeywords = t('home_seo_keywords');
   const canonicalUrl = buildLocalizedUrl('/', currentLanguage);
 
   const heroProofs = useMemo(() => ([
@@ -154,7 +151,7 @@ const LandingPage: React.FC = () => {
         <meta name="description" content={homeDescription} />
         <meta
           name="keywords"
-          content="dotblue, enterprise AI assistants, AI assistant platform, Casdoor, AI agent deployment, private AI platform, product docs"
+          content={homeKeywords}
         />
         <meta name="robots" content="index,follow" />
         <link rel="canonical" href={canonicalUrl} />

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Card, Button, Modal, Form, Input, message, Typography, Space, Empty, Popconfirm, Select, Tag, Statistic, Table, Radio, Tabs } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, RobotOutlined, LineChartOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
@@ -295,7 +295,7 @@ const AgentList: React.FC = () => {
       setUsageOverview(overviewRes.data || null);
       setUsageTrends(Array.isArray(trendsRes.data) ? trendsRes.data : []);
     } catch {
-      message.error('加载 Agent 用量失败');
+      message.error(t('agent_list_usage_load_failed'));
       setUsageOverview(null);
       setUsageTrends([]);
     } finally {
@@ -366,18 +366,18 @@ const AgentList: React.FC = () => {
                     {item.modelName ? <Text type="secondary">{item.modelName}</Text> : null}
                   </div>
                   <div style={{ marginTop: 12, display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-                    <Text type="secondary">今日 Tokens: {agentOverviewMap[item.id]?.todayTokens || 0}</Text>
-                    <Text type="secondary">今日计费: {(agentOverviewMap[item.id]?.todayCharge || 0).toFixed(4)}</Text>
-                    <Text type="secondary">本月 Tokens: {agentOverviewMap[item.id]?.monthTokens || 0}</Text>
-                    <Text type="secondary">本月计费: {(agentOverviewMap[item.id]?.monthCharge || 0).toFixed(4)}</Text>
+                    <Text type="secondary">{t('agent_list_today_tokens')}: {agentOverviewMap[item.id]?.todayTokens || 0}</Text>
+                    <Text type="secondary">{t('agent_list_today_charge')}: {(agentOverviewMap[item.id]?.todayCharge || 0).toFixed(4)}</Text>
+                    <Text type="secondary">{t('agent_list_month_tokens')}: {agentOverviewMap[item.id]?.monthTokens || 0}</Text>
+                    <Text type="secondary">{t('agent_list_month_charge')}: {(agentOverviewMap[item.id]?.monthCharge || 0).toFixed(4)}</Text>
                   </div>
                 </div>
                 <Space style={{ marginLeft: 16, flexShrink: 0 }}>
                   <Button onClick={() => navigate(getLocalizedPath(`/dashboard/agents/${item.id}/skills`, currentLanguage))}>
-                    技能
+                    {t('agent_list_skills_button')}
                   </Button>
                   <Button icon={<LineChartOutlined />} onClick={() => openUsage(item)}>
-                    用量
+                    {t('agent_list_usage_button')}
                   </Button>
                   <Button icon={<EditOutlined />} onClick={() => openEdit(item)}>
                     {t('agent_edit')}
@@ -414,7 +414,7 @@ const AgentList: React.FC = () => {
           items={[
             {
               key: 'basic',
-              label: '基础配置',
+              label: t('agent_list_basic_tab'),
               children: (
                 <Form
                   form={form}
@@ -465,14 +465,14 @@ const AgentList: React.FC = () => {
             },
             {
               key: 'skills',
-              label: '已安装 Skills',
+              label: t('agent_list_installed_skills_tab'),
               children: editingAgent ? (
                 <AgentSkillsPanel
                   agentId={editingAgent.id}
                   authHeaders={getAgentAuthHeaders()}
                 />
               ) : (
-                <Empty description="请先创建 Agent，再安装 Skill" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                <Empty description={t('agent_list_install_skill_empty')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
               ),
             },
           ]}
@@ -480,7 +480,7 @@ const AgentList: React.FC = () => {
       </Modal>
 
       <Modal
-        title={usageAgent ? `${usageAgent.agentName} 用量` : 'Agent 用量'}
+        title={usageAgent ? `${usageAgent.agentName} ${t('agent_list_usage_title')}` : t('agent_list_usage_title')}
         open={usageModalOpen}
         onCancel={() => setUsageModalOpen(false)}
         footer={null}
@@ -490,26 +490,26 @@ const AgentList: React.FC = () => {
         <Space orientation="vertical" size={16} style={{ width: '100%' }}>
           <Card variant="borderless" loading={usageLoading} style={{ background: '#fafafa' }}>
             <Space size={24} wrap>
-              <Statistic title="今日请求" value={usageOverview?.todayRequests || 0} />
-              <Statistic title="今日 Tokens" value={usageOverview?.todayTokens || 0} />
-              <Statistic title="今日计费" value={usageOverview?.todayCharge || 0} precision={4} />
-              <Statistic title="本月请求" value={usageOverview?.monthRequests || 0} />
-              <Statistic title="本月 Tokens" value={usageOverview?.monthTokens || 0} />
-              <Statistic title="本月计费" value={usageOverview?.monthCharge || 0} precision={4} />
+              <Statistic title={t('agent_list_today_requests')} value={usageOverview?.todayRequests || 0} />
+              <Statistic title={t('agent_list_today_tokens')} value={usageOverview?.todayTokens || 0} />
+              <Statistic title={t('agent_list_today_charge')} value={usageOverview?.todayCharge || 0} precision={4} />
+              <Statistic title={t('agent_list_month_requests')} value={usageOverview?.monthRequests || 0} />
+              <Statistic title={t('agent_list_month_tokens')} value={usageOverview?.monthTokens || 0} />
+              <Statistic title={t('agent_list_month_charge')} value={usageOverview?.monthCharge || 0} precision={4} />
             </Space>
           </Card>
-          <Card variant="borderless" title="近 7 天趋势">
+          <Card variant="borderless" title={t('agent_list_seven_day_trend')}>
             <Table
               rowKey="date"
               loading={usageLoading}
               pagination={false}
               dataSource={usageTrends}
               columns={[
-                { title: '日期', dataIndex: 'date', key: 'date', width: 120 },
-                { title: '请求数', dataIndex: 'requestCount', key: 'requestCount', width: 120 },
-                { title: 'Tokens', dataIndex: 'totalTokens', key: 'totalTokens', width: 140 },
-                { title: '成本', dataIndex: 'costAmount', key: 'costAmount', width: 140, render: (value: number) => value.toFixed(4) },
-                { title: '计费', dataIndex: 'chargeAmount', key: 'chargeAmount', width: 140, render: (value: number) => value.toFixed(4) },
+                { title: t('agent_list_date'), dataIndex: 'date', key: 'date', width: 120 },
+                { title: t('agent_list_request_count'), dataIndex: 'requestCount', key: 'requestCount', width: 120 },
+                { title: t('agent_list_tokens_label'), dataIndex: 'totalTokens', key: 'totalTokens', width: 140 },
+                { title: t('agent_list_cost'), dataIndex: 'costAmount', key: 'costAmount', width: 140, render: (value: number) => value.toFixed(4) },
+                { title: t('agent_list_charge'), dataIndex: 'chargeAmount', key: 'chargeAmount', width: 140, render: (value: number) => value.toFixed(4) },
               ]}
             />
           </Card>
@@ -520,3 +520,4 @@ const AgentList: React.FC = () => {
 };
 
 export default AgentList;
+

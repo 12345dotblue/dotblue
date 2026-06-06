@@ -25,6 +25,19 @@ __DOTBLUE_CASDOOR_CERT_PEM_BLOCK__
 setup:
   initDataPath: ""
 
+files:
+  driver: "__DOTBLUE_FILES_DRIVER__"
+  localRoot: "__DOTBLUE_FILES_LOCAL_ROOT__"
+  s3:
+    endpoint: "__DOTBLUE_S3_ENDPOINT__"
+    region: "__DOTBLUE_S3_REGION__"
+    bucket: "__DOTBLUE_S3_BUCKET__"
+    accessKey: "__DOTBLUE_S3_ACCESS_KEY__"
+    secretKey: "__DOTBLUE_S3_SECRET_KEY__"
+    sessionToken: "__DOTBLUE_S3_SESSION_TOKEN__"
+    forcePathStyle: __DOTBLUE_S3_FORCE_PATH_STYLE__
+    autoCreateBucket: __DOTBLUE_S3_AUTO_CREATE_BUCKET__
+
 logger:
   level: "all"
   stdout: true

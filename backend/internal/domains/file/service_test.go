@@ -45,11 +45,17 @@ func (s *stubRepository) UpdateConversationID(id, conversationID string) error {
 }
 
 type stubStorage struct {
+	name     string
 	saveFunc func(ctx context.Context, objectKey string, content io.Reader) (StoredObject, error)
 	openFunc func(ctx context.Context, objectKey string) (io.ReadSeekCloser, error)
 }
 
-func (s *stubStorage) Name() string { return "local" }
+func (s *stubStorage) Name() string {
+	if s.name != "" {
+		return s.name
+	}
+	return "local"
+}
 
 func (s *stubStorage) Save(ctx context.Context, objectKey string, content io.Reader) (StoredObject, error) {
 	if s.saveFunc != nil {
@@ -154,5 +160,43 @@ func TestServiceGetPublicForUserRejectsForeignFile(t *testing.T) {
 	_, err := service.GetPublicForUser(context.Background(), "file-1", "user-1", "ent-1")
 	if !errors.Is(err, ErrFileAccessDenied) {
 		t.Fatalf("expected ErrFileAccessDenied, got %v", err)
+	}
+}
+
+func TestServiceOpenStorageUsesRecordedStorageType(t *testing.T) {
+	localOpened := false
+	s3Opened := false
+	service := NewService(
+		&stubRepository{},
+		&stubStorage{
+			name: "local",
+			openFunc: func(ctx context.Context, objectKey string) (io.ReadSeekCloser, error) {
+				localOpened = true
+				return &readSeekNopCloser{Reader: bytes.NewReader([]byte("local"))}, nil
+			},
+		},
+		&stubStorage{
+			name: "s3",
+			openFunc: func(ctx context.Context, objectKey string) (io.ReadSeekCloser, error) {
+				s3Opened = true
+				return &readSeekNopCloser{Reader: bytes.NewReader([]byte("s3"))}, nil
+			},
+		},
+	)
+
+	content, err := service.OpenStorage(context.Background(), &File{
+		StorageType: "s3",
+		StorageKey:  "2026/06/file-1.txt",
+	})
+	if err != nil {
+		t.Fatalf("OpenStorage() error = %v", err)
+	}
+	defer content.Close()
+
+	if localOpened {
+		t.Fatal("expected local storage not to be used")
+	}
+	if !s3Opened {
+		t.Fatal("expected s3 storage to be used")
 	}
 }

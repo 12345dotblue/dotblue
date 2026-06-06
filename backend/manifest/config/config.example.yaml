@@ -27,6 +27,19 @@ casdoor:
 setup:
   initDataPath: ""
 
+files:
+  driver: "local"
+  localRoot: "storage/chat-files"
+  s3:
+    endpoint: ""
+    region: "us-east-1"
+    bucket: ""
+    accessKey: ""
+    secretKey: ""
+    sessionToken: ""
+    forcePathStyle: false
+    autoCreateBucket: false
+
 logger:
   level: "all"
   stdout: true

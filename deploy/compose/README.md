@@ -65,6 +65,12 @@ or on Windows:
 docker compose up -d --build
 ```
 
+If you want to test the S3 driver with the bundled MinIO service:
+
+```bash
+docker compose --profile s3 up -d --build
+```
+
 5. Run a smoke test:
 
 ```bash
@@ -102,6 +108,7 @@ or on Windows:
 - `postgres`: shared PostgreSQL for Casdoor and DotBlue
 - `redis`: Redis for session control plane and dataplane
 - `casdoor`: auth server with first-boot `init_data.json`
+- `minio`: optional local S3-compatible object storage for driver verification, enabled with `--profile s3`
 - `dotblue`: Go application service using generated runtime config and an embedded worker loop
 - `web`: static frontend image built with generated `VITE_*` values
 
@@ -115,6 +122,10 @@ or on Windows:
 - All published ports are user-configurable in `.env`
 - `postgres:18-alpine` expects the data volume to be mounted at `/var/lib/postgresql`
 - The generated DotBlue config enables `worker.embedded=true`, so local async chat works without a second app role
+- File storage defaults to `local`, and the backend upload directory is persisted through `DOTBLUE_FILES_HOST_PATH -> DOTBLUE_FILES_LOCAL_ROOT`
+- To switch to S3, set `DOTBLUE_FILES_DRIVER=s3` and fill `DOTBLUE_S3_*`
+- For local MinIO testing, use `DOTBLUE_S3_ENDPOINT=http://minio:9000` and usually set `DOTBLUE_S3_FORCE_PATH_STYLE=true`; `.env.example` already aligns the sample bucket and credentials with the bundled MinIO defaults
+- `DOTBLUE_S3_AUTO_CREATE_BUCKET=true` lets the backend create the bucket automatically on first upload, which is convenient for MinIO-based local verification
 - When accessing from another machine or via host IP, set `CASDOOR_PUBLIC_URL`, `DOTBLUE_PUBLIC_URL`, and `DOTBLUE_BACKEND_PUBLIC_URL` to that reachable IP or domain instead of `localhost`
 - The prepare scripts register multiple Casdoor OAuth callbacks by default: `${DOTBLUE_PUBLIC_URL}/callback`, `http://localhost:9000/callback`, and `http://127.0.0.1:9000/callback`
 - Add more callbacks with `DOTBLUE_CASDOOR_EXTRA_REDIRECT_URIS`, using a comma-separated list in `.env`

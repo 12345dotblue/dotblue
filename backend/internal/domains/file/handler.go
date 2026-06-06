@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"dotblue/internal/domains/identity"
+	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
 )
 
@@ -49,6 +50,17 @@ func UploadHandler(r *ghttp.Request) {
 		Content:        readSeeker,
 	})
 	if err != nil {
+		g.Log().Errorf(
+			r.Context(),
+			"file upload failed user=%s group=%s conversation=%s filename=%q size=%d kind=%s: %v",
+			userID,
+			groupID,
+			strings.TrimSpace(r.Get("conversationId").String()),
+			upload.Filename,
+			upload.Size,
+			r.Get("kind").String(),
+			err,
+		)
 		writeFileError(r, err)
 		return
 	}

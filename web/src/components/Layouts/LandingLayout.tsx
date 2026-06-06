@@ -15,13 +15,14 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const navigate = useNavigate();
   const isAuthenticated = useAuthState();
   const currentLanguage = resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language);
-  const currentLanguageLabel = LANGUAGE_OPTIONS.find((item) => item.value === currentLanguage)?.shortLabel || 'EN';
+  const currentLanguageLabel = LANGUAGE_OPTIONS.find((item) => item.value === currentLanguage)?.shortLabel || currentLanguage.toUpperCase();
 
   const changeLanguage = async (lng: string) => {
+    const currentPath = stripLanguagePrefix(window.location.pathname);
+    const search = window.location.search;
+    const hash = window.location.hash;
     const resolved = await applyLanguagePreference(lng);
-    if (resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language) !== resolved) {
-      window.location.reload();
-    }
+    navigate(`${getLocalizedPath(currentPath, resolved)}${search}${hash}`, { replace: true });
   };
 
   const scrollToSection = (sectionId: string) => {
@@ -63,7 +64,7 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             >
               <img
                 src="/brand/dotblue-logo.png"
-                alt="dotblue"
+                alt={t('app_name')}
                 style={{ width: 132, height: 42, objectFit: 'contain', flexShrink: 0 }}
               />
               <div
@@ -111,26 +112,21 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               <Button className="landing-nav-button" type="text" onClick={() => navigate(getLocalizedPath('/docs', currentLanguage))}>
                 {t('landing_nav_docs')}
               </Button>
-              <Button
-                className="landing-nav-button"
-                type="text"
-                icon={<GithubOutlined />}
-                href="https://github.com/12345dotblue/dotblue"
-                target="_blank"
-                rel="noreferrer"
-              >
-                {t('landing_nav_github')}
-              </Button>
-              <Button className="landing-nav-button landing-nav-button--secondary" type="text" onClick={() => navigate(getLocalizedPath('/terms', currentLanguage))}>
-                {t('terms')}
-              </Button>
-              <Button className="landing-nav-button landing-nav-button--secondary" type="text" onClick={() => navigate(getLocalizedPath('/privacy', currentLanguage))}>
-                {t('privacy')}
-              </Button>
             </Space>
           </div>
 
           <Space size="small" className="landing-header-actions">
+            <Button
+              className="landing-utility-button landing-github-button"
+              type="text"
+              shape="circle"
+              icon={<GithubOutlined />}
+              href="https://github.com/12345dotblue/dotblue"
+              target="_blank"
+              rel="noreferrer"
+              aria-label={t('landing_nav_github')}
+              title={t('landing_nav_github')}
+            />
             <Dropdown
               menu={{
                 items: LANGUAGE_OPTIONS.map((item) => ({
@@ -180,13 +176,13 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
               <img
                 src="/brand/dotblue-logo.png"
-                alt="dotblue"
+                alt={t('app_name')}
                 style={{ width: 104, height: 32, objectFit: 'contain', marginRight: 10 }}
               />
             </div>
             <Paragraph type="secondary">{t('footer_desc')}</Paragraph>
             <Text type="secondary" style={{ fontSize: 12 }}>
-              &copy; 2026 Dotblue Tech Co., Ltd.
+              &copy; 2026 {t('footer_company_name')}
             </Text>
           </Col>
           <Col xs={12} md={4}>
@@ -208,9 +204,7 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           </Col>
           <Col xs={24} md={8}>
             <Title level={5}>{t('contact_us')}</Title>
-            <Paragraph type="secondary">
-              Email: support@dotblue.ai
-            </Paragraph>
+            <Paragraph type="secondary">{t('footer_support_email')}</Paragraph>
             <Paragraph style={{ marginBottom: 0 }}>
               <a href="https://github.com/12345dotblue/dotblue" target="_blank" rel="noreferrer">
                 <Space size={8}>
@@ -221,9 +215,9 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             </Paragraph>
             <Divider style={{ margin: '16px 0' }} />
             <div style={{ display: 'flex', gap: 12, opacity: 0.5 }}>
-              <div style={{ width: 40, height: 24, background: '#e0e0e0', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10 }}>VISA</div>
-              <div style={{ width: 40, height: 24, background: '#e0e0e0', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10 }}>MC</div>
-              <div style={{ width: 40, height: 24, background: '#e0e0e0', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10 }}>AX</div>
+              <div style={{ width: 40, height: 24, background: '#e0e0e0', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10 }}>{t('footer_payment_visa')}</div>
+              <div style={{ width: 40, height: 24, background: '#e0e0e0', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10 }}>{t('footer_payment_mastercard')}</div>
+              <div style={{ width: 40, height: 24, background: '#e0e0e0', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10 }}>{t('footer_payment_amex')}</div>
             </div>
           </Col>
         </Row>
@@ -316,6 +310,12 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             background: #f8fbff !important;
           }
 
+          .landing-github-button {
+            width: 38px;
+            min-width: 38px;
+            padding: 0;
+          }
+
           .landing-secondary-button {
             height: 40px;
             padding: 0 18px;
@@ -343,12 +343,6 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           .landing-header-actions {
             flex: 0 0 auto;
             white-space: nowrap;
-          }
-
-          @media (max-width: 1320px) {
-            .landing-nav-button--secondary {
-              display: none;
-            }
           }
 
           @media (max-width: 1180px) {

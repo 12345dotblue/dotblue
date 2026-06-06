@@ -2,6 +2,7 @@ package file
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"time"
 )
@@ -60,7 +61,15 @@ type OpenedFile struct {
 	Content io.ReadSeekCloser
 }
 
-var defaultService = NewService(NewGFRepository(), NewLocalStorage(defaultStorageConfigLoader{}))
+var defaultService = mustNewDefaultService()
+
+func mustNewDefaultService() *Service {
+	defaultStorage, additionalStorages, err := NewConfiguredStorage(context.Background(), defaultStorageConfigLoader{})
+	if err != nil {
+		panic(fmt.Errorf("initialize file storage: %w", err))
+	}
+	return NewService(NewGFRepository(), defaultStorage, additionalStorages...)
+}
 
 func Upload(ctx context.Context, input UploadInput) (*File, error) {
 	return defaultService.Upload(ctx, input)

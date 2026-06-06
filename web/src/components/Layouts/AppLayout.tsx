@@ -55,9 +55,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const isAdmin = casdoorService.isAdmin();
   const normalizedPath = stripLanguagePrefix(location.pathname);
   const isChatPage = normalizedPath === '/chat';
-  const username = casdoorService.getUsername() || 'User';
+  const username = casdoorService.getUsername() || t('common_user');
   const currentLanguage = resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language);
-  const currentLanguageLabel = LANGUAGE_OPTIONS.find((item) => item.value === currentLanguage)?.shortLabel || 'EN';
+  const currentLanguageLabel = LANGUAGE_OPTIONS.find((item) => item.value === currentLanguage)?.shortLabel || currentLanguage.toUpperCase();
 
   React.useEffect(() => {
     if (!casdoorService.isAuthenticated()) {
@@ -89,9 +89,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
   const changeLanguage = async (lng: string) => {
     const resolved = await applyLanguagePreference(lng);
-    if (resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language) !== resolved) {
-      window.location.reload();
-    }
+    navigate(`${getLocalizedPath(normalizedPath, resolved)}${location.search}${location.hash}`, { replace: true });
   };
 
   const handleEnterpriseSwitch = async (enterpriseId: string) => {
@@ -216,7 +214,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       <div className={`app-sider-brand ${collapsed && !mobileVisible ? 'app-sider-brand--collapsed' : ''}`}>
         <img
           src="/brand/dotblue-logo.png"
-          alt="dotblue"
+          alt={t('app_name')}
           className="app-sider-brand-logo"
         />
         {(!collapsed || mobileVisible) && (
@@ -340,7 +338,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                 label: item.label,
               })),
               onClick: ({ key }) => changeLanguage(String(key)),
-            }}>
+            }} trigger={['click']}>
               <Button type="text" icon={<GlobalOutlined />}>
                 {currentLanguageLabel}
               </Button>

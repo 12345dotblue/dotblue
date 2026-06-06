@@ -107,9 +107,9 @@ describe('AppLayout', () => {
 
     expect(screen.getAllByText('platform_admin_nav').length).toBeGreaterThan(0);
     expect(screen.getAllByText('platform_settings_nav').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('platform_skills_title').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('platform_skill_governance_nav').length).toBeGreaterThan(0);
 
-    await user.click(screen.getAllByText('platform_skills_title')[0]);
+    await user.click(screen.getAllByText('platform_skill_governance_nav')[0]);
 
     await waitFor(() => {
       expect(screen.getByTestId('location-path').textContent).toBe('/zh-CN/admin/platform/skills');

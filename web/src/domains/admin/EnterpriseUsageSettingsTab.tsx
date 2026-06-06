@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { Button, Card, Form, InputNumber, Modal, Select, Space, Statistic, Switch, Table, Typography, message } from 'antd';
 import { DollarOutlined, LineChartOutlined, PlusOutlined } from '@ant-design/icons';
 import axios from 'axios';
+import { useTranslation } from 'react-i18next';
 import { BACKEND_URL } from '../../config';
 import { casdoorService } from '../identity/CasdoorService';
 
@@ -78,6 +79,7 @@ function getAuthHeaders() {
 }
 
 const EnterpriseUsageSettingsTab: React.FC = () => {
+  const { t } = useTranslation();
   const [messageApi, contextHolder] = message.useMessage();
   const [loading, setLoading] = useState(true);
   const [overview, setOverview] = useState<UsageOverview | null>(null);
@@ -127,7 +129,7 @@ const EnterpriseUsageSettingsTab: React.FC = () => {
         ...(Array.isArray(agentPoliciesRes.data) ? agentPoliciesRes.data : []),
       ]);
     } catch {
-      messageApi.error('加载企业用量数据失败');
+      messageApi.error(t('enterprise_usage_load_failed'));
     } finally {
       setLoading(false);
     }
@@ -162,15 +164,15 @@ const EnterpriseUsageSettingsTab: React.FC = () => {
     try {
       if (editingPrice) {
         await axios.put(`${BACKEND_URL}/api/admin/llm-model-prices/${editingPrice.id}`, values, { headers: getAuthHeaders() });
-        messageApi.success('企业模型内部计费价已更新');
+        messageApi.success(t('enterprise_usage_price_updated'));
       } else {
         await axios.post(`${BACKEND_URL}/api/admin/llm-model-prices`, values, { headers: getAuthHeaders() });
-        messageApi.success('企业模型内部计费价已创建');
+        messageApi.success(t('enterprise_usage_price_created'));
       }
       setPriceModalOpen(false);
       await loadData();
     } catch (error: any) {
-      messageApi.error(typeof error?.response?.data === 'string' ? error.response.data : '保存企业模型价格失败');
+      messageApi.error(t('enterprise_usage_price_save_failed'));
     } finally {
       setSaving(false);
     }
@@ -179,10 +181,10 @@ const EnterpriseUsageSettingsTab: React.FC = () => {
   const deletePrice = async (id: string) => {
     try {
       await axios.delete(`${BACKEND_URL}/api/admin/llm-model-prices/${id}`, { headers: getAuthHeaders() });
-      messageApi.success('企业模型内部计费价已删除');
+      messageApi.success(t('enterprise_usage_price_deleted'));
       await loadData();
     } catch {
-      messageApi.error('删除企业模型价格失败');
+      messageApi.error(t('enterprise_usage_price_delete_failed'));
     }
   };
 
@@ -212,15 +214,15 @@ const EnterpriseUsageSettingsTab: React.FC = () => {
     try {
       if (editingPolicy) {
         await axios.put(`${BACKEND_URL}/api/admin/usage-limit-policies/${editingPolicy.id}`, values, { headers: getAuthHeaders() });
-        messageApi.success('企业限额策略已更新');
+        messageApi.success(t('enterprise_usage_policy_updated'));
       } else {
         await axios.post(`${BACKEND_URL}/api/admin/usage-limit-policies`, values, { headers: getAuthHeaders() });
-        messageApi.success('企业限额策略已创建');
+        messageApi.success(t('enterprise_usage_policy_created'));
       }
       setPolicyModalOpen(false);
       await loadData();
     } catch (error: any) {
-      messageApi.error(typeof error?.response?.data === 'string' ? error.response.data : '保存企业限额策略失败');
+      messageApi.error(t('enterprise_usage_policy_save_failed'));
     } finally {
       setSaving(false);
     }
@@ -229,10 +231,10 @@ const EnterpriseUsageSettingsTab: React.FC = () => {
   const deletePolicy = async (item: LimitPolicy) => {
     try {
       await axios.delete(`${BACKEND_URL}/api/admin/usage-limit-policies/${item.id}?scopeType=${item.scopeType}&scopeId=${item.scopeId}`, { headers: getAuthHeaders() });
-      messageApi.success('企业限额策略已删除');
+      messageApi.success(t('enterprise_usage_policy_deleted'));
       await loadData();
     } catch {
-      messageApi.error('删除企业限额策略失败');
+      messageApi.error(t('enterprise_usage_policy_delete_failed'));
     }
   };
 
@@ -241,53 +243,53 @@ const EnterpriseUsageSettingsTab: React.FC = () => {
       {contextHolder}
       <Card variant="borderless" style={{ borderRadius: 20 }} loading={loading}>
         <Paragraph type="secondary" style={{ marginBottom: 16 }}>
-          企业可在这里查看 token 审计、配置企业模型内部计费价，并按企业或 Agent 设置消费限制。
+          {t('enterprise_usage_summary_description')}
         </Paragraph>
         <Space size={16} wrap>
-          <Statistic title="今日请求" value={overview?.todayRequests || 0} />
-          <Statistic title="今日 Tokens" value={overview?.todayTokens || 0} />
-          <Statistic title="今日计费额" value={overview?.todayCharge || 0} precision={4} prefix={<DollarOutlined />} />
-          <Statistic title="本月计费额" value={overview?.monthCharge || 0} precision={4} prefix={<DollarOutlined />} />
+          <Statistic title={t('enterprise_usage_today_requests')} value={overview?.todayRequests || 0} />
+          <Statistic title={t('enterprise_usage_today_tokens')} value={overview?.todayTokens || 0} />
+          <Statistic title={t('enterprise_usage_today_charge')} value={overview?.todayCharge || 0} precision={4} prefix={<DollarOutlined />} />
+          <Statistic title={t('enterprise_usage_month_charge')} value={overview?.monthCharge || 0} precision={4} prefix={<DollarOutlined />} />
         </Space>
       </Card>
 
-      <Card variant="borderless" title={<Space><LineChartOutlined />近 7 天趋势</Space>} style={{ borderRadius: 20 }} loading={loading}>
+      <Card variant="borderless" title={<Space><LineChartOutlined />{t('enterprise_usage_seven_day_trend')}</Space>} style={{ borderRadius: 20 }} loading={loading}>
         <Table
           rowKey="date"
           pagination={false}
           dataSource={trends}
           columns={[
-            { title: '日期', dataIndex: 'date', key: 'date', width: 120 },
-            { title: '请求数', dataIndex: 'requestCount', key: 'requestCount', width: 100 },
-            { title: 'Tokens', dataIndex: 'totalTokens', key: 'totalTokens', width: 140 },
-            { title: '成本', dataIndex: 'costAmount', key: 'costAmount', width: 140, render: (value: number) => value.toFixed(4) },
-            { title: '计费额', dataIndex: 'chargeAmount', key: 'chargeAmount', width: 140, render: (value: number) => value.toFixed(4) },
+            { title: t('enterprise_usage_date'), dataIndex: 'date', key: 'date', width: 120 },
+            { title: t('enterprise_usage_request_count'), dataIndex: 'requestCount', key: 'requestCount', width: 100 },
+            { title: t('enterprise_usage_tokens_label'), dataIndex: 'totalTokens', key: 'totalTokens', width: 140 },
+            { title: t('enterprise_usage_cost'), dataIndex: 'costAmount', key: 'costAmount', width: 140, render: (value: number) => value.toFixed(4) },
+            { title: t('enterprise_usage_charge'), dataIndex: 'chargeAmount', key: 'chargeAmount', width: 140, render: (value: number) => value.toFixed(4) },
           ]}
         />
       </Card>
 
-      <Card variant="borderless" title="最近调用事件" style={{ borderRadius: 20 }} loading={loading}>
+      <Card variant="borderless" title={t('enterprise_usage_recent_events')} style={{ borderRadius: 20 }} loading={loading}>
         <Table
           rowKey="id"
           pagination={false}
           dataSource={events}
           scroll={{ x: 900 }}
           columns={[
-            { title: '时间', dataIndex: 'createdAt', key: 'createdAt', width: 180 },
-            { title: '模型', dataIndex: 'modelNameSnapshot', key: 'modelNameSnapshot', width: 220 },
-            { title: 'Agent', dataIndex: 'agentId', key: 'agentId', width: 220, render: (value: string) => agentNameMap.get(value) || value },
-            { title: '来源', dataIndex: 'sourceType', key: 'sourceType', width: 100 },
-            { title: '状态', dataIndex: 'status', key: 'status', width: 110 },
-            { title: 'Tokens', dataIndex: 'totalTokens', key: 'totalTokens', width: 120 },
-            { title: '计费额', dataIndex: 'chargeAmount', key: 'chargeAmount', width: 120, render: (value: number) => value.toFixed(4) },
+            { title: t('enterprise_usage_time'), dataIndex: 'createdAt', key: 'createdAt', width: 180 },
+            { title: t('enterprise_usage_model'), dataIndex: 'modelNameSnapshot', key: 'modelNameSnapshot', width: 220 },
+            { title: t('enterprise_usage_agent_label'), dataIndex: 'agentId', key: 'agentId', width: 220, render: (value: string) => agentNameMap.get(value) || value },
+            { title: t('enterprise_usage_source'), dataIndex: 'sourceType', key: 'sourceType', width: 100 },
+            { title: t('enterprise_usage_status'), dataIndex: 'status', key: 'status', width: 110 },
+            { title: t('enterprise_usage_tokens_label'), dataIndex: 'totalTokens', key: 'totalTokens', width: 120 },
+            { title: t('enterprise_usage_charge'), dataIndex: 'chargeAmount', key: 'chargeAmount', width: 120, render: (value: number) => value.toFixed(4) },
           ]}
         />
       </Card>
 
       <Card
         variant="borderless"
-        title="企业模型内部计费价"
-        extra={<Button type="primary" icon={<PlusOutlined />} onClick={openCreatePrice}>新增价格</Button>}
+        title={t('enterprise_usage_enterprise_model_pricing')}
+        extra={<Button type="primary" icon={<PlusOutlined />} onClick={openCreatePrice}>{t('enterprise_usage_add_price')}</Button>}
         style={{ borderRadius: 20 }}
         loading={loading}
       >
@@ -296,20 +298,20 @@ const EnterpriseUsageSettingsTab: React.FC = () => {
           pagination={false}
           dataSource={prices}
           columns={[
-            { title: '模型', dataIndex: 'modelId', key: 'modelId', render: (value: string) => modelNameMap.get(value) || value },
-            { title: '币种', dataIndex: 'currency', key: 'currency', width: 100 },
-            { title: '输入成本价', dataIndex: 'costInputUnitPrice', key: 'costInputUnitPrice', width: 140 },
-            { title: '输出成本价', dataIndex: 'costOutputUnitPrice', key: 'costOutputUnitPrice', width: 140 },
-            { title: '输入计费价', dataIndex: 'chargeInputUnitPrice', key: 'chargeInputUnitPrice', width: 140 },
-            { title: '输出计费价', dataIndex: 'chargeOutputUnitPrice', key: 'chargeOutputUnitPrice', width: 140 },
+            { title: t('enterprise_usage_model'), dataIndex: 'modelId', key: 'modelId', render: (value: string) => modelNameMap.get(value) || value },
+            { title: t('enterprise_usage_currency'), dataIndex: 'currency', key: 'currency', width: 100 },
+            { title: t('enterprise_usage_input_cost'), dataIndex: 'costInputUnitPrice', key: 'costInputUnitPrice', width: 140 },
+            { title: t('enterprise_usage_output_cost'), dataIndex: 'costOutputUnitPrice', key: 'costOutputUnitPrice', width: 140 },
+            { title: t('enterprise_usage_input_charge'), dataIndex: 'chargeInputUnitPrice', key: 'chargeInputUnitPrice', width: 140 },
+            { title: t('enterprise_usage_output_charge'), dataIndex: 'chargeOutputUnitPrice', key: 'chargeOutputUnitPrice', width: 140 },
             {
-              title: '操作',
+              title: t('enterprise_usage_actions'),
               key: 'actions',
               width: 160,
               render: (_: unknown, item: ModelPrice) => (
                 <Space>
-                  <Button onClick={() => openEditPrice(item)}>编辑</Button>
-                  <Button danger onClick={() => deletePrice(item.id)}>删除</Button>
+                  <Button onClick={() => openEditPrice(item)}>{t('enterprise_usage_edit')}</Button>
+                  <Button danger onClick={() => deletePrice(item.id)}>{t('enterprise_usage_delete')}</Button>
                 </Space>
               ),
             },
@@ -319,8 +321,8 @@ const EnterpriseUsageSettingsTab: React.FC = () => {
 
       <Card
         variant="borderless"
-        title="企业消费限额"
-        extra={<Button type="primary" icon={<PlusOutlined />} onClick={openCreatePolicy}>新增策略</Button>}
+        title={t('enterprise_usage_enterprise_limit_policy')}
+        extra={<Button type="primary" icon={<PlusOutlined />} onClick={openCreatePolicy}>{t('enterprise_usage_add_policy')}</Button>}
         style={{ borderRadius: 20 }}
         loading={loading}
       >
@@ -329,21 +331,21 @@ const EnterpriseUsageSettingsTab: React.FC = () => {
           pagination={false}
           dataSource={policies}
           columns={[
-            { title: '作用域', dataIndex: 'scopeType', key: 'scopeType', width: 110, render: (value: string) => value === 'agent' ? 'Agent' : '企业' },
-            { title: '目标', dataIndex: 'scopeId', key: 'scopeId', render: (value: string, item: LimitPolicy) => item.scopeType === 'agent' ? (agentNameMap.get(value) || value) : '当前企业' },
-            { title: '启用', dataIndex: 'enabled', key: 'enabled', width: 90, render: (value: boolean) => value ? '是' : '否' },
-            { title: '日 Token 限额', dataIndex: 'dailyTokenLimit', key: 'dailyTokenLimit', width: 140 },
-            { title: '月 Token 限额', dataIndex: 'monthlyTokenLimit', key: 'monthlyTokenLimit', width: 140 },
-            { title: '日计费限额', dataIndex: 'dailyChargeLimit', key: 'dailyChargeLimit', width: 140 },
-            { title: '月计费限额', dataIndex: 'monthlyChargeLimit', key: 'monthlyChargeLimit', width: 140 },
+            { title: t('enterprise_usage_scope'), dataIndex: 'scopeType', key: 'scopeType', width: 110, render: (value: string) => value === 'agent' ? t('enterprise_usage_agent_label') : t('enterprise_usage_enterprise_scope') },
+            { title: t('enterprise_usage_target'), dataIndex: 'scopeId', key: 'scopeId', render: (value: string, item: LimitPolicy) => item.scopeType === 'agent' ? (agentNameMap.get(value) || value) : t('enterprise_usage_current_enterprise') },
+            { title: t('enterprise_usage_enabled'), dataIndex: 'enabled', key: 'enabled', width: 90, render: (value: boolean) => value ? t('enterprise_usage_yes') : t('enterprise_usage_no') },
+            { title: t('enterprise_usage_daily_token_limit'), dataIndex: 'dailyTokenLimit', key: 'dailyTokenLimit', width: 140 },
+            { title: t('enterprise_usage_monthly_token_limit'), dataIndex: 'monthlyTokenLimit', key: 'monthlyTokenLimit', width: 140 },
+            { title: t('enterprise_usage_daily_charge_limit'), dataIndex: 'dailyChargeLimit', key: 'dailyChargeLimit', width: 140 },
+            { title: t('enterprise_usage_monthly_charge_limit'), dataIndex: 'monthlyChargeLimit', key: 'monthlyChargeLimit', width: 140 },
             {
-              title: '操作',
+              title: t('enterprise_usage_actions'),
               key: 'actions',
               width: 160,
               render: (_: unknown, item: LimitPolicy) => (
                 <Space>
-                  <Button onClick={() => openEditPolicy(item)}>编辑</Button>
-                  <Button danger onClick={() => deletePolicy(item)}>删除</Button>
+                  <Button onClick={() => openEditPolicy(item)}>{t('enterprise_usage_edit')}</Button>
+                  <Button danger onClick={() => deletePolicy(item)}>{t('enterprise_usage_delete')}</Button>
                 </Space>
               ),
             },
@@ -352,7 +354,7 @@ const EnterpriseUsageSettingsTab: React.FC = () => {
       </Card>
 
       <Modal
-        title={editingPrice ? '编辑企业模型价格' : '新增企业模型价格'}
+        title={editingPrice ? t('enterprise_usage_edit_model_price') : t('enterprise_usage_create_model_price')}
         open={priceModalOpen}
         onOk={savePrice}
         onCancel={() => setPriceModalOpen(false)}
@@ -360,29 +362,29 @@ const EnterpriseUsageSettingsTab: React.FC = () => {
         destroyOnHidden
       >
         <Form form={priceForm} layout="vertical">
-          <Form.Item label="模型" name="modelId" rules={[{ required: true, message: '请选择模型' }]}>
+          <Form.Item label={t('enterprise_usage_model')} name="modelId" rules={[{ required: true, message: t('enterprise_usage_select_model') }]}>
             <Select options={modelOptions} />
           </Form.Item>
-          <Form.Item label="币种" name="currency">
-            <Select options={[{ label: 'USD', value: 'USD' }, { label: 'CNY', value: 'CNY' }]} />
+          <Form.Item label={t('enterprise_usage_currency')} name="currency">
+            <Select options={[{ label: t('enterprise_usage_currency_usd'), value: 'USD' }, { label: t('enterprise_usage_currency_cny'), value: 'CNY' }]} />
           </Form.Item>
-          <Form.Item label="输入成本价 / 1M tokens" name="costInputUnitPrice">
-            <InputNumber style={{ width: '100%' }} min={0} />
+          <Form.Item label={`${t('enterprise_usage_input_cost')} ${t('enterprise_usage_per_million_tokens')}`} name="costInputUnitPrice">
+            <InputNumber controls={false} style={{ width: '100%' }} min={0} />
           </Form.Item>
-          <Form.Item label="输出成本价 / 1M tokens" name="costOutputUnitPrice">
-            <InputNumber style={{ width: '100%' }} min={0} />
+          <Form.Item label={`${t('enterprise_usage_output_cost')} ${t('enterprise_usage_per_million_tokens')}`} name="costOutputUnitPrice">
+            <InputNumber controls={false} style={{ width: '100%' }} min={0} />
           </Form.Item>
-          <Form.Item label="输入计费价 / 1M tokens" name="chargeInputUnitPrice">
-            <InputNumber style={{ width: '100%' }} min={0} />
+          <Form.Item label={`${t('enterprise_usage_input_charge')} ${t('enterprise_usage_per_million_tokens')}`} name="chargeInputUnitPrice">
+            <InputNumber controls={false} style={{ width: '100%' }} min={0} />
           </Form.Item>
-          <Form.Item label="输出计费价 / 1M tokens" name="chargeOutputUnitPrice">
-            <InputNumber style={{ width: '100%' }} min={0} />
+          <Form.Item label={`${t('enterprise_usage_output_charge')} ${t('enterprise_usage_per_million_tokens')}`} name="chargeOutputUnitPrice">
+            <InputNumber controls={false} style={{ width: '100%' }} min={0} />
           </Form.Item>
         </Form>
       </Modal>
 
       <Modal
-        title={editingPolicy ? '编辑企业限额策略' : '新增企业限额策略'}
+        title={editingPolicy ? t('enterprise_usage_edit_limit_policy') : t('enterprise_usage_create_limit_policy')}
         open={policyModalOpen}
         onOk={savePolicy}
         onCancel={() => setPolicyModalOpen(false)}
@@ -390,34 +392,34 @@ const EnterpriseUsageSettingsTab: React.FC = () => {
         destroyOnHidden
       >
         <Form form={policyForm} layout="vertical">
-          <Form.Item label="作用域" name="scopeType" rules={[{ required: true, message: '请选择作用域' }]}>
-            <Select options={[{ label: '企业', value: 'enterprise' }, { label: 'Agent', value: 'agent' }]} />
+          <Form.Item label={t('enterprise_usage_scope')} name="scopeType" rules={[{ required: true, message: t('enterprise_usage_select_scope') }]}>
+            <Select options={[{ label: t('enterprise_usage_enterprise_scope'), value: 'enterprise' }, { label: t('enterprise_usage_agent_label'), value: 'agent' }]} />
           </Form.Item>
           <Form.Item noStyle shouldUpdate={(prev, next) => prev.scopeType !== next.scopeType}>
             {({ getFieldValue }) => (
               getFieldValue('scopeType') === 'agent' ? (
-                <Form.Item label="Agent" name="scopeId" rules={[{ required: true, message: '请选择 Agent' }]}>
+                <Form.Item label={t('enterprise_usage_agent_label')} name="scopeId" rules={[{ required: true, message: t('enterprise_usage_select_agent') }]}>
                   <Select options={agents.map((item) => ({ label: item.agentName, value: item.id }))} />
                 </Form.Item>
               ) : null
             )}
           </Form.Item>
-          <Form.Item label="启用" name="enabled" valuePropName="checked">
+          <Form.Item label={t('enterprise_usage_enabled')} name="enabled" valuePropName="checked">
             <Switch />
           </Form.Item>
-          <Form.Item label="日 Token 限额" name="dailyTokenLimit">
-            <InputNumber style={{ width: '100%' }} min={0} />
+          <Form.Item label={t('enterprise_usage_daily_token_limit')} name="dailyTokenLimit">
+            <InputNumber controls={false} style={{ width: '100%' }} min={0} />
           </Form.Item>
-          <Form.Item label="月 Token 限额" name="monthlyTokenLimit">
-            <InputNumber style={{ width: '100%' }} min={0} />
+          <Form.Item label={t('enterprise_usage_monthly_token_limit')} name="monthlyTokenLimit">
+            <InputNumber controls={false} style={{ width: '100%' }} min={0} />
           </Form.Item>
-          <Form.Item label="日计费限额" name="dailyChargeLimit">
-            <InputNumber style={{ width: '100%' }} min={0} />
+          <Form.Item label={t('enterprise_usage_daily_charge_limit')} name="dailyChargeLimit">
+            <InputNumber controls={false} style={{ width: '100%' }} min={0} />
           </Form.Item>
-          <Form.Item label="月计费限额" name="monthlyChargeLimit">
-            <InputNumber style={{ width: '100%' }} min={0} />
+          <Form.Item label={t('enterprise_usage_monthly_charge_limit')} name="monthlyChargeLimit">
+            <InputNumber controls={false} style={{ width: '100%' }} min={0} />
           </Form.Item>
-          <Form.Item label="硬限制" name="hardLimit" valuePropName="checked">
+          <Form.Item label={t('enterprise_usage_hard_limit')} name="hardLimit" valuePropName="checked">
             <Switch />
           </Form.Item>
         </Form>
@@ -427,3 +429,5 @@ const EnterpriseUsageSettingsTab: React.FC = () => {
 };
 
 export default EnterpriseUsageSettingsTab;
+
+

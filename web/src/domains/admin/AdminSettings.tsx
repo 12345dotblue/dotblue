@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import {
   Button,
   Card,
@@ -132,6 +132,10 @@ function buildOrgTree(units: OrgUnit[], parentId?: string): Array<{ key: string;
     }));
 }
 
+function getAdminActionErrorMessage(fallbackMessage: string) {
+  return fallbackMessage;
+}
+
 const AdminSettings: React.FC = () => {
   const { t, i18n } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -200,14 +204,14 @@ const AdminSettings: React.FC = () => {
     }
     if (activeTab === 'im') {
       return {
-        label: '新建 IM 连接',
+        label: t('admin_settings_new_im_connection'),
         icon: <PlusOutlined />,
         onClick: () => setIMCreateSignal((current) => current + 1),
       };
     }
     if (activeTab === 'usage') {
       return {
-        label: '刷新用量数据',
+        label: t('admin_settings_refresh_usage'),
         icon: <PlusOutlined />,
         onClick: () => window.location.reload(),
       };
@@ -357,8 +361,7 @@ const AdminSettings: React.FC = () => {
       orgForm.resetFields();
       await loadEnterpriseData();
     } catch (error: any) {
-      const errorText = error?.response?.data;
-      messageApi.error(typeof errorText === 'string' ? errorText : t('enterprise_admin_department_save_failed'));
+      messageApi.error(getAdminActionErrorMessage(t('enterprise_admin_department_save_failed')));
     } finally {
       setSavingOrgUnit(false);
     }
@@ -372,8 +375,7 @@ const AdminSettings: React.FC = () => {
       messageApi.success(t('enterprise_admin_department_deleted'));
       await loadEnterpriseData();
     } catch (error: any) {
-      const errorText = error?.response?.data;
-      messageApi.error(typeof errorText === 'string' ? errorText : t('enterprise_admin_department_delete_failed'));
+      messageApi.error(getAdminActionErrorMessage(t('enterprise_admin_department_delete_failed')));
     }
   };
 
@@ -415,8 +417,7 @@ const AdminSettings: React.FC = () => {
       setUserSearchOptions([]);
       await loadEnterpriseData();
     } catch (error: any) {
-      const errorText = error?.response?.data;
-      messageApi.error(typeof errorText === 'string' ? errorText : t('enterprise_admin_member_add_failed'));
+      messageApi.error(getAdminActionErrorMessage(t('enterprise_admin_member_add_failed')));
     } finally {
       setAddingMember(false);
     }
@@ -466,8 +467,7 @@ const AdminSettings: React.FC = () => {
         messageApi.success(t('enterprise_admin_invitation_link_copied'));
       }
     } catch (error: any) {
-      const errorText = error?.response?.data;
-      messageApi.error(typeof errorText === 'string' ? errorText : t('enterprise_admin_invitation_create_failed'));
+      messageApi.error(getAdminActionErrorMessage(t('enterprise_admin_invitation_create_failed')));
     } finally {
       setCreatingInvitation(false);
     }
@@ -820,12 +820,12 @@ const AdminSettings: React.FC = () => {
                 },
                 {
                   key: 'usage',
-                  label: '用量审计',
+                  label: t('admin_settings_usage_audit'),
                   children: <EnterpriseUsageSettingsTab />,
                 },
                 {
                   key: 'im',
-                  label: 'IM 接入',
+                  label: t('admin_settings_im_access'),
                   children: <IMSettingsTab createSignal={imCreateSignal} />,
                 },
                 {
@@ -877,7 +877,7 @@ const AdminSettings: React.FC = () => {
             <Input placeholder={t('enterprise_admin_optional')} />
           </Form.Item>
           <Form.Item label={t('enterprise_admin_department_sort')} name="sortOrder">
-            <InputNumber style={{ width: '100%' }} min={0} />
+            <InputNumber controls={false} style={{ width: '100%' }} min={0} />
           </Form.Item>
         </Form>
       </Modal>
@@ -950,10 +950,10 @@ const AdminSettings: React.FC = () => {
             <Select allowClear options={orgUnitOptions} placeholder={t('enterprise_admin_optional')} />
           </Form.Item>
           <Form.Item label={t('enterprise_admin_expires_in_days')} name="expiresInDays">
-            <InputNumber style={{ width: '100%' }} min={1} max={90} />
+            <InputNumber controls={false} style={{ width: '100%' }} min={1} max={90} />
           </Form.Item>
           <Form.Item label={t('enterprise_admin_max_uses')} name="maxUses">
-            <InputNumber style={{ width: '100%' }} min={1} max={50} />
+            <InputNumber controls={false} style={{ width: '100%' }} min={1} max={50} />
           </Form.Item>
         </Form>
       </Modal>
@@ -962,3 +962,4 @@ const AdminSettings: React.FC = () => {
 };
 
 export default AdminSettings;
+

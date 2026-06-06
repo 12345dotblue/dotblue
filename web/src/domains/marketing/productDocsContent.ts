@@ -27,6 +27,13 @@ export type DocsLocale = {
   repoPoints: string[];
 };
 
+export type DocsContentBundle = {
+  requestedLanguage: string;
+  contentLanguage: string;
+  isFallbackContent: boolean;
+  locale: DocsLocale;
+};
+
 const CASDOOR_SIGNUP_ITEMS_URL = 'https://casdoor.ai/docs/application/signup-items-table';
 const CASDOOR_SIGNIN_METHODS_URL = 'https://casdoor.ai/docs/application/signin-methods';
 const CASDOOR_APP_CONFIG_URL = 'https://casdoor.ai/docs/application/config';
@@ -791,4 +798,23 @@ const locales: Record<string, DocsLocale> = {
 export function getDocsContent(language: string) {
   const resolved = resolveSupportedLanguage(language);
   return locales[resolved] || locales.en;
+}
+
+export function getDocsContentBundle(language: string): DocsContentBundle {
+  const resolved = resolveSupportedLanguage(language);
+  const locale = locales[resolved];
+  if (locale) {
+    return {
+      requestedLanguage: resolved,
+      contentLanguage: resolved,
+      isFallbackContent: false,
+      locale,
+    };
+  }
+  return {
+    requestedLanguage: resolved,
+    contentLanguage: 'en',
+    isFallbackContent: true,
+    locale: locales.en,
+  };
 }

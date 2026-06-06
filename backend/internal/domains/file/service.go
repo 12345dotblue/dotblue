@@ -47,23 +47,39 @@ var (
 )
 
 type Service struct {
-	repo        Repository
-	storage     Storage
-	idGenerator func() string
-	now         func() time.Time
+	repo           Repository
+	defaultStorage Storage
+	storages       map[string]Storage
+	idGenerator    func() string
+	now            func() time.Time
 }
 
-func NewService(repo Repository, storage Storage) *Service {
+func NewService(repo Repository, defaultStorage Storage, additionalStorages ...Storage) *Service {
+	storages := make(map[string]Storage, 1+len(additionalStorages))
+	registerStorage := func(item Storage) {
+		if item == nil {
+			return
+		}
+		name := strings.TrimSpace(strings.ToLower(item.Name()))
+		if name != "" {
+			storages[name] = item
+		}
+	}
+	registerStorage(defaultStorage)
+	for _, item := range additionalStorages {
+		registerStorage(item)
+	}
 	return &Service{
-		repo:        repo,
-		storage:     storage,
-		idGenerator: func() string { return uuid.New().String() },
-		now:         time.Now,
+		repo:           repo,
+		defaultStorage: defaultStorage,
+		storages:       storages,
+		idGenerator:    func() string { return uuid.New().String() },
+		now:            time.Now,
 	}
 }
 
 func (s *Service) Upload(ctx context.Context, input UploadInput) (*File, error) {
-	if s == nil || s.repo == nil || s.storage == nil {
+	if s == nil || s.repo == nil || s.defaultStorage == nil {
 		return nil, errors.New("file service is not configured")
 	}
 	if input.Content == nil {
@@ -103,7 +119,7 @@ func (s *Service) Upload(ctx context.Context, input UploadInput) (*File, error) 
 	}
 
 	fileID := s.idGenerator()
-	stored, err := s.storage.Save(ctx, buildObjectKey(fileID, input.OriginalName, s.now()), input.Content)
+	stored, err := s.defaultStorage.Save(ctx, buildObjectKey(fileID, input.OriginalName, s.now()), input.Content)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +128,7 @@ func (s *Service) Upload(ctx context.Context, input UploadInput) (*File, error) 
 		UserId:         strings.TrimSpace(input.UserID),
 		GroupId:        strings.TrimSpace(input.GroupID),
 		ConversationId: strings.TrimSpace(input.ConversationID),
-		StorageType:    s.storage.Name(),
+		StorageType:    s.defaultStorage.Name(),
 		StorageKey:     stored.Key,
 		OriginName:     input.OriginalName,
 		MimeType:       input.MimeType,
@@ -195,13 +211,34 @@ func (s *Service) OpenForUser(ctx context.Context, id, userID, groupID string) (
 }
 
 func (s *Service) OpenStorage(ctx context.Context, fileRec *File) (io.ReadSeekCloser, error) {
-	if s == nil || s.storage == nil {
+	if s == nil || s.defaultStorage == nil {
 		return nil, errors.New("file storage is not configured")
 	}
 	if fileRec == nil {
 		return nil, ErrFileNotFound
 	}
-	return s.storage.Open(ctx, fileRec.StorageKey)
+	storage, err := s.storageForRecord(fileRec)
+	if err != nil {
+		return nil, err
+	}
+	return storage.Open(ctx, fileRec.StorageKey)
+}
+
+func (s *Service) storageForRecord(fileRec *File) (Storage, error) {
+	if s == nil || s.defaultStorage == nil {
+		return nil, errors.New("file storage is not configured")
+	}
+	if fileRec == nil {
+		return nil, ErrFileNotFound
+	}
+	name := strings.TrimSpace(strings.ToLower(fileRec.StorageType))
+	if name == "" {
+		return s.defaultStorage, nil
+	}
+	if storage, ok := s.storages[name]; ok && storage != nil {
+		return storage, nil
+	}
+	return nil, fmt.Errorf("file storage %q is not configured", fileRec.StorageType)
 }
 
 func (s *Service) getOwnedFile(id, userID, groupID string) (*File, error) {

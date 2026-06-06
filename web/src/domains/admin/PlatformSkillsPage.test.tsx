@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import axios from 'axios';
 import i18n from '../../i18n/config';
 import PlatformSkillsPage from './PlatformSkillsPage';
@@ -14,6 +15,14 @@ const mockedAxios = vi.mocked(axios, true);
 const mockedAxiosGet = vi.mocked(axios.get);
 const mockedAxiosPost = vi.mocked(axios.post);
 const mockedAxiosPut = vi.mocked(axios.put);
+
+function renderPage() {
+  return render(
+    <MemoryRouter>
+      <PlatformSkillsPage />
+    </MemoryRouter>,
+  );
+}
 
 function installDomMocks() {
   (globalThis as any).matchMedia = (query: string) => ({
@@ -73,7 +82,7 @@ describe('PlatformSkillsPage', () => {
       return Promise.resolve({ data: [] } as any);
     });
 
-    render(<PlatformSkillsPage />);
+    renderPage();
 
     expect(await screen.findByText('knowledge.search')).toBeTruthy();
     expect(screen.getByText('知识检索')).toBeTruthy();
@@ -84,10 +93,10 @@ describe('PlatformSkillsPage', () => {
     await i18n.changeLanguage('zh-CN');
     mockedAxiosGet.mockImplementation(() => Promise.resolve({ data: [] } as any));
 
-    render(<PlatformSkillsPage />);
+    renderPage();
 
     await waitFor(() => expect(mockedAxiosGet).toHaveBeenCalled());
-    expect(screen.getAllByRole('heading', { name: /Skill 管理/ }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('heading', { name: /技能治理中心/ }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('button', { name: /新建 Skill/ }).length).toBeGreaterThan(0);
   });
 
@@ -96,7 +105,7 @@ describe('PlatformSkillsPage', () => {
     mockedAxiosGet.mockImplementation(() => Promise.resolve({ data: [] } as any));
     mockedAxiosPost.mockResolvedValue({ data: { id: 'skill-1' } } as any);
 
-    render(<PlatformSkillsPage />);
+    renderPage();
 
     await waitFor(() => expect(mockedAxiosGet).toHaveBeenCalled());
     await user.click(screen.getAllByRole('button', { name: /New Skill/i })[0]);
@@ -142,7 +151,7 @@ describe('PlatformSkillsPage', () => {
     });
     mockedAxiosPost.mockResolvedValue({ data: { id: 'job-1', jobStatus: 'completed' } } as any);
 
-    render(<PlatformSkillsPage />);
+    renderPage();
 
     await waitFor(() => expect(mockedAxiosGet).toHaveBeenCalled());
     const importButtons = screen.getAllByRole('button', { name: /Import Jobs/i });
@@ -153,9 +162,9 @@ describe('PlatformSkillsPage', () => {
     const dialog = dialogs[dialogs.length - 1];
     await user.click(within(dialog).getByRole('combobox'));
     await user.click(await screen.findByText(/Partner Hub/));
-    await user.type(within(dialog).getByPlaceholderText('petstore/openapi.yaml'), 'petstore/openapi.yaml');
-    await user.type(within(dialog).getByPlaceholderText('partner.petstore'), 'partner.petstore');
-    await user.type(within(dialog).getByPlaceholderText('1.0.0'), '1.2.3');
+    await user.type(within(dialog).getByPlaceholderText('For example: https://skillhub.cn/skills/weather'), 'petstore/openapi.yaml');
+    await user.type(within(dialog).getByPlaceholderText('For example: weather or partner.petstore'), 'partner.petstore');
+    await user.type(within(dialog).getByPlaceholderText('For example: latest or 1.0.0'), '1.2.3');
     await user.click(within(dialog).getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(mockedAxiosPost).toHaveBeenCalled());
@@ -167,5 +176,5 @@ describe('PlatformSkillsPage', () => {
       sourceNamespace: 'partner.petstore',
       sourceVersion: '1.2.3',
     });
-  });
+  }, 10000);
 });

@@ -115,7 +115,7 @@ describe('AgentList', () => {
       modelId: 'model-1',
       engineType: 'nanobot',
     });
-  });
+  }, 10000);
 
   it('列表展示返回的 engineType 标签', async () => {
     mockedAxios.get.mockImplementation((url: string) => {

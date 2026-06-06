@@ -28,6 +28,8 @@ function getAuthHeaders() {
 
 const EnterpriseLLMSettingsTab: React.FC<Props> = ({ createSignal = 0 }) => {
   const { t } = useTranslation();
+  const getProviderLabel = (value: EnterpriseLLMModel['type']) =>
+    value === 'anthropic' ? t('llm_provider_anthropic') : t('llm_provider_openai');
   const [messageApi, contextHolder] = message.useMessage();
   const [models, setModels] = useState<EnterpriseLLMModel[]>([]);
   const [loading, setLoading] = useState(true);
@@ -103,8 +105,7 @@ const EnterpriseLLMSettingsTab: React.FC<Props> = ({ createSignal = 0 }) => {
       setModalOpen(false);
       await loadModels();
     } catch (error: any) {
-      const errorText = error?.response?.data;
-      messageApi.error(typeof errorText === 'string' ? errorText : t('enterprise_admin_llm_save_failed'));
+      messageApi.error(t('enterprise_admin_llm_save_failed'));
     } finally {
       setSaving(false);
     }
@@ -159,6 +160,7 @@ const EnterpriseLLMSettingsTab: React.FC<Props> = ({ createSignal = 0 }) => {
               dataIndex: 'type',
               key: 'type',
               width: 140,
+              render: (value: EnterpriseLLMModel['type']) => getProviderLabel(value),
             },
             {
               title: t('enterprise_admin_llm_api_base'),
@@ -220,23 +222,41 @@ const EnterpriseLLMSettingsTab: React.FC<Props> = ({ createSignal = 0 }) => {
           >
             <Select
               options={[
-                { label: 'OpenAI', value: 'openai' },
-                { label: 'Anthropic', value: 'anthropic' },
+                { label: t('llm_provider_openai'), value: 'openai' },
+                { label: t('llm_provider_anthropic'), value: 'anthropic' },
               ]}
             />
           </Form.Item>
           <Form.Item label={t('enterprise_admin_llm_api_base')} name="apiBase">
-            <Input placeholder={providerType === 'anthropic' ? 'https://api.anthropic.com/v1' : 'https://api.openai.com/v1'} />
+            <Input
+              placeholder={
+                providerType === 'anthropic'
+                  ? t('llm_api_base_placeholder_anthropic')
+                  : t('llm_api_base_placeholder_openai')
+              }
+            />
           </Form.Item>
           <Form.Item label={t('enterprise_admin_llm_api_key')} name="apiKey">
-            <Input.Password placeholder={providerType === 'anthropic' ? 'sk-ant-...' : 'sk-...'} />
+            <Input.Password
+              placeholder={
+                providerType === 'anthropic'
+                  ? t('llm_api_key_placeholder_anthropic')
+                  : t('llm_api_key_placeholder_openai')
+              }
+            />
           </Form.Item>
           <Form.Item
             label={t('enterprise_admin_llm_model')}
             name="model"
             rules={[{ required: true, message: t('enterprise_admin_llm_model_required') }]}
           >
-            <Input placeholder={providerType === 'anthropic' ? 'claude-sonnet-4-20250514' : 'gpt-4o'} />
+            <Input
+              placeholder={
+                providerType === 'anthropic'
+                  ? t('llm_model_placeholder_anthropic')
+                  : t('llm_model_placeholder_openai')
+              }
+            />
           </Form.Item>
         </Form>
       </Modal>

@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { Anchor, Breadcrumb, Button, Card, Col, Divider, Row, Space, Tag, Typography } from 'antd';
+import React from 'react';
+import { Alert, Anchor, Breadcrumb, Button, Card, Col, Divider, Row, Space, Tag, Typography } from 'antd';
 import { ArrowLeftOutlined, ArrowRightOutlined, BookOutlined, GithubOutlined, LoginOutlined, RocketOutlined } from '@ant-design/icons';
 import { Helmet } from 'react-helmet-async';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
@@ -15,12 +15,18 @@ const ProductDocsPage: React.FC = () => {
   const navigate = useNavigate();
   const { sectionSlug, docSlug } = useParams();
   const isAuthenticated = useAuthState();
-  const currentLanguage = resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language);
+  const currentLanguage = resolveSupportedLanguage(i18n?.resolvedLanguage || i18n?.language);
   const docs = getDocsLibrary(currentLanguage);
   const articleMatch = sectionSlug && docSlug ? findDocsArticle(currentLanguage, sectionSlug, docSlug) : null;
   const article = articleMatch?.article;
   const articleSection = articleMatch?.section;
-  const allArticles = useMemo(() => flattenDocsArticles(docs), [docs]);
+  const hasNativeDocsContent = article ? !(article.isFallbackContent ?? docs.isFallbackContent) : !docs.isFallbackContent;
+  const currentContentLanguage = article?.contentLanguage || docs.contentLanguage;
+  const docsFallbackNotice = {
+    title: t('docs_fallback_notice_title'),
+    description: t('docs_fallback_notice_description'),
+  };
+  const allArticles = flattenDocsArticles(docs);
   const currentArticleIndex = article ? allArticles.findIndex((item) => item.slug === article.slug && item.sectionSlug === article.sectionSlug) : -1;
   const previousArticle = currentArticleIndex > 0 ? allArticles[currentArticleIndex - 1] : null;
   const nextArticle = currentArticleIndex >= 0 && currentArticleIndex < allArticles.length - 1 ? allArticles[currentArticleIndex + 1] : null;
@@ -28,14 +34,11 @@ const ProductDocsPage: React.FC = () => {
   const canonicalUrl = buildLocalizedUrl(currentPath, currentLanguage);
   const localizedHomePath = getLocalizedPath('/', currentLanguage);
   const localizedDocsHomePath = getLocalizedPath('/docs', currentLanguage);
-  const tocTitle = currentLanguage === 'zh-CN' ? '本页目录' : 'On this page';
-  const previousLabel = currentLanguage === 'zh-CN' ? '上一篇' : 'Previous';
-  const nextLabel = currentLanguage === 'zh-CN' ? '下一篇' : 'Next';
+  const tocTitle = t('docs_toc_title');
+  const previousLabel = t('docs_previous_label');
+  const nextLabel = t('docs_next_label');
 
-  const anchorItems = useMemo(
-    () => (article ? article.sections.map((section) => ({ key: section.id, href: `#${section.id}`, title: section.title })) : []),
-    [article],
-  );
+  const anchorItems = article ? article.sections.map((section) => ({ key: section.id, href: `#${section.id}`, title: section.title })) : [];
 
   if ((sectionSlug || docSlug) && !article) {
     return <Navigate to={localizedDocsHomePath} replace />;
@@ -62,7 +65,7 @@ const ProductDocsPage: React.FC = () => {
         '@type': 'TechArticle',
         headline: article.seoTitle,
         description: article.seoDescription,
-        inLanguage: currentLanguage,
+        inLanguage: currentContentLanguage,
         url: canonicalUrl,
         about: articleSection?.title || docs.title,
       }
@@ -112,6 +115,15 @@ const ProductDocsPage: React.FC = () => {
                 <Paragraph style={{ fontSize: 17, color: '#5b6673', marginBottom: 0, maxWidth: 980 }}>
                   {docs.subtitle}
                 </Paragraph>
+                {!hasNativeDocsContent && (
+                  <Alert
+                    showIcon
+                    type="info"
+                    message={docsFallbackNotice.title}
+                    description={docsFallbackNotice.description}
+                    style={{ maxWidth: 980, borderRadius: 16 }}
+                  />
+                )}
                 <Space wrap size={[12, 12]}>
                   <Button type="primary" shape="round" icon={<LoginOutlined />} onClick={() => navigate(getLocalizedPath('/login', currentLanguage))}>
                     {t('login')}
@@ -120,7 +132,7 @@ const ProductDocsPage: React.FC = () => {
                     {t('go_to_dashboard')}
                   </Button>
                   <Button shape="round" icon={<GithubOutlined />} href={DOCS_REPO_URL} target="_blank" rel="noreferrer">
-                    GitHub
+                    {t('docs_github_label')}
                   </Button>
                 </Space>
               </Space>
@@ -255,6 +267,15 @@ const ProductDocsPage: React.FC = () => {
                   <Tag color="blue" style={{ width: 'fit-content', borderRadius: 999, padding: '6px 12px' }}>
                     {articleSection?.title}
                   </Tag>
+                  {!hasNativeDocsContent && (
+                    <Alert
+                      showIcon
+                      type="info"
+                      message={docsFallbackNotice.title}
+                      description={docsFallbackNotice.description}
+                      style={{ width: '100%', borderRadius: 16 }}
+                    />
+                  )}
                   <Title level={1} style={{ margin: 0 }}>{article.title}</Title>
                   <Paragraph style={{ fontSize: 17, color: '#475569', marginBottom: 0 }}>{article.summary}</Paragraph>
                   <Space split={<Divider type="vertical" />} wrap>
@@ -359,7 +380,7 @@ const ProductDocsPage: React.FC = () => {
                       {t('landing_nav_docs')}
                     </Button>
                     <Button block icon={<GithubOutlined />} href={DOCS_REPO_URL} target="_blank" rel="noreferrer">
-                      GitHub
+                      {t('docs_github_label')}
                     </Button>
                   </Space>
                 </Card>

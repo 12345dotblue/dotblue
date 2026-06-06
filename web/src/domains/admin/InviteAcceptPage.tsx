@@ -21,7 +21,7 @@ const InviteAcceptPage: React.FC = () => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { code = '' } = useParams();
-  const currentLanguage = resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language);
+  const currentLanguage = resolveSupportedLanguage(i18n?.resolvedLanguage || i18n?.language);
   const [messageApi, contextHolder] = message.useMessage();
   const [loading, setLoading] = useState(false);
   const [acceptedEnterpriseName, setAcceptedEnterpriseName] = useState('');
@@ -41,9 +41,8 @@ const InviteAcceptPage: React.FC = () => {
       const enterpriseName = res.data?.enterprise?.name || '';
       setAcceptedEnterpriseName(enterpriseName);
       messageApi.success(t('invite_accept_success'));
-    }).catch((error) => {
-      const errorText = error?.response?.data || t('invite_accept_failed');
-      messageApi.error(typeof errorText === 'string' ? errorText : t('invite_accept_failed'));
+    }).catch(() => {
+      messageApi.error(t('invite_accept_failed'));
     }).finally(() => {
       setLoading(false);
     });

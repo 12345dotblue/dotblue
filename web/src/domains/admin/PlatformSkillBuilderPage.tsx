@@ -10,7 +10,7 @@ const { Title, Paragraph, Text } = Typography;
 const PlatformSkillBuilderPage: React.FC = () => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  const currentLanguage = resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language);
+  const currentLanguage = resolveSupportedLanguage(i18n?.resolvedLanguage || i18n?.language);
 
   const go = (path: string) => navigate(getLocalizedPath(path, currentLanguage));
 

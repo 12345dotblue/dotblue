@@ -19,7 +19,7 @@ const sections = [
 
 const Privacy: React.FC = () => {
   const { t, i18n } = useTranslation();
-  const currentLanguage = resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language);
+  const currentLanguage = resolveSupportedLanguage(i18n?.resolvedLanguage || i18n?.language);
 
   return (
     <div style={{ maxWidth: 1000, margin: '40px auto', padding: '0 24px' }}>

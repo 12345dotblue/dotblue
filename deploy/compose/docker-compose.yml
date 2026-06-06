@@ -44,6 +44,19 @@ services:
       - ./.generated/casdoor/init_data.json:/init_data.json:ro
       - ./.generated/casdoor/logs:/logs
 
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    profiles: ["s3"]
+    environment:
+      MINIO_ROOT_USER: ${DOTBLUE_MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${DOTBLUE_MINIO_ROOT_PASSWORD}
+    command: ["server", "/data", "--console-address", ":9001"]
+    ports:
+      - "${DOTBLUE_MINIO_CONSOLE_PORT}:9001"
+    volumes:
+      - minio-data:/data
+
   dotblue:
     build:
       context: ../../backend
@@ -74,6 +87,7 @@ services:
     volumes:
       - ./.generated/dotblue/config.yaml:/app/manifest/config/config.yaml:ro
       - ./.generated/dotblue/init_data.json:/app/manifest/config/init_data.json:ro
+      - ${DOTBLUE_FILES_HOST_PATH}:${DOTBLUE_FILES_LOCAL_ROOT}
       - ${DOTBLUE_ENGINE_HOST_DATA_PATH}:${DOTBLUE_ENGINE_MOUNT_DATA_PATH}
       - /var/run/docker.sock:/var/run/docker.sock
       - app-data:/app/data
@@ -98,4 +112,5 @@ services:
 
 volumes:
   postgres-data:
+  minio-data:
   app-data:

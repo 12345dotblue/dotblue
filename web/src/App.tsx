@@ -2,6 +2,12 @@ import React from 'react'
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation, useParams } from 'react-router-dom'
 import { HelmetProvider, Helmet } from 'react-helmet-async'
 import { ConfigProvider, theme } from 'antd'
+import enUS from 'antd/locale/en_US'
+import zhCN from 'antd/locale/zh_CN'
+import jaJP from 'antd/locale/ja_JP'
+import koKR from 'antd/locale/ko_KR'
+import frFR from 'antd/locale/fr_FR'
+import esES from 'antd/locale/es_ES'
 import { useTranslation } from 'react-i18next'
 import './i18n/config'
 import { getLocalizedPath, getPreferredLanguage, resolveSupportedLanguage } from './i18n/config'
@@ -28,6 +34,15 @@ import Privacy from './domains/legal/Privacy'
 import Refund from './domains/legal/Refund'
 
 import { BACKEND_URL } from './config'
+
+const ANTD_LOCALES = {
+  en: enUS,
+  'zh-CN': zhCN,
+  ja: jaJP,
+  ko: koKR,
+  fr: frFR,
+  es: esES,
+} as const
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { lng } = useParams()
@@ -133,14 +148,26 @@ function LocalizedFallback() {
 
 function App() {
   const { t, i18n } = useTranslation()
+  const currentLanguage = resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language) as keyof typeof ANTD_LOCALES
 
   React.useEffect(() => {
-    document.documentElement.lang = resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language)
-  }, [i18n.language, i18n.resolvedLanguage])
+    document.documentElement.lang = currentLanguage
+  }, [currentLanguage])
 
   return (
     <HelmetProvider>
       <ConfigProvider
+        locale={ANTD_LOCALES[currentLanguage]}
+        modal={{
+          closable: {
+            'aria-label': t('common_close'),
+          },
+        }}
+        drawer={{
+          closable: {
+            'aria-label': t('common_close'),
+          },
+        }}
         theme={{
           algorithm: theme.defaultAlgorithm,
           token: {
@@ -160,7 +187,7 @@ function App() {
             Button: {
               controlHeight: 40,
               paddingContentHorizontal: 20,
-            }
+            },
           },
         }}
       >

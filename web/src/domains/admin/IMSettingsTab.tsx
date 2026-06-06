@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import {
   Alert,
   Button,
@@ -28,6 +28,7 @@ import {
   ReloadOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
+import { useTranslation } from 'react-i18next';
 import { BACKEND_URL } from '../../config';
 import { casdoorService } from '../identity/CasdoorService';
 
@@ -127,11 +128,16 @@ function isFixtureConnection(connection?: ConnectionItem | null) {
 }
 
 function formatConnectionSource(connection?: ConnectionItem | null) {
-  if (!connection?.createdBy) return '未知来源';
-  return connection.createdBy === 'integration-test' ? 'integration-test' : connection.createdBy;
+  if (!connection?.createdBy) return '';
+  return connection.createdBy;
+}
+
+function getResponseErrorText(error: any) {
+  return typeof error?.response?.data === 'string' ? error.response.data.toLowerCase() : '';
 }
 
 const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
+  const { t } = useTranslation();
   const [messageApi, contextHolder] = message.useMessage();
   const [loading, setLoading] = React.useState(true);
   const [agentsLoading, setAgentsLoading] = React.useState(false);
@@ -165,26 +171,138 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
     () => isFixtureConnection(selectedConnection),
     [selectedConnection],
   );
+  const getPlatformLabel = React.useCallback((value?: string) => {
+    switch (value) {
+      case TELEGRAM_PLATFORM:
+        return t('im_settings_platform_telegram');
+      case QQ_PLATFORM:
+        return t('im_settings_platform_qq');
+      case MATRIX_PLATFORM:
+        return t('im_settings_platform_matrix');
+      case DISCORD_PLATFORM:
+        return t('im_settings_platform_discord');
+      case SLACK_PLATFORM:
+        return t('im_settings_platform_slack');
+      case FEISHU_PLATFORM:
+        return t('im_settings_platform_feishu');
+      case WEB_PLATFORM:
+        return t('im_settings_platform_web');
+      default:
+        return value || '-';
+    }
+  }, [t]);
+  const getConnectionModeLabel = React.useCallback((value?: string) => {
+    switch (value) {
+      case 'direct':
+        return t('im_settings_connection_mode_direct');
+      case 'polling':
+        return t('im_settings_connection_mode_polling');
+      case 'sync':
+        return t('im_settings_connection_mode_sync');
+      case 'gateway':
+        return t('im_settings_connection_mode_gateway');
+      case 'socket_mode':
+        return t('im_settings_connection_mode_socket_mode');
+      default:
+        return value || '-';
+    }
+  }, [t]);
+  const getDirectionLabel = React.useCallback((value?: string) => {
+    switch (value) {
+      case 'inbound':
+        return t('im_settings_inbound_label');
+      case 'outbound':
+        return t('im_settings_outbound_label');
+      default:
+        return value || '-';
+    }
+  }, [t]);
+  const getStatusLabel = React.useCallback((value?: string) => {
+    switch (value) {
+      case 'received':
+        return t('im_settings_received_status');
+      case 'processed':
+        return t('im_settings_processed_status');
+      case 'no_binding':
+        return t('im_settings_no_binding_status');
+      case 'error':
+        return t('im_settings_error_status');
+      case 'pending':
+        return t('im_settings_pending_status');
+      case 'accepted':
+        return t('im_settings_accepted_status');
+      case 'failed':
+        return t('im_settings_failed_status');
+      case 'active':
+        return t('im_settings_active_status');
+      case 'disabled':
+        return t('im_settings_disabled_status');
+      default:
+        return value || '-';
+    }
+  }, [t]);
+  const getTriggerModeLabel = React.useCallback((value?: string) => {
+    switch (value) {
+      case 'mention_only':
+        return t('im_settings_mention_only_trigger');
+      case 'all_messages':
+        return t('im_settings_all_messages_trigger');
+      case 'keyword':
+        return t('im_settings_keyword_trigger');
+      case 'command':
+        return t('im_settings_command_trigger');
+      case 'dm_only':
+        return t('im_settings_dm_only_trigger');
+      case 'group_only':
+        return t('im_settings_group_only_trigger');
+      default:
+        return value || '-';
+    }
+  }, [t]);
+  const getSessionStrategyLabel = React.useCallback((value?: string) => {
+    switch (value) {
+      case 'per_user':
+        return t('im_settings_per_user_session');
+      case 'per_chat':
+        return t('im_settings_per_chat_session');
+      case 'per_thread':
+        return t('im_settings_per_thread_session');
+      case 'per_chat_per_user':
+        return t('im_settings_per_chat_per_user_session');
+      default:
+        return value || '-';
+    }
+  }, [t]);
+  const getSourceLabel = React.useCallback((connection?: ConnectionItem | null) => {
+    const source = formatConnectionSource(connection);
+    if (!source) {
+      return t('im_settings_unknown_source');
+    }
+    if (source === 'integration-test') {
+      return t('im_settings_fixture_tag');
+    }
+    return source;
+  }, [t]);
   const connectionModeOptions = React.useMemo(
     () => {
       if (connectionFormPlatform === WEB_PLATFORM) {
-        return [{ label: 'direct', value: 'direct' }];
+        return [{ label: t('im_settings_connection_mode_direct'), value: 'direct' }];
       }
       if (connectionFormPlatform === TELEGRAM_PLATFORM) {
-        return [{ label: 'polling', value: 'polling' }];
+        return [{ label: t('im_settings_connection_mode_polling'), value: 'polling' }];
       }
       if (connectionFormPlatform === MATRIX_PLATFORM) {
-        return [{ label: 'sync', value: 'sync' }];
+        return [{ label: t('im_settings_connection_mode_sync'), value: 'sync' }];
       }
       if (connectionFormPlatform === QQ_PLATFORM) {
-        return [{ label: 'gateway', value: 'gateway' }];
+        return [{ label: t('im_settings_connection_mode_gateway'), value: 'gateway' }];
       }
       if (connectionFormPlatform === DISCORD_PLATFORM) {
-        return [{ label: 'gateway', value: 'gateway' }];
+        return [{ label: t('im_settings_connection_mode_gateway'), value: 'gateway' }];
       }
-      return [{ label: 'socket_mode', value: 'socket_mode' }];
+      return [{ label: t('im_settings_connection_mode_socket_mode'), value: 'socket_mode' }];
     },
-    [connectionFormPlatform],
+    [connectionFormPlatform, t],
   );
 
   const loadConnections = React.useCallback(async () => {
@@ -202,7 +320,7 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
         return items[0]?.id;
       });
     } catch {
-      messageApi.error('加载 IM 连接失败');
+      messageApi.error(t('im_settings_load_connections_failed'));
       setConnections([]);
     } finally {
       setLoading(false);
@@ -235,7 +353,7 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
       });
       setBindings(Array.isArray(res.data) ? res.data : []);
     } catch {
-      messageApi.error('加载绑定失败');
+      messageApi.error(t('im_settings_load_bindings_failed'));
       setBindings([]);
     } finally {
       setBindingsLoading(false);
@@ -259,7 +377,7 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
       });
       setEvents(Array.isArray(res.data?.items) ? res.data.items : []);
     } catch {
-      messageApi.error('加载事件日志失败');
+      messageApi.error(t('im_settings_load_events_failed'));
       setEvents([]);
     } finally {
       setEventsLoading(false);
@@ -282,7 +400,7 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
       });
       setDeliveries(Array.isArray(res.data?.items) ? res.data.items : []);
     } catch {
-      messageApi.error('加载投递日志失败');
+      messageApi.error(t('im_settings_load_deliveries_failed'));
       setDeliveries([]);
     } finally {
       setDeliveriesLoading(false);
@@ -470,17 +588,17 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
         await axios.put(`${BACKEND_URL}/api/admin/im/connections/${editingConnection.id}`, payload, {
           headers: getAuthHeaders(),
         });
-        messageApi.success('连接已更新');
+        messageApi.success(t('im_settings_connection_updated'));
       } else {
         await axios.post(`${BACKEND_URL}/api/admin/im/connections`, payload, {
           headers: getAuthHeaders(),
         });
-        messageApi.success('连接已创建');
+        messageApi.success(t('im_settings_connection_created'));
       }
       setConnectionModalOpen(false);
       await loadConnections();
     } catch (error: any) {
-      messageApi.error(typeof error?.response?.data === 'string' ? error.response.data : '保存连接失败');
+      messageApi.error(t('im_settings_save_connection_failed'));
     } finally {
       setSavingConnection(false);
     }
@@ -488,12 +606,12 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
 
   const handleTestConnection = async (connection: ConnectionItem) => {
     try {
-      const res = await axios.post(`${BACKEND_URL}/api/admin/im/connections/${connection.id}/test`, {}, {
+      await axios.post(`${BACKEND_URL}/api/admin/im/connections/${connection.id}/test`, {}, {
         headers: getAuthHeaders(),
       });
-      messageApi.success(res.data?.detail || '连接测试通过');
+      messageApi.success(t('im_settings_connection_test_passed'));
     } catch (error: any) {
-      messageApi.error(typeof error?.response?.data === 'string' ? error.response.data : '连接测试失败');
+      messageApi.error(t('im_settings_connection_test_failed'));
     }
   };
 
@@ -502,21 +620,21 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
       await axios.post(`${BACKEND_URL}/api/admin/im/connections/${connection.id}/${enable ? 'enable' : 'disable'}`, {}, {
         headers: getAuthHeaders(),
       });
-      messageApi.success(enable ? '连接已启用' : '连接已停用');
+      messageApi.success(enable ? t('im_settings_connection_enabled') : t('im_settings_connection_disabled'));
       await loadConnections();
     } catch (error: any) {
-      const errorMessage = typeof error?.response?.data === 'string' ? error.response.data : '更新连接状态失败';
-      if (enable && isFixtureConnection(connection) && errorMessage.includes('invalid param')) {
-        messageApi.error('当前连接是集成测试夹具数据，使用了无效的飞书 App ID / Secret，无法真实启用。请改成真实飞书应用配置后再启用。');
+      const errorText = getResponseErrorText(error);
+      if (enable && isFixtureConnection(connection) && errorText.includes('invalid param')) {
+        messageApi.error(t('im_settings_fixture_enable_failed'));
         return;
       }
-      messageApi.error(errorMessage);
+      messageApi.error(t('im_settings_connection_status_update_failed'));
     }
   };
 
   const openCreateBinding = () => {
     if (!selectedConnection) {
-      messageApi.warning('请先选择一个连接');
+      messageApi.warning(t('im_settings_select_connection_warning'));
       return;
     }
     setEditingBinding(null);
@@ -582,17 +700,17 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
         await axios.put(`${BACKEND_URL}/api/admin/im/bindings/${editingBinding.id}`, payload, {
           headers: getAuthHeaders(),
         });
-        messageApi.success('绑定已更新');
+        messageApi.success(t('im_settings_binding_updated'));
       } else {
         await axios.post(`${BACKEND_URL}/api/admin/im/connections/${selectedConnection.id}/bindings`, payload, {
           headers: getAuthHeaders(),
         });
-        messageApi.success('绑定已创建');
+        messageApi.success(t('im_settings_binding_created'));
       }
       setBindingModalOpen(false);
       await loadBindings(selectedConnection.id);
     } catch (error: any) {
-      messageApi.error(typeof error?.response?.data === 'string' ? error.response.data : '保存绑定失败');
+      messageApi.error(t('im_settings_save_binding_failed'));
     } finally {
       setSavingBinding(false);
     }
@@ -603,26 +721,26 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
       await axios.delete(`${BACKEND_URL}/api/admin/im/bindings/${binding.id}`, {
         headers: getAuthHeaders(),
       });
-      messageApi.success('绑定已删除');
+      messageApi.success(t('im_settings_binding_deleted'));
       await loadBindings(selectedConnection?.id);
     } catch (error: any) {
-      messageApi.error(typeof error?.response?.data === 'string' ? error.response.data : '删除绑定失败');
+      messageApi.error(t('im_settings_binding_delete_failed'));
     }
   };
 
   const connectionColumns = [
     {
-      title: '连接',
+      title: t('im_settings_connection_column'),
       key: 'name',
       render: (_: unknown, item: ConnectionItem) => (
         <Space orientation="vertical" size={0}>
           <Space wrap size={[8, 0]}>
             <Text strong>{item.name}</Text>
-            {isFixtureConnection(item) ? <Tag color="gold">测试夹具</Tag> : null}
-            {item.lastError ? <Tag color="error">最近失败</Tag> : null}
+            {isFixtureConnection(item) ? <Tag color="gold">{t('im_settings_fixture_tag')}</Tag> : null}
+            {item.lastError ? <Tag color="error">{t('im_settings_recent_failure_tag')}</Tag> : null}
           </Space>
           <Text type="secondary">
-            {item.platform} · {item.connectionMode} · 来源：{formatConnectionSource(item)}
+            {getPlatformLabel(item.platform)} · {getConnectionModeLabel(item.connectionMode)} · {t('im_settings_source_prefix')}: {getSourceLabel(item)}
           </Text>
           {item.lastError ? (
             <Text type="danger">{formatErrorPreview(item.lastError)}</Text>
@@ -631,41 +749,41 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
       ),
     },
     {
-      title: '状态',
+      title: t('im_settings_status_column'),
       dataIndex: 'status',
       key: 'status',
       width: 120,
       render: (value: string) => (
         <Tag color={value === 'active' ? 'success' : value === 'error' ? 'error' : 'default'}>
-          {value}
+          {getStatusLabel(value)}
         </Tag>
       ),
     },
     {
-      title: '回调路径',
+      title: t('im_settings_callback_path_column'),
       dataIndex: 'callbackPath',
       key: 'callbackPath',
       render: (value?: string) => <Text code>{value || '-'}</Text>,
     },
     {
-      title: '最近连接',
+      title: t('im_settings_last_connected_column'),
       dataIndex: 'lastConnectedAt',
       key: 'lastConnectedAt',
       width: 180,
       render: (value?: string) => formatDateTime(value),
     },
     {
-      title: '操作',
+      title: t('im_settings_actions_column'),
       key: 'actions',
       width: 320,
       render: (_: unknown, item: ConnectionItem) => (
         <Space wrap>
-          <Button size="small" onClick={() => openEditConnection(item)}>编辑</Button>
-          <Button size="small" onClick={() => handleTestConnection(item)}>测试</Button>
+          <Button size="small" onClick={() => openEditConnection(item)}>{t('im_settings_edit')}</Button>
+          <Button size="small" onClick={() => handleTestConnection(item)}>{t('im_settings_test')}</Button>
           {item.status === 'active' ? (
-            <Button size="small" onClick={() => handleToggleConnection(item, false)}>停用</Button>
+            <Button size="small" onClick={() => handleToggleConnection(item, false)}>{t('im_settings_disable')}</Button>
           ) : (
-            <Button size="small" type="primary" onClick={() => handleToggleConnection(item, true)}>启用</Button>
+            <Button size="small" type="primary" onClick={() => handleToggleConnection(item, true)}>{t('im_settings_enable')}</Button>
           )}
         </Space>
       ),
@@ -674,7 +792,7 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
 
   const bindingColumns = [
     {
-      title: 'Agent',
+      title: t('im_settings_agent_label'),
       key: 'agentId',
       render: (_: unknown, item: BindingItem) => {
         const agent = agents.find((candidate) => candidate.id === item.agentId);
@@ -687,11 +805,11 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
       },
     },
     {
-      title: '触发',
+      title: t('im_settings_trigger_column'),
       key: 'triggerMode',
       render: (_: unknown, item: BindingItem) => (
         <Space orientation="vertical" size={0}>
-          <Tag color="blue">{item.triggerMode}</Tag>
+          <Tag color="blue">{getTriggerModeLabel(item.triggerMode)}</Tag>
           {item.triggerMode === 'keyword' && (
             <Text type="secondary">
               {(item.triggerConfig?.keywords || []).join(', ') || '-'}
@@ -701,33 +819,34 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
       ),
     },
     {
-      title: '会话',
+      title: t('im_settings_session_column'),
       dataIndex: 'sessionStrategy',
       key: 'sessionStrategy',
       width: 180,
+      render: (value: string) => getSessionStrategyLabel(value),
     },
     {
-      title: '优先级',
+      title: t('im_settings_priority_column'),
       dataIndex: 'priority',
       key: 'priority',
       width: 100,
     },
     {
-      title: '状态',
+      title: t('im_settings_status_column'),
       dataIndex: 'status',
       key: 'status',
       width: 100,
-      render: (value: string) => <Tag color={value === 'active' ? 'success' : 'default'}>{value}</Tag>,
+      render: (value: string) => <Tag color={value === 'active' ? 'success' : 'default'}>{getStatusLabel(value)}</Tag>,
     },
     {
-      title: '操作',
+      title: t('im_settings_actions_column'),
       key: 'actions',
       width: 180,
       render: (_: unknown, item: BindingItem) => (
         <Space>
-          <Button size="small" onClick={() => openEditBinding(item)}>编辑</Button>
-          <Popconfirm title="确认删除这个绑定？" onConfirm={() => handleDeleteBinding(item)}>
-            <Button size="small" danger>删除</Button>
+          <Button size="small" onClick={() => openEditBinding(item)}>{t('im_settings_edit')}</Button>
+          <Popconfirm title={t('im_settings_confirm_delete_binding')} onConfirm={() => handleDeleteBinding(item)}>
+            <Button size="small" danger>{t('im_settings_delete')}</Button>
           </Popconfirm>
         </Space>
       ),
@@ -736,55 +855,55 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
 
   const eventColumns = [
     {
-      title: '事件 ID',
+      title: t('im_settings_event_id_column'),
       dataIndex: 'event_id',
       key: 'event_id',
       render: (value: string) => <Text code>{value || '-'}</Text>,
     },
     {
-      title: '方向',
+      title: t('im_settings_direction_column'),
       dataIndex: 'direction',
       key: 'direction',
       width: 100,
-      render: (value: string) => <Tag>{value || '-'}</Tag>,
+      render: (value: string) => <Tag>{getDirectionLabel(value)}</Tag>,
     },
     {
-      title: '状态',
+      title: t('im_settings_status_column'),
       dataIndex: 'status',
       key: 'status',
       width: 110,
       render: (value: string) => (
         <Tag color={value === 'received' ? 'processing' : value === 'no_binding' ? 'warning' : value === 'error' ? 'error' : 'default'}>
-          {value}
+          {getStatusLabel(value)}
         </Tag>
       ),
     },
     {
-      title: '外部消息',
+      title: t('im_settings_external_message_column'),
       dataIndex: 'external_message_id',
       key: 'external_message_id',
       render: (value?: string) => value ? <Text code>{value}</Text> : '-',
     },
     {
-      title: '时间',
+      title: t('im_settings_time_column'),
       dataIndex: 'created_at',
       key: 'created_at',
       width: 180,
       render: (value?: string) => formatDateTime(value),
     },
     {
-      title: '错误',
+      title: t('im_settings_error_column'),
       dataIndex: 'error_message',
       key: 'error_message',
       render: (value?: string) => value ? <Text type="danger">{formatErrorPreview(value)}</Text> : '-',
     },
     {
-      title: '详情',
+      title: t('im_settings_detail_column'),
       key: 'actions',
       width: 100,
       render: (_: unknown, item: ConnectionEventItem) => (
-        <Button size="small" onClick={() => openDetail(`事件详情 · ${item.event_id || item.id}`, item)}>
-          查看
+        <Button size="small" onClick={() => openDetail(`${t('im_settings_event_detail_title')} · ${item.event_id || item.id}`, item)}>
+          {t('im_settings_view')}
         </Button>
       ),
     },
@@ -792,54 +911,54 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
 
   const deliveryColumns = [
     {
-      title: '状态',
+      title: t('im_settings_status_column'),
       dataIndex: 'status',
       key: 'status',
       width: 110,
       render: (value: string) => (
         <Tag color={value === 'accepted' ? 'success' : value === 'pending' ? 'processing' : value === 'failed' ? 'error' : 'default'}>
-          {value}
+          {getStatusLabel(value)}
         </Tag>
       ),
     },
     {
-      title: '尝试',
+      title: t('im_settings_attempts_column'),
       dataIndex: 'attempt',
       key: 'attempt',
       width: 80,
     },
     {
-      title: '消息 ID',
+      title: t('im_settings_message_id_column'),
       dataIndex: 'message_id',
       key: 'message_id',
       render: (value?: string) => value ? <Text code>{value}</Text> : '-',
     },
     {
-      title: '会话 ID',
+      title: t('im_settings_conversation_id_column'),
       dataIndex: 'conversation_id',
       key: 'conversation_id',
       render: (value?: string) => value ? <Text code>{value}</Text> : '-',
     },
     {
-      title: '时间',
+      title: t('im_settings_time_column'),
       dataIndex: 'created_at',
       key: 'created_at',
       width: 180,
       render: (value?: string) => formatDateTime(value),
     },
     {
-      title: '错误',
+      title: t('im_settings_error_column'),
       dataIndex: 'error_message',
       key: 'error_message',
       render: (value?: string) => value ? <Text type="danger">{formatErrorPreview(value)}</Text> : '-',
     },
     {
-      title: '详情',
+      title: t('im_settings_detail_column'),
       key: 'actions',
       width: 100,
       render: (_: unknown, item: DeliveryLogItem) => (
-        <Button size="small" onClick={() => openDetail(`投递详情 · ${item.id}`, item)}>
-          查看
+        <Button size="small" onClick={() => openDetail(`${t('im_settings_delivery_detail_title')} · ${item.id}`, item)}>
+          {t('im_settings_view')}
         </Button>
       ),
     },
@@ -851,7 +970,7 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
       <Space orientation="vertical" size={16} style={{ width: '100%' }}>
         <Card variant="borderless" style={{ borderRadius: 20 }}>
           <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            管理企业级 IM 渠道连接，并为每个连接配置 Agent 绑定、触发规则和会话策略。
+            {t('im_settings_summary_description')}
           </Paragraph>
         </Card>
 
@@ -860,11 +979,11 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
             <Card
               variant="borderless"
               style={{ borderRadius: 20 }}
-              title={<Space><ApiOutlined />IM 连接</Space>}
+              title={<Space><ApiOutlined />{t('im_settings_connections_card_title')}</Space>}
               extra={
                 <Space>
-                  <Button icon={<ReloadOutlined />} onClick={loadConnections}>刷新</Button>
-                  <Button type="primary" icon={<PlusOutlined />} onClick={openCreateConnection}>新建连接</Button>
+                  <Button icon={<ReloadOutlined />} onClick={loadConnections}>{t('im_settings_refresh')}</Button>
+                  <Button type="primary" icon={<PlusOutlined />} onClick={openCreateConnection}>{t('im_settings_new_connection')}</Button>
                 </Space>
               }
             >
@@ -874,7 +993,7 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
                 dataSource={connections}
                 columns={connectionColumns}
                 pagination={false}
-                locale={{ emptyText: <Empty description="暂无 IM 连接" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
+                locale={{ emptyText: <Empty description={t('im_settings_no_connections')} image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
                 rowClassName={(record) => record.id === selectedConnectionId ? 'im-selected-row' : ''}
                 onRow={(record) => ({
                   onClick: () => setSelectedConnectionId(record.id),
@@ -888,11 +1007,11 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
             <Card
               variant="borderless"
               style={{ borderRadius: 20, minHeight: 420 }}
-              title={<Space><LinkOutlined />Agent 绑定</Space>}
+              title={<Space><LinkOutlined />{t('im_settings_bindings_card_title')}</Space>}
               extra={
                 <Space>
-                  <Button icon={<ReloadOutlined />} disabled={!selectedConnection} onClick={() => loadBindings(selectedConnection?.id)}>刷新</Button>
-                  <Button type="primary" icon={<PlusOutlined />} disabled={!selectedConnection} onClick={openCreateBinding}>新增绑定</Button>
+                  <Button icon={<ReloadOutlined />} disabled={!selectedConnection} onClick={() => loadBindings(selectedConnection?.id)}>{t('im_settings_refresh')}</Button>
+                  <Button type="primary" icon={<PlusOutlined />} disabled={!selectedConnection} onClick={openCreateBinding}>{t('im_settings_new_binding')}</Button>
                 </Space>
               }
             >
@@ -902,27 +1021,31 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
                     <Space orientation="vertical" size={4}>
                       <Space wrap size={[8, 0]}>
                         <Text strong>{selectedConnection.name}</Text>
-                        {selectedConnectionIsFixture ? <Tag color="gold">测试夹具连接</Tag> : null}
-                        {selectedConnection.status === 'error' ? <Tag color="error">启用异常</Tag> : null}
+                      {selectedConnectionIsFixture ? <Tag color="gold">{t('im_settings_fixture_connection_tag')}</Tag> : null}
+                      {selectedConnection.status === 'error' ? <Tag color="error">{t('im_settings_enable_error_tag')}</Tag> : null}
                       </Space>
-                      <Text type="secondary">{selectedConnection.platform} · {selectedConnection.connectionMode}</Text>
-                      <Text type="secondary">来源：{formatConnectionSource(selectedConnection)}</Text>
+                      <Text type="secondary">{getPlatformLabel(selectedConnection.platform)} · {getConnectionModeLabel(selectedConnection.connectionMode)}</Text>
+                    <Text type="secondary">{t('im_settings_source_prefix')}: {getSourceLabel(selectedConnection)}</Text>
                       <Text type="secondary">
                         {selectedConnection.platform === WEB_PLATFORM
-                          ? `通道：${selectedConnection.config?.channel || 'web_chat'}`
+                          ? `${t('im_settings_channel_label')}: ${
+                              !selectedConnection.config?.channel || selectedConnection.config.channel === 'web_chat'
+                                ? t('im_settings_channel_web_chat')
+                                : selectedConnection.config.channel
+                            }`
                           : selectedConnection.platform === TELEGRAM_PLATFORM
-                            ? `轮询超时：${selectedConnection.config?.pollTimeoutSeconds || 30}s`
+                            ? `${t('im_settings_poll_timeout_label')}: ${selectedConnection.config?.pollTimeoutSeconds || 30}s`
                             : selectedConnection.platform === QQ_PLATFORM
-                              ? `App ID：${selectedConnection.config?.appId || '-'}`
+                              ? `${t('im_settings_app_id_label')}: ${selectedConnection.config?.appId || '-'}`
                             : selectedConnection.platform === MATRIX_PLATFORM
-                              ? `Homeserver：${selectedConnection.config?.homeserver || '-'}`
+                                ? `${t('im_settings_homeserver_label')}: ${selectedConnection.config?.homeserver || '-'}`
                             : selectedConnection.platform === DISCORD_PLATFORM
-                              ? '模式：Gateway'
+                                ? t('im_settings_gateway_mode_label')
                             : selectedConnection.platform === SLACK_PLATFORM
-                              ? '模式：Socket Mode'
-                            : `App ID：${selectedConnection.config?.appId || '-'}`}
+                                  ? t('im_settings_socket_mode_label')
+                                  : `${t('im_settings_app_id_label')}: ${selectedConnection.config?.appId || '-'}`}
                       </Text>
-                      <Text type="secondary">回调路径：{selectedConnection.callbackPath || '-'}</Text>
+                      <Text type="secondary">{t('im_settings_callback_path_label')}: {selectedConnection.callbackPath || '-'}</Text>
                       {selectedConnection.lastError ? <Text type="danger">{selectedConnection.lastError}</Text> : null}
                     </Space>
                   </Card>
@@ -930,15 +1053,15 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
                     <Alert
                       type="warning"
                       showIcon
-                      message="当前连接来自集成测试夹具"
-                      description="这条连接使用测试用 App ID / Secret，测试连接或启用时会命中真实飞书 API 的 invalid param。若要验证真实启用链路，请新建或编辑为真实飞书应用配置。"
+                      message={t('im_settings_fixture_warning_title')}
+                      description={t('im_settings_fixture_warning_description')}
                     />
                   ) : null}
                   <Tabs
                     items={[
                       {
                         key: 'bindings',
-                        label: `绑定 (${bindings.length})`,
+                        label: `${t('im_settings_bindings_tab_label')} (${bindings.length})`,
                         children: (
                           <Table
                             rowKey="id"
@@ -946,44 +1069,44 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
                             dataSource={bindings}
                             columns={bindingColumns}
                             pagination={false}
-                            locale={{ emptyText: <Empty description="当前连接暂无绑定" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
+                            locale={{ emptyText: <Empty description={t('im_settings_no_bindings')} image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
                             scroll={{ x: 760 }}
                           />
                         ),
                       },
                       {
                         key: 'events',
-                        label: `事件 (${events.length})`,
+                        label: `${t('im_settings_events_tab_label')} (${events.length})`,
                         children: (
                           <Space orientation="vertical" size={12} style={{ width: '100%' }}>
                             <Space wrap style={{ justifyContent: 'space-between', width: '100%' }}>
                               <Space wrap>
                                 <Select
                                   allowClear
-                                  placeholder="方向"
+                                  placeholder={t('im_settings_direction_column')}
                                   style={{ width: 120 }}
                                   value={eventFilters.direction || undefined}
                                   options={[
-                                    { label: 'inbound', value: 'inbound' },
-                                    { label: 'outbound', value: 'outbound' },
+                                    { label: t('im_settings_inbound_label'), value: 'inbound' },
+                                    { label: t('im_settings_outbound_label'), value: 'outbound' },
                                   ]}
                                   onChange={(value) => setEventFilters((current) => ({ ...current, direction: value || '' }))}
                                 />
                                 <Select
                                   allowClear
-                                  placeholder="状态"
+                                  placeholder={t('im_settings_status_column')}
                                   style={{ width: 160 }}
                                   value={eventFilters.status || undefined}
                                   options={[
-                                    { label: 'received', value: 'received' },
-                                    { label: 'processed', value: 'processed' },
-                                    { label: 'no_binding', value: 'no_binding' },
-                                    { label: 'error', value: 'error' },
+                                    { label: t('im_settings_received_status'), value: 'received' },
+                                    { label: t('im_settings_processed_status'), value: 'processed' },
+                                    { label: t('im_settings_no_binding_status'), value: 'no_binding' },
+                                    { label: t('im_settings_error_status'), value: 'error' },
                                   ]}
                                   onChange={(value) => setEventFilters((current) => ({ ...current, status: value || '' }))}
                                 />
                               </Space>
-                              <Button icon={<ReloadOutlined />} onClick={() => loadEvents(selectedConnection.id)}>刷新事件</Button>
+                              <Button icon={<ReloadOutlined />} onClick={() => loadEvents(selectedConnection.id)}>{t('im_settings_refresh_events')}</Button>
                             </Space>
                             <Table
                               rowKey="id"
@@ -991,7 +1114,7 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
                               dataSource={events}
                               columns={eventColumns}
                               pagination={false}
-                              locale={{ emptyText: <Empty description="当前连接暂无事件日志" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
+                              locale={{ emptyText: <Empty description={t('im_settings_no_events')} image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
                               scroll={{ x: 960 }}
                             />
                           </Space>
@@ -999,23 +1122,23 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
                       },
                       {
                         key: 'deliveries',
-                        label: `投递 (${deliveries.length})`,
+                        label: `${t('im_settings_deliveries_tab_label')} (${deliveries.length})`,
                         children: (
                           <Space orientation="vertical" size={12} style={{ width: '100%' }}>
                             <Space wrap style={{ justifyContent: 'space-between', width: '100%' }}>
                               <Select
                                 allowClear
-                                placeholder="状态"
+                                placeholder={t('im_settings_status_column')}
                                 style={{ width: 160 }}
                                 value={deliveryFilters.status || undefined}
                                 options={[
-                                  { label: 'pending', value: 'pending' },
-                                  { label: 'accepted', value: 'accepted' },
-                                  { label: 'failed', value: 'failed' },
+                                  { label: t('im_settings_pending_status'), value: 'pending' },
+                                  { label: t('im_settings_accepted_status'), value: 'accepted' },
+                                  { label: t('im_settings_failed_status'), value: 'failed' },
                                 ]}
                                 onChange={(value) => setDeliveryFilters({ status: value || '' })}
                               />
-                              <Button icon={<ReloadOutlined />} onClick={() => loadDeliveries(selectedConnection.id)}>刷新投递</Button>
+                              <Button icon={<ReloadOutlined />} onClick={() => loadDeliveries(selectedConnection.id)}>{t('im_settings_refresh_deliveries')}</Button>
                             </Space>
                             <Table
                               rowKey="id"
@@ -1023,7 +1146,7 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
                               dataSource={deliveries}
                               columns={deliveryColumns}
                               pagination={false}
-                              locale={{ emptyText: <Empty description="当前连接暂无投递日志" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
+                              locale={{ emptyText: <Empty description={t('im_settings_no_deliveries')} image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
                               scroll={{ x: 960 }}
                             />
                           </Space>
@@ -1033,7 +1156,7 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
                   />
                 </Space>
               ) : (
-                <Empty description="请先选择一个 IM 连接" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                <Empty description={t('im_settings_select_connection_first')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
               )}
             </Card>
           </Col>
@@ -1041,55 +1164,55 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
       </Space>
 
       <Modal
-        title={editingConnection ? '编辑 IM 连接' : '新建 IM 连接'}
+        title={editingConnection ? t('im_settings_edit_connection_title') : t('im_settings_create_connection_title')}
         open={connectionModalOpen}
         destroyOnHidden
         onCancel={() => setConnectionModalOpen(false)}
         onOk={handleSaveConnection}
         confirmLoading={savingConnection}
-        okText={editingConnection ? '保存' : '创建'}
+        okText={editingConnection ? t('im_settings_save') : t('im_settings_create')}
       >
         <Form form={connectionForm} layout="vertical">
-          <Form.Item label="平台" name="platform" rules={[{ required: true, message: '请选择平台' }]}>
+          <Form.Item label={t('im_settings_platform_label')} name="platform" rules={[{ required: true, message: t('im_settings_select_platform') }]}>
             <Select
               disabled={Boolean(editingConnection)}
               options={[
-                { label: 'Telegram', value: TELEGRAM_PLATFORM },
-                { label: 'QQ', value: QQ_PLATFORM },
-                { label: 'Matrix', value: MATRIX_PLATFORM },
-                { label: 'Discord', value: DISCORD_PLATFORM },
-                { label: 'Slack', value: SLACK_PLATFORM },
-                { label: 'Feishu', value: FEISHU_PLATFORM },
-                { label: 'Web Chat', value: WEB_PLATFORM },
+                { label: t('im_settings_platform_telegram'), value: TELEGRAM_PLATFORM },
+                { label: t('im_settings_platform_qq'), value: QQ_PLATFORM },
+                { label: t('im_settings_platform_matrix'), value: MATRIX_PLATFORM },
+                { label: t('im_settings_platform_discord'), value: DISCORD_PLATFORM },
+                { label: t('im_settings_platform_slack'), value: SLACK_PLATFORM },
+                { label: t('im_settings_platform_feishu'), value: FEISHU_PLATFORM },
+                { label: t('im_settings_platform_web'), value: WEB_PLATFORM },
               ]}
             />
           </Form.Item>
-          <Form.Item label="连接名称" name="name" rules={[{ required: true, message: '请输入连接名称' }]}>
-            <Input placeholder="例如：企业飞书主通道" />
+          <Form.Item label={t('im_settings_connection_name_label')} name="name" rules={[{ required: true, message: t('im_settings_connection_name_required') }]}>
+            <Input placeholder={t('im_settings_connection_name_placeholder')} />
           </Form.Item>
-          <Form.Item label="连接模式" name="connectionMode" rules={[{ required: true, message: '请选择连接模式' }]}>
+          <Form.Item label={t('im_settings_connection_mode_label')} name="connectionMode" rules={[{ required: true, message: t('im_settings_select_connection_mode') }]}>
             <Select options={connectionModeOptions} />
           </Form.Item>
           {connectionFormPlatform === WEB_PLATFORM ? (
             <Alert
               type="info"
               showIcon
-              message="Web Chat 连接"
-              description="Web Chat 连接不需要第三方 App ID / Secret。系统会把网页聊天请求接入 IM 框架，并通过该连接记录绑定、事件和投递。"
+              message={t('im_settings_web_chat_connection_title')}
+              description={t('im_settings_web_chat_connection_description')}
             />
           ) : connectionFormPlatform === TELEGRAM_PLATFORM ? (
             <>
               <Alert
                 type="info"
                 showIcon
-                message="Telegram 连接"
-                description="Telegram 使用 long polling 直连 Bot API，不需要公网回调地址。建议优先用于快速落地外部 IM 接入。"
+                message={t('im_settings_telegram_connection_title')}
+                description={t('im_settings_telegram_connection_description')}
               />
-              <Form.Item label={editingConnection ? 'Bot Token（留空表示保持不变）' : 'Bot Token'} name="token" rules={editingConnection ? [] : [{ required: true, message: '请输入 Bot Token' }]}>
-                <Input.Password placeholder="例如：123456:ABCDEF..." />
+              <Form.Item label={editingConnection ? t('im_settings_bot_token_optional_label') : t('im_settings_bot_token_label')} name="token" rules={editingConnection ? [] : [{ required: true, message: t('im_settings_bot_token_required') }]}>
+                <Input.Password placeholder={t('im_settings_bot_token_example')} />
               </Form.Item>
-              <Form.Item label="轮询超时（秒）" name="pollTimeoutSeconds" rules={[{ required: true, message: '请输入轮询超时' }]}>
-                <InputNumber min={10} max={60} style={{ width: '100%' }} />
+              <Form.Item label={t('im_settings_poll_timeout_label')} name="pollTimeoutSeconds" rules={[{ required: true, message: t('im_settings_poll_timeout_label') }]}>
+                <InputNumber controls={false} min={10} max={60} style={{ width: '100%' }} />
               </Form.Item>
             </>
           ) : connectionFormPlatform === QQ_PLATFORM ? (
@@ -1097,14 +1220,14 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
               <Alert
                 type="info"
                 showIcon
-                message="QQ 连接"
-                description="QQ 官方 Bot 使用 Gateway WebSocket 接收消息，出站通过 OpenAPI 发送。首版优先支持单聊和群 @ 机器人消息。"
+                message={t('im_settings_qq_connection_title')}
+                description={t('im_settings_qq_connection_description')}
               />
-              <Form.Item label="App ID" name="qqAppId" rules={[{ required: true, message: '请输入 App ID' }]}>
-                <Input placeholder="QQ Bot App ID" />
+              <Form.Item label={t('im_settings_app_id_label')} name="qqAppId" rules={[{ required: true, message: t('im_settings_app_id_required') }]}>
+                <Input placeholder={t('im_settings_qq_app_id_placeholder')} />
               </Form.Item>
-              <Form.Item label={editingConnection ? 'App Secret（留空表示保持不变）' : 'App Secret'} name="qqAppSecret" rules={editingConnection ? [] : [{ required: true, message: '请输入 App Secret' }]}>
-                <Input.Password placeholder="QQ Bot App Secret" />
+              <Form.Item label={editingConnection ? t('im_settings_app_secret_optional_label') : t('im_settings_app_secret_label')} name="qqAppSecret" rules={editingConnection ? [] : [{ required: true, message: t('im_settings_app_secret_required') }]}>
+                <Input.Password placeholder={t('im_settings_qq_app_secret_placeholder')} />
               </Form.Item>
             </>
           ) : connectionFormPlatform === MATRIX_PLATFORM ? (
@@ -1112,20 +1235,20 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
               <Alert
                 type="info"
                 showIcon
-                message="Matrix 连接"
-                description="Matrix 使用 Client-Server API 的 /sync 长轮询接收消息，不需要公网 webhook。"
+                message={t('im_settings_matrix_connection_title')}
+                description={t('im_settings_matrix_connection_description')}
               />
-              <Form.Item label="Homeserver" name="matrixHomeserver" rules={[{ required: true, message: '请输入 Homeserver' }]}>
-                <Input placeholder="例如：https://matrix.org" />
+              <Form.Item label={t('im_settings_homeserver_label')} name="matrixHomeserver" rules={[{ required: true, message: t('im_settings_homeserver_required') }]}>
+                <Input placeholder={t('im_settings_homeserver_placeholder')} />
               </Form.Item>
-              <Form.Item label="User ID" name="matrixUserId" rules={[{ required: true, message: '请输入 User ID' }]}>
-                <Input placeholder="例如：@bot:matrix.org" />
+              <Form.Item label={t('im_settings_user_id_label')} name="matrixUserId" rules={[{ required: true, message: t('im_settings_user_id_required') }]}>
+                <Input placeholder={t('im_settings_user_id_placeholder')} />
               </Form.Item>
-              <Form.Item label={editingConnection ? 'Access Token（留空表示保持不变）' : 'Access Token'} name="matrixAccessToken" rules={editingConnection ? [] : [{ required: true, message: '请输入 Access Token' }]}>
-                <Input.Password placeholder="Matrix Access Token" />
+              <Form.Item label={editingConnection ? t('im_settings_access_token_optional_label') : t('im_settings_access_token_label')} name="matrixAccessToken" rules={editingConnection ? [] : [{ required: true, message: t('im_settings_access_token_required') }]}>
+                <Input.Password placeholder={t('im_settings_access_token_label')} />
               </Form.Item>
-              <Form.Item label="Sync 超时（秒）" name="matrixSyncTimeoutSeconds" rules={[{ required: true, message: '请输入 Sync 超时' }]}>
-                <InputNumber min={10} max={60} style={{ width: '100%' }} />
+              <Form.Item label={t('im_settings_sync_timeout_label')} name="matrixSyncTimeoutSeconds" rules={[{ required: true, message: t('im_settings_sync_timeout_required') }]}>
+                <InputNumber controls={false} min={10} max={60} style={{ width: '100%' }} />
               </Form.Item>
             </>
           ) : connectionFormPlatform === DISCORD_PLATFORM ? (
@@ -1133,11 +1256,11 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
               <Alert
                 type="info"
                 showIcon
-                message="Discord 连接"
-                description="Discord 使用 Gateway WebSocket 接收消息，不需要公网 webhook。建议在开发者后台开启 Message Content Intent。"
+                message={t('im_settings_discord_connection_title')}
+                description={t('im_settings_discord_connection_description')}
               />
-              <Form.Item label={editingConnection ? 'Bot Token（留空表示保持不变）' : 'Bot Token'} name="discordToken" rules={editingConnection ? [] : [{ required: true, message: '请输入 Bot Token' }]}>
-                <Input.Password placeholder="Discord Bot Token" />
+              <Form.Item label={editingConnection ? t('im_settings_bot_token_optional_label') : t('im_settings_bot_token_label')} name="discordToken" rules={editingConnection ? [] : [{ required: true, message: t('im_settings_bot_token_required') }]}>
+                <Input.Password placeholder={t('im_settings_bot_token_label')} />
               </Form.Item>
             </>
           ) : connectionFormPlatform === SLACK_PLATFORM ? (
@@ -1145,26 +1268,26 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
               <Alert
                 type="info"
                 showIcon
-                message="Slack 连接"
-                description="Slack 使用 Socket Mode 接收事件，不需要公网 webhook。需要同时配置 Bot Token 和 App Token。"
+                message={t('im_settings_slack_connection_title')}
+                description={t('im_settings_slack_connection_description')}
               />
-              <Form.Item label={editingConnection ? 'Bot Token（留空表示保持不变）' : 'Bot Token'} name="botToken" rules={editingConnection ? [] : [{ required: true, message: '请输入 Bot Token' }]}>
-                <Input.Password placeholder="例如：xoxb-..." />
+              <Form.Item label={editingConnection ? t('im_settings_bot_token_optional_label') : t('im_settings_bot_token_label')} name="botToken" rules={editingConnection ? [] : [{ required: true, message: t('im_settings_bot_token_required') }]}>
+                <Input.Password placeholder={t('im_settings_slack_bot_token_placeholder')} />
               </Form.Item>
-              <Form.Item label={editingConnection ? 'App Token（留空表示保持不变）' : 'App Token'} name="appToken" rules={editingConnection ? [] : [{ required: true, message: '请输入 App Token' }]}>
-                <Input.Password placeholder="例如：xapp-..." />
+              <Form.Item label={editingConnection ? t('im_settings_app_token_optional_label') : t('im_settings_app_token_label')} name="appToken" rules={editingConnection ? [] : [{ required: true, message: t('im_settings_app_token_required') }]}>
+                <Input.Password placeholder={t('im_settings_slack_app_token_placeholder')} />
               </Form.Item>
             </>
           ) : (
             <>
-              <Form.Item label="App ID" name="appId" rules={[{ required: true, message: '请输入 App ID' }]}>
+              <Form.Item label={t('im_settings_app_id_label')} name="appId" rules={[{ required: true, message: t('im_settings_app_id_required') }]}>
                 <Input />
               </Form.Item>
-              <Form.Item label={editingConnection ? 'App Secret（留空表示保持不变）' : 'App Secret'} name="appSecret" rules={editingConnection ? [] : [{ required: true, message: '请输入 App Secret' }]}>
+              <Form.Item label={editingConnection ? t('im_settings_app_secret_optional_label') : t('im_settings_app_secret_label')} name="appSecret" rules={editingConnection ? [] : [{ required: true, message: t('im_settings_app_secret_required') }]}>
                 <Input.Password />
               </Form.Item>
-              <Form.Item label="域名" name="domain">
-                <Select options={[{ label: 'feishu', value: 'feishu' }, { label: 'lark', value: 'lark' }]} />
+              <Form.Item label={t('im_settings_domain_label')} name="domain">
+                <Select options={[{ label: t('im_settings_domain_feishu'), value: 'feishu' }, { label: t('im_settings_domain_lark'), value: 'lark' }]} />
               </Form.Item>
             </>
           )}
@@ -1172,16 +1295,16 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
       </Modal>
 
       <Modal
-        title={editingBinding ? '编辑绑定' : '新增绑定'}
+        title={editingBinding ? t('im_settings_edit_binding_title') : t('im_settings_create_binding_title')}
         open={bindingModalOpen}
         destroyOnHidden
         onCancel={() => setBindingModalOpen(false)}
         onOk={handleSaveBinding}
         confirmLoading={savingBinding}
-        okText={editingBinding ? '保存' : '创建'}
+        okText={editingBinding ? t('im_settings_save') : t('im_settings_create')}
       >
         <Form form={bindingForm} layout="vertical" initialValues={{ allowGroup: true, allowDm: true }}>
-          <Form.Item label="Agent" name="agentId" rules={[{ required: true, message: '请选择 Agent' }]}>
+          <Form.Item label={t('im_settings_agent_label')} name="agentId" rules={[{ required: true, message: t('im_settings_select_agent') }]}>
             <Select
               loading={agentsLoading}
               showSearch
@@ -1189,65 +1312,65 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
               options={agents.map((item) => ({ label: item.agentName, value: item.id }))}
             />
           </Form.Item>
-          <Form.Item label="状态" name="status" rules={[{ required: true, message: '请选择状态' }]}>
-            <Select options={[{ label: 'active', value: 'active' }, { label: 'disabled', value: 'disabled' }]} />
+          <Form.Item label={t('im_settings_status_column')} name="status" rules={[{ required: true, message: t('im_settings_select_status') }]}>
+            <Select options={[{ label: t('im_settings_active_status'), value: 'active' }, { label: t('im_settings_disabled_status'), value: 'disabled' }]} />
           </Form.Item>
-          <Form.Item label="触发模式" name="triggerMode" rules={[{ required: true, message: '请选择触发模式' }]}>
+          <Form.Item label={t('im_settings_trigger_column')} name="triggerMode" rules={[{ required: true, message: t('im_settings_select_trigger_mode') }]}>
             <Select
               options={[
-                { label: 'mention_only', value: 'mention_only' },
-                { label: 'all_messages', value: 'all_messages' },
-                { label: 'keyword', value: 'keyword' },
-                { label: 'command', value: 'command' },
-                { label: 'dm_only', value: 'dm_only' },
-                { label: 'group_only', value: 'group_only' },
+                { label: t('im_settings_mention_only_trigger'), value: 'mention_only' },
+                { label: t('im_settings_all_messages_trigger'), value: 'all_messages' },
+                { label: t('im_settings_keyword_trigger'), value: 'keyword' },
+                { label: t('im_settings_command_trigger'), value: 'command' },
+                { label: t('im_settings_dm_only_trigger'), value: 'dm_only' },
+                { label: t('im_settings_group_only_trigger'), value: 'group_only' },
               ]}
             />
           </Form.Item>
           <Form.Item noStyle shouldUpdate={(prev, current) => prev.triggerMode !== current.triggerMode}>
             {({ getFieldValue }) => getFieldValue('triggerMode') === 'keyword' ? (
               <Form.Item
-                label="关键词"
+                label={t('im_settings_keyword_label')}
                 name="keywords"
-                rules={[{ required: true, message: '请输入关键词，多个关键词用逗号分隔' }]}
+                rules={[{ required: true, message: t('im_settings_keyword_required') }]}
               >
-                <Input placeholder="例如：报销,审批,日报" />
+                <Input placeholder={t('im_settings_keyword_placeholder')} />
               </Form.Item>
             ) : null}
           </Form.Item>
-          <Form.Item label="会话策略" name="sessionStrategy" rules={[{ required: true, message: '请选择会话策略' }]}>
+          <Form.Item label={t('im_settings_session_strategy_label')} name="sessionStrategy" rules={[{ required: true, message: t('im_settings_select_session_strategy') }]}>
             <Select
               options={[
-                { label: 'per_user', value: 'per_user' },
-                { label: 'per_chat', value: 'per_chat' },
-                { label: 'per_thread', value: 'per_thread' },
-                { label: 'per_chat_per_user', value: 'per_chat_per_user' },
+                { label: t('im_settings_per_user_session'), value: 'per_user' },
+                { label: t('im_settings_per_chat_session'), value: 'per_chat' },
+                { label: t('im_settings_per_thread_session'), value: 'per_thread' },
+                { label: t('im_settings_per_chat_per_user_session'), value: 'per_chat_per_user' },
               ]}
             />
           </Form.Item>
-          <Form.Item label="回复模式" name="replyMode" rules={[{ required: true, message: '请输入回复模式' }]}>
+          <Form.Item label={t('im_settings_reply_mode_label')} name="replyMode" rules={[{ required: true, message: t('im_settings_reply_mode_required') }]}>
             <Input />
           </Form.Item>
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item label="允许群聊" name="allowGroup" valuePropName="checked">
+              <Form.Item label={t('im_settings_allow_group')} name="allowGroup" valuePropName="checked">
                 <Switch />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item label="允许私聊" name="allowDm" valuePropName="checked">
+              <Form.Item label={t('im_settings_allow_dm')} name="allowDm" valuePropName="checked">
                 <Switch />
               </Form.Item>
             </Col>
           </Row>
-          <Form.Item label="优先级" name="priority" rules={[{ required: true, message: '请输入优先级' }]}>
-            <InputNumber min={0} style={{ width: '100%' }} />
+          <Form.Item label={t('im_settings_priority_column')} name="priority" rules={[{ required: true, message: t('im_settings_priority_required') }]}>
+            <InputNumber controls={false} min={0} style={{ width: '100%' }} />
           </Form.Item>
         </Form>
       </Modal>
 
       <Modal
-        title={detailState?.title || '日志详情'}
+        title={detailState?.title || t('im_settings_detail_dialog_title')}
         open={Boolean(detailState)}
         footer={null}
         width={720}
@@ -1284,3 +1407,4 @@ const IMSettingsTab: React.FC<IMSettingsTabProps> = ({ createSignal = 0 }) => {
 };
 
 export default IMSettingsTab;
+

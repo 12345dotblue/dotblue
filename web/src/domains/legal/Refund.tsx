@@ -8,7 +8,7 @@ const { Title, Paragraph, Text } = Typography;
 
 const Refund: React.FC = () => {
   const { t, i18n } = useTranslation();
-  const currentLanguage = resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language);
+  const currentLanguage = resolveSupportedLanguage(i18n?.resolvedLanguage || i18n?.language);
 
   const eligibilityItems = [1, 2, 3, 4].map(i => t(`refund_eligibility_${i}`));
 

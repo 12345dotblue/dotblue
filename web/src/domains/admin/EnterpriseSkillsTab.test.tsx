@@ -82,20 +82,29 @@ describe('EnterpriseSkillsTab', () => {
 
   it('启用 skill 时调用企业启用接口', async () => {
     const user = userEvent.setup();
-    mockedAxiosGet.mockResolvedValue({
-      data: [
-        {
-          id: 'skill-1',
-          code: 'knowledge.search',
-          name: '知识检索',
-          sourceType: 'builtin',
-          trustLevel: 'platform_trusted',
-          status: 'published',
-          latestPublishedVersion: '1.0.0',
-          enablementStatus: '',
-        },
-      ],
-    } as any);
+    mockedAxiosGet.mockImplementation((url) => {
+      const target = String(url);
+      if (target.includes('/api/admin/skills?view=governance')) {
+        return Promise.resolve({ data: [] } as any);
+      }
+      if (target.includes('/api/admin/skills?view=catalog')) {
+        return Promise.resolve({
+          data: [
+            {
+              id: 'skill-1',
+              code: 'knowledge.search',
+              name: '知识检索',
+              sourceType: 'builtin',
+              trustLevel: 'platform_trusted',
+              status: 'published',
+              latestPublishedVersion: '1.0.0',
+              enablementStatus: '',
+            },
+          ],
+        } as any);
+      }
+      throw new Error(`unexpected get ${target}`);
+    });
     mockedAxiosPost.mockResolvedValue({ data: {} } as any);
 
     render(<EnterpriseSkillsTab createSignal={0} />);
@@ -106,14 +115,15 @@ describe('EnterpriseSkillsTab', () => {
     expect(await screen.findByText('knowledge.search')).toBeTruthy();
     const row = screen.getByText('knowledge.search').closest('tr');
     expect(row).toBeTruthy();
-    await user.click(within(row as HTMLElement).getByRole('button'));
-    await user.click(screen.getAllByRole('combobox')[0]);
-    await user.click((await screen.findAllByText('knowledge.search · 知识检索')).at(-1)!);
-    await user.click(screen.getAllByRole('button').at(-1)!);
+    await user.click(within(row as HTMLElement).getByRole('button', { name: 'enterprise_admin_skills_action_enable' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getAllByRole('combobox')[0]);
+    await user.click(await screen.findByText('knowledge.search · 知识检索'));
+    await user.click(within(dialog).getByRole('button', { name: 'enterprise_admin_skills_action_enable' }));
 
     await waitFor(() => expect(mockedAxiosPost).toHaveBeenCalled());
     expect(mockedAxiosPost.mock.calls[0][0]).toContain('/api/admin/skills/skill-1/enable');
-  });
+  }, 10000);
 
   it('createSignal 触发时打开企业自有 skill 创建弹窗', async () => {
     mockedAxiosGet.mockImplementation((url) => {

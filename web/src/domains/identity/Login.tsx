@@ -1,7 +1,10 @@
-import React, { useEffect } from 'react';
+﻿import React, { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { casdoorService } from './CasdoorService';
 
 const Login: React.FC = () => {
+  const { t } = useTranslation();
+
   useEffect(() => {
     // Redirect to Casdoor login page automatically
     window.location.href = casdoorService.getSigninUrl();
@@ -35,12 +38,12 @@ const Login: React.FC = () => {
       >
         <img
           src="/brand/dotblue-logo.png"
-          alt="dotblue"
+          alt={t('app_name')}
           style={{ width: 160, height: 56, objectFit: 'contain', marginBottom: 20 }}
         />
-        <h2 style={{ margin: 0, color: '#0f172a', fontSize: 28 }}>Redirecting to Casdoor</h2>
+        <h2 style={{ margin: 0, color: '#0f172a', fontSize: 28 }}>{t('login_redirect_title')}</h2>
         <p style={{ margin: '12px 0 0', color: '#475569', lineHeight: 1.7 }}>
-          Preparing your secure login experience...
+          {t('login_redirect_subtitle')}
         </p>
       </div>
     </div>
@@ -48,3 +51,4 @@ const Login: React.FC = () => {
 };
 
 export default Login;
+

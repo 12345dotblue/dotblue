@@ -21,7 +21,7 @@ const SetupWizard: React.FC = () => {
   const [initialized, setInitialized] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const currentLanguage = resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language);
+  const currentLanguage = resolveSupportedLanguage(i18n?.resolvedLanguage || i18n?.language);
 
   const [form] = Form.useForm<AdminInfo>();
 
@@ -135,13 +135,13 @@ const SetupWizard: React.FC = () => {
             initialValues={{ adminUsername: 'admin' }}
           >
             <Form.Item label={t('setup_username')} name="adminUsername" rules={[{ required: true }]}>
-              <Input prefix={<UserOutlined />} placeholder="admin" />
+              <Input prefix={<UserOutlined />} placeholder={t('setup_username_placeholder')} />
             </Form.Item>
             <Form.Item label={t('setup_password')} name="adminPassword" rules={[{ required: true, min: 6 }]}>
               <Password placeholder={t('setup_password_placeholder')} />
             </Form.Item>
             <Form.Item label={t('setup_email')} name="adminEmail" rules={[{ required: true, type: 'email' }]}>
-              <Input placeholder="admin@example.com" />
+              <Input placeholder={t('setup_email_placeholder')} />
             </Form.Item>
             <Form.Item style={{ marginBottom: 0 }}>
               <Button type="primary" htmlType="submit" block loading={loading}>

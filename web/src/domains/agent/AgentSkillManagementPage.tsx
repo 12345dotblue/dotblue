@@ -29,7 +29,7 @@ const AgentSkillManagementPage: React.FC = () => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { agentId = '' } = useParams();
-  const currentLanguage = resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language);
+  const currentLanguage = resolveSupportedLanguage(i18n?.resolvedLanguage || i18n?.language);
   const marketPath = getLocalizedPath('/admin/platform/skill-market', currentLanguage);
   const builderPath = getLocalizedPath('/admin/platform/skills/new', currentLanguage);
   const [agentName, setAgentName] = useState('');

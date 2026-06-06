@@ -225,7 +225,7 @@ function formatDateTime(value?: string, locale?: string) {
   }).format(date);
 }
 
-function renderStatusTag(status: string, label: string) {
+function renderStatusTag(status: string, label: string, fallbackLabel = '-') {
   const normalized = (status || '').toLowerCase();
   const color = normalized === 'published' || normalized === 'completed' || normalized === 'enabled'
     ? 'success'
@@ -238,10 +238,10 @@ function renderStatusTag(status: string, label: string) {
           : normalized === 'failed' || normalized === 'blocked'
             ? 'error'
             : 'blue';
-  return <Tag color={color}>{label || status || '-'}</Tag>;
+  return <Tag color={color}>{label || status || fallbackLabel}</Tag>;
 }
 
-function renderTrustTag(trustLevel: string, label: string) {
+function renderTrustTag(trustLevel: string, label: string, fallbackLabel = '-') {
   const normalized = (trustLevel || '').toLowerCase();
   const color = normalized.includes('trusted')
     ? 'success'
@@ -250,7 +250,7 @@ function renderTrustTag(trustLevel: string, label: string) {
       : normalized.includes('blocked')
         ? 'error'
         : 'default';
-  return <Tag color={color}>{label || trustLevel || '-'}</Tag>;
+  return <Tag color={color}>{label || trustLevel || fallbackLabel}</Tag>;
 }
 
 function translatePlatformSkillError(
@@ -277,7 +277,7 @@ function translatePlatformSkillError(
   };
 
   const errorKey = errorKeyMap[normalized];
-  return errorKey ? t(errorKey, { defaultValue: errorText }) : errorText;
+  return errorKey ? t(errorKey, { defaultValue: fallbackMessage }) : fallbackMessage;
 }
 
 function renderSummaryCards(items: Array<{ label: string; value: number }>) {
@@ -307,7 +307,16 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
 }) => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  const currentLanguage = resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language);
+  const currentLanguage = resolveSupportedLanguage(i18n?.resolvedLanguage || i18n?.language);
+  const emptyPlaceholder = t('common_empty_placeholder');
+  const platformSkillFormExamples = useMemo(() => ({
+    skillCode: t('platform_skills_form_code_example'),
+    hubCode: t('platform_skill_hubs_form_code_example'),
+    hubName: t('platform_skill_hubs_form_name_example'),
+    hubBaseUrl: t('platform_skill_hubs_form_base_url_example'),
+    version: t('platform_skill_version_form_version_example'),
+    referencesJson: t('platform_skill_version_form_references_example'),
+  }), [t]);
   const [messageApi, contextHolder] = message.useMessage();
   const [activeTab, setActiveTab] = useState<PlatformTabKey>(defaultTab);
   const [skills, setSkills] = useState<SkillItem[]>([]);
@@ -839,7 +848,9 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
       await fetchHubs();
     } catch (error: any) {
       const errorText = error?.response?.data;
-      messageApi.error(typeof errorText === 'string' ? errorText : t('platform_skill_hub_save_failed'));
+      messageApi.error(
+        translatePlatformSkillError(errorText, t('platform_skill_hub_save_failed'), t),
+      );
     } finally {
       setSaving(false);
     }
@@ -858,7 +869,9 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
       await Promise.all([fetchImportJobs(), fetchSkills()]);
     } catch (error: any) {
       const errorText = error?.response?.data;
-      messageApi.error(typeof errorText === 'string' ? errorText : t('platform_skill_import_create_failed'));
+      messageApi.error(
+        translatePlatformSkillError(errorText, t('platform_skill_import_create_failed'), t),
+      );
     } finally {
       setSaving(false);
     }
@@ -1126,7 +1139,7 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
                   <Text type="secondary">{item.code}</Text>
                   <Title level={5} style={{ margin: '6px 0 0' }}>{item.name}</Title>
                 </div>
-                {renderStatusTag(item.status, translateStatus(item.status))}
+                {renderStatusTag(item.status, translateStatus(item.status), emptyPlaceholder)}
               </Space>
               <Paragraph
                 type="secondary"
@@ -1136,13 +1149,13 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
                 {item.description || t('platform_skill_detail_no_description')}
               </Paragraph>
               <Space wrap size={[8, 8]}>
-                {renderTrustTag(item.trustLevel, translateTrustLevel(item.trustLevel))}
+                {renderTrustTag(item.trustLevel, translateTrustLevel(item.trustLevel), emptyPlaceholder)}
                 <Tag>{translateSourceType(item.sourceType)}</Tag>
                 <Tag>{translateProviderType(item.providerType)}</Tag>
               </Space>
               <Text type="secondary">
                 {t('platform_skill_market_card_updated_at', {
-                  value: formatDateTime(item.updatedAt, i18n.resolvedLanguage || i18n.language),
+                  value: formatDateTime(item.updatedAt, i18n?.resolvedLanguage || i18n?.language),
                 })}
               </Text>
               <Space wrap>
@@ -1195,14 +1208,14 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
                   <Text type="secondary">{item.hubCode}</Text>
                   <Title level={5} style={{ margin: '6px 0 0' }}>{item.name}</Title>
                 </div>
-                {renderStatusTag(item.status, translateStatus(item.status))}
+                {renderStatusTag(item.status, translateStatus(item.status), emptyPlaceholder)}
               </Space>
               <Space wrap size={[8, 8]}>
                 <Tag>{translateHubType(item.hubType)}</Tag>
-                {renderTrustTag(item.trustLevel, translateTrustLevel(item.trustLevel))}
+                {renderTrustTag(item.trustLevel, translateTrustLevel(item.trustLevel), emptyPlaceholder)}
               </Space>
               <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-                {item.baseUrl || '-'}
+                {item.baseUrl || emptyPlaceholder}
               </Paragraph>
               <Space direction="vertical" size={2}>
                 <Text type="secondary">{t('platform_skill_market_card_sync_mode', { value: translateSyncMode(item.syncMode) })}</Text>
@@ -1245,15 +1258,15 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
             <Space direction="vertical" size={14} style={{ width: '100%' }}>
               <Space align="start" style={{ width: '100%', justifyContent: 'space-between' }}>
                 <div>
-                  <Text type="secondary">{hubNameMap[item.hubId] || '-'}</Text>
-                  <Title level={5} style={{ margin: '6px 0 0' }}>{item.sourceLocator || '-'}</Title>
+                  <Text type="secondary">{hubNameMap[item.hubId] || emptyPlaceholder}</Text>
+                  <Title level={5} style={{ margin: '6px 0 0' }}>{item.sourceLocator || emptyPlaceholder}</Title>
                 </div>
-                {renderStatusTag(item.jobStatus, translateStatus(item.jobStatus))}
+                {renderStatusTag(item.jobStatus, translateStatus(item.jobStatus), emptyPlaceholder)}
               </Space>
               <Space direction="vertical" size={2}>
-                <Text type="secondary">{t('platform_skill_import_jobs_column_source_namespace')}: {item.sourceNamespace || '-'}</Text>
-                <Text type="secondary">{t('platform_skill_import_jobs_column_source_version')}: {item.sourceVersion || '-'}</Text>
-                <Text type="secondary">{t('platform_skill_import_jobs_column_target_skill')}: {item.targetSkillId || '-'}</Text>
+                <Text type="secondary">{t('platform_skill_import_jobs_column_source_namespace')}: {item.sourceNamespace || emptyPlaceholder}</Text>
+                <Text type="secondary">{t('platform_skill_import_jobs_column_source_version')}: {item.sourceVersion || emptyPlaceholder}</Text>
+                <Text type="secondary">{t('platform_skill_import_jobs_column_target_skill')}: {item.targetSkillId || emptyPlaceholder}</Text>
               </Space>
               {item.errorMessage ? (
                 <Paragraph type="danger" style={{ marginBottom: 0 }}>
@@ -1262,7 +1275,7 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
               ) : (
                 <Paragraph type="secondary" style={{ marginBottom: 0 }}>
                   {t('platform_skill_market_card_finished_at', {
-                    value: formatDateTime(item.finishedAt || item.startedAt || item.createdAt, i18n.resolvedLanguage || i18n.language),
+                    value: formatDateTime(item.finishedAt || item.startedAt || item.createdAt, i18n?.resolvedLanguage || i18n?.language),
                   })}
                 </Paragraph>
               )}
@@ -1530,14 +1543,14 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
                     dataIndex: 'trustLevel',
                     key: 'trustLevel',
                     width: 150,
-                    render: (value: string) => renderTrustTag(value, translateTrustLevel(value)),
+                    render: (value: string) => renderTrustTag(value, translateTrustLevel(value), emptyPlaceholder),
                   },
                   {
                     title: t('platform_skills_column_status'),
                     dataIndex: 'status',
                     key: 'status',
                     width: 120,
-                    render: (value: string) => renderStatusTag(value, translateStatus(value)),
+                    render: (value: string) => renderStatusTag(value, translateStatus(value), emptyPlaceholder),
                   },
                   {
                     title: t('platform_skills_column_latest_stable'),
@@ -1545,14 +1558,14 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
                     key: 'latestStableVersionId',
                     width: 220,
                     ellipsis: true,
-                    render: (value?: string) => value || '-',
+                    render: (value?: string) => value || emptyPlaceholder,
                   },
                   {
                     title: t('platform_skills_column_updated_at'),
                     dataIndex: 'updatedAt',
                     key: 'updatedAt',
                     width: 200,
-                    render: (value: string) => formatDateTime(value, i18n.resolvedLanguage || i18n.language),
+                    render: (value: string) => formatDateTime(value, i18n?.resolvedLanguage || i18n?.language),
                   },
                   {
                     title: t('platform_skills_column_actions'),
@@ -1622,28 +1635,28 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
                     key: 'baseUrl',
                     width: 320,
                     ellipsis: true,
-                    render: (value: string) => value || '-',
+                    render: (value: string) => value || emptyPlaceholder,
                   },
                   {
                     title: t('platform_skills_column_trust_level'),
                     dataIndex: 'trustLevel',
                     key: 'trustLevel',
                     width: 150,
-                    render: (value: string) => renderTrustTag(value, translateTrustLevel(value)),
+                    render: (value: string) => renderTrustTag(value, translateTrustLevel(value), emptyPlaceholder),
                   },
                   {
                     title: t('platform_skills_column_status'),
                     dataIndex: 'status',
                     key: 'status',
                     width: 120,
-                    render: (value: string) => renderStatusTag(value, translateStatus(value)),
+                    render: (value: string) => renderStatusTag(value, translateStatus(value), emptyPlaceholder),
                   },
                   {
                     title: t('platform_skills_column_updated_at'),
                     dataIndex: 'updatedAt',
                     key: 'updatedAt',
                     width: 180,
-                    render: (value: string) => formatDateTime(value, i18n.resolvedLanguage || i18n.language),
+                    render: (value: string) => formatDateTime(value, i18n?.resolvedLanguage || i18n?.language),
                   },
                   {
                     title: t('platform_skills_column_actions'),
@@ -1698,7 +1711,7 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
                     dataIndex: 'hubId',
                     key: 'hubId',
                     width: 180,
-                    render: (value: string) => hubNameMap[value] || value || '-',
+                    render: (value: string) => hubNameMap[value] || value || emptyPlaceholder,
                   },
                   {
                     title: t('platform_skill_import_jobs_column_source_locator'),
@@ -1706,43 +1719,43 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
                     key: 'sourceLocator',
                     width: 280,
                     ellipsis: true,
-                    render: (value: string) => value || '-',
+                    render: (value: string) => value || emptyPlaceholder,
                   },
                   {
                     title: t('platform_skill_import_jobs_column_source_namespace'),
                     dataIndex: 'sourceNamespace',
                     key: 'sourceNamespace',
                     width: 180,
-                    render: (value: string) => value || '-',
+                    render: (value: string) => value || emptyPlaceholder,
                   },
-                  { title: t('platform_skill_import_jobs_column_source_version'), dataIndex: 'sourceVersion', key: 'sourceVersion', width: 120, render: (value: string) => value || '-' },
+                  { title: t('platform_skill_import_jobs_column_source_version'), dataIndex: 'sourceVersion', key: 'sourceVersion', width: 120, render: (value: string) => value || emptyPlaceholder },
                   {
                     title: t('platform_skills_column_status'),
                     dataIndex: 'jobStatus',
                     key: 'jobStatus',
                     width: 120,
-                    render: (value: string) => renderStatusTag(value, translateStatus(value)),
+                    render: (value: string) => renderStatusTag(value, translateStatus(value), emptyPlaceholder),
                   },
                   {
                     title: t('platform_skill_import_jobs_column_target_skill'),
                     dataIndex: 'targetSkillId',
                     key: 'targetSkillId',
                     width: 160,
-                    render: (value?: string) => value || '-',
+                    render: (value?: string) => value || emptyPlaceholder,
                   },
                   {
                     title: t('platform_skill_import_jobs_column_target_version'),
                     dataIndex: 'targetSkillVersionId',
                     key: 'targetSkillVersionId',
                     width: 160,
-                    render: (value?: string) => value || '-',
+                    render: (value?: string) => value || emptyPlaceholder,
                   },
                   {
                     title: t('platform_skill_import_jobs_column_finished_at'),
                     dataIndex: 'finishedAt',
                     key: 'finishedAt',
                     width: 180,
-                    render: (value?: string) => formatDateTime(value, i18n.resolvedLanguage || i18n.language),
+                    render: (value?: string) => formatDateTime(value, i18n?.resolvedLanguage || i18n?.language),
                   },
                   {
                     title: t('platform_skill_import_jobs_column_error_message'),
@@ -1750,7 +1763,7 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
                     key: 'errorMessage',
                     width: 280,
                     ellipsis: true,
-                    render: (value?: string) => value || '-',
+                    render: (value?: string) => value || emptyPlaceholder,
                   },
                 ]}
               />
@@ -1776,7 +1789,7 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
           initialValues={{ sourceType: 'builtin', providerType: 'native' }}
         >
           <Form.Item label={t('platform_skills_form_code')} name="code" rules={[{ required: true, message: t('platform_skills_form_code_required') }]}>
-            <Input placeholder="knowledge.search" />
+            <Input placeholder={platformSkillFormExamples.skillCode} />
           </Form.Item>
           <Form.Item label={t('platform_skills_form_name')} name="name" rules={[{ required: true, message: t('platform_skills_form_name_required') }]}>
             <Input placeholder={t('platform_skills_form_name_placeholder')} />
@@ -1824,10 +1837,10 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
       >
         <Form layout="vertical" form={hubForm}>
           <Form.Item label={t('platform_skill_hubs_form_code')} name="hubCode" rules={[{ required: true, message: t('platform_skill_hubs_form_code_required') }]}>
-            <Input placeholder="partner-openapi" />
+            <Input placeholder={platformSkillFormExamples.hubCode} />
           </Form.Item>
           <Form.Item label={t('platform_skills_form_name')} name="name" rules={[{ required: true, message: t('platform_skills_form_name_required') }]}>
-            <Input placeholder="Partner OpenAPI Hub" />
+            <Input placeholder={platformSkillFormExamples.hubName} />
           </Form.Item>
           <Form.Item label={t('platform_skill_hubs_form_type')} name="hubType" rules={[{ required: true, message: t('platform_skill_hubs_form_type_required') }]}>
             <Select
@@ -1841,7 +1854,7 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
             />
           </Form.Item>
           <Form.Item label={t('platform_skill_hubs_form_base_url')} name="baseUrl">
-            <Input placeholder="https://hub.example.com" />
+            <Input placeholder={platformSkillFormExamples.hubBaseUrl} />
           </Form.Item>
           <Space size={12} style={{ width: '100%' }} wrap>
             <Form.Item label={t('platform_skills_column_status')} name="status" style={{ minWidth: 180 }}>
@@ -1992,7 +2005,7 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
           >
             <Space direction="vertical" size={6} style={{ width: '100%' }}>
               <Text strong>{t('platform_skill_install_agent_selected_skill')}</Text>
-              <Text>{installSkill ? `${installSkill.name} (${installSkill.code})` : '-'}</Text>
+              <Text>{installSkill ? `${installSkill.name} (${installSkill.code})` : emptyPlaceholder}</Text>
               <Text type="secondary">{t('platform_skill_install_agent_modal_desc')}</Text>
             </Space>
           </Card>
@@ -2124,8 +2137,8 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
             <Card size="small">
               <Space size={12} wrap>
                 <Text strong>{selectedSkill.skill.code}</Text>
-                {renderTrustTag(selectedSkill.skill.trustLevel, translateTrustLevel(selectedSkill.skill.trustLevel))}
-                {renderStatusTag(selectedSkill.skill.status, translateStatus(selectedSkill.skill.status))}
+                {renderTrustTag(selectedSkill.skill.trustLevel, translateTrustLevel(selectedSkill.skill.trustLevel), emptyPlaceholder)}
+                {renderStatusTag(selectedSkill.skill.status, translateStatus(selectedSkill.skill.status), emptyPlaceholder)}
               </Space>
               <Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0 }}>
                 {selectedSkill.skill.description || t('platform_skill_detail_no_description')}
@@ -2153,20 +2166,20 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
                     dataIndex: 'releaseStatus',
                     key: 'releaseStatus',
                     width: 120,
-                    render: (value: string) => renderStatusTag(value, translateStatus(value)),
+                    render: (value: string) => renderStatusTag(value, translateStatus(value), emptyPlaceholder),
                   },
                   {
                     title: t('platform_skill_detail_version_column_change_log'),
                     dataIndex: 'changeLog',
                     key: 'changeLog',
-                    render: (value: string) => value || '-',
+                    render: (value: string) => value || emptyPlaceholder,
                   },
                   {
                     title: t('platform_skill_detail_version_column_published_at'),
                     dataIndex: 'publishedAt',
                     key: 'publishedAt',
                     width: 180,
-                    render: (value?: string) => formatDateTime(value, i18n.resolvedLanguage || i18n.language),
+                    render: (value?: string) => formatDateTime(value, i18n?.resolvedLanguage || i18n?.language),
                   },
                   {
                     title: t('platform_skills_column_actions'),
@@ -2209,7 +2222,7 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
                     dataIndex: 'toSkillVersionId',
                     key: 'toSkillVersionId',
                     width: 220,
-                    render: (value: string) => value || '-',
+                    render: (value: string) => value || emptyPlaceholder,
                   },
                   {
                     title: t('platform_skill_detail_reference_column_invoke_mode'),
@@ -2222,7 +2235,7 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
                     title: t('platform_skill_detail_reference_column_condition_expr'),
                     dataIndex: 'conditionExpr',
                     key: 'conditionExpr',
-                    render: (value: string) => value || '-',
+                    render: (value: string) => value || emptyPlaceholder,
                   },
                   {
                     title: t('platform_skill_detail_reference_column_passthrough'),
@@ -2256,7 +2269,7 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
       >
         <Form layout="vertical" form={versionForm}>
           <Form.Item label={t('platform_skill_version_form_version')} name="version" rules={[{ required: true, message: t('platform_skill_version_form_version_required') }]}>
-            <Input placeholder="1.0.0" />
+            <Input placeholder={platformSkillFormExamples.version} />
           </Form.Item>
           <Form.Item label={t('platform_skill_version_form_manifest')} name="manifest">
             <TextArea rows={4} />
@@ -2274,7 +2287,7 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
             <TextArea rows={4} />
           </Form.Item>
           <Form.Item label={t('platform_skill_version_form_references')} name="references">
-            <TextArea rows={4} placeholder='[{"toSkillVersionId":"version-2","invokeMode":"sync"}]' />
+            <TextArea rows={4} placeholder={platformSkillFormExamples.referencesJson} />
           </Form.Item>
           <Form.Item label={t('platform_skill_version_form_change_log')} name="changeLog">
             <TextArea rows={3} />
@@ -2299,7 +2312,7 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
       >
         <Form layout="vertical" form={referenceEditorForm}>
           <Form.Item label={t('platform_skill_version_form_references')} name="references">
-            <TextArea rows={8} placeholder='[{"toSkillVersionId":"version-2","invokeMode":"sync"}]' />
+            <TextArea rows={8} placeholder={platformSkillFormExamples.referencesJson} />
           </Form.Item>
         </Form>
       </Modal>

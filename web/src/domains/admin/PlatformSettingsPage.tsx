@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { Button, Card, Col, Form, Input, InputNumber, Row, Select, Switch, Typography, message } from 'antd';
 import { DatabaseOutlined, SettingOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
@@ -152,20 +152,20 @@ const PlatformSettingsPage: React.FC = () => {
                 name="dataBasePath"
                 rules={[{ required: true, message: t('platform_settings_database_path_required') }]}
               >
-                <Input placeholder="/var/lib/dotblue/agents" />
+                <Input placeholder={t('platform_settings_database_path_placeholder')} />
               </Form.Item>
               <Form.Item
                 label={t('platform_settings_data_mount_path')}
                 name="dataMountPath"
               >
-                <Input placeholder="/runtime-data" />
+                <Input placeholder={t('platform_settings_data_mount_path_placeholder')} />
               </Form.Item>
               <Form.Item
                 label={t('platform_settings_container_port')}
                 name="containerPort"
                 rules={[{ required: true, message: t('platform_settings_container_port_required') }]}
               >
-                <InputNumber style={{ width: '100%' }} placeholder="8642" />
+                <InputNumber controls={false} style={{ width: '100%' }} placeholder={t('platform_settings_container_port_placeholder')} />
               </Form.Item>
               <Form.Item
                 label={t('platform_settings_runtime_mode')}
@@ -197,13 +197,13 @@ const PlatformSettingsPage: React.FC = () => {
                 label={t('platform_settings_docker_endpoint')}
                 name="dockerEndpoint"
               >
-                <Input placeholder="unix:///var/run/docker.sock" />
+                <Input placeholder={t('platform_settings_docker_endpoint_placeholder')} />
               </Form.Item>
               <Form.Item
                 label={t('platform_settings_docker_network')}
                 name="dockerNetwork"
               >
-                <Input placeholder="dotblue_default" />
+                <Input placeholder={t('platform_settings_docker_network_placeholder')} />
               </Form.Item>
               <Card
                 size="small"
@@ -254,3 +254,4 @@ const PlatformSettingsPage: React.FC = () => {
 };
 
 export default PlatformSettingsPage;
+

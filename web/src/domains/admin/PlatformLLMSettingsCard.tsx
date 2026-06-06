@@ -25,6 +25,8 @@ function getAuthHeaders() {
 
 const PlatformLLMSettingsCard: React.FC = () => {
   const { t } = useTranslation();
+  const getProviderLabel = (value: PlatformLLMModel['type']) =>
+    value === 'anthropic' ? t('llm_provider_anthropic') : t('llm_provider_openai');
   const [messageApi, contextHolder] = message.useMessage();
   const [models, setModels] = useState<PlatformLLMModel[]>([]);
   const [loading, setLoading] = useState(true);
@@ -88,8 +90,7 @@ const PlatformLLMSettingsCard: React.FC = () => {
       setModalOpen(false);
       await loadModels();
     } catch (error: any) {
-      const errorText = error?.response?.data;
-      messageApi.error(typeof errorText === 'string' ? errorText : t('platform_admin_llm_save_failed'));
+      messageApi.error(t('platform_admin_llm_save_failed'));
     } finally {
       setSaving(false);
     }
@@ -147,7 +148,13 @@ const PlatformLLMSettingsCard: React.FC = () => {
               </Space>
             ),
           },
-          { title: t('platform_admin_llm_provider'), dataIndex: 'type', key: 'type', width: 140 },
+          {
+            title: t('platform_admin_llm_provider'),
+            dataIndex: 'type',
+            key: 'type',
+            width: 140,
+            render: (value: PlatformLLMModel['type']) => getProviderLabel(value),
+          },
           { title: t('platform_admin_llm_api_base'), dataIndex: 'apiBase', key: 'apiBase', ellipsis: true },
           {
             title: t('platform_admin_llm_actions'),
@@ -209,23 +216,41 @@ const PlatformLLMSettingsCard: React.FC = () => {
           >
             <Select
               options={[
-                { label: 'OpenAI', value: 'openai' },
-                { label: 'Anthropic', value: 'anthropic' },
+                { label: t('llm_provider_openai'), value: 'openai' },
+                { label: t('llm_provider_anthropic'), value: 'anthropic' },
               ]}
             />
           </Form.Item>
           <Form.Item label={t('platform_admin_llm_api_base')} name="apiBase">
-            <Input placeholder={providerType === 'anthropic' ? 'https://api.anthropic.com/v1' : 'https://api.openai.com/v1'} />
+            <Input
+              placeholder={
+                providerType === 'anthropic'
+                  ? t('llm_api_base_placeholder_anthropic')
+                  : t('llm_api_base_placeholder_openai')
+              }
+            />
           </Form.Item>
           <Form.Item label={t('platform_admin_llm_api_key')} name="apiKey">
-            <Input.Password placeholder={providerType === 'anthropic' ? 'sk-ant-...' : 'sk-...'} />
+            <Input.Password
+              placeholder={
+                providerType === 'anthropic'
+                  ? t('llm_api_key_placeholder_anthropic')
+                  : t('llm_api_key_placeholder_openai')
+              }
+            />
           </Form.Item>
           <Form.Item
             label={t('platform_admin_llm_model')}
             name="model"
             rules={[{ required: true, message: t('platform_admin_llm_model_required') }]}
           >
-            <Input placeholder={providerType === 'anthropic' ? 'claude-sonnet-4-20250514' : 'gpt-4o'} />
+            <Input
+              placeholder={
+                providerType === 'anthropic'
+                  ? t('llm_model_placeholder_anthropic')
+                  : t('llm_model_placeholder_openai')
+              }
+            />
           </Form.Item>
           <Form.Item name="isDefault" valuePropName="checked">
             <Checkbox>{t('platform_admin_llm_default_checkbox')}</Checkbox>

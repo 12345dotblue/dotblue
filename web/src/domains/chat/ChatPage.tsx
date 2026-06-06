@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Bubble, Sender, Welcome, Conversations, FileCard } from '@ant-design/x';
 import {
   Typography, Space, theme, Tooltip, Avatar, Button, Empty, Collapse,
@@ -16,9 +16,10 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useXChat } from '@ant-design/x-sdk';
 import { BACKEND_URL } from '../../config';
-import { LANGUAGE_OPTIONS, applyLanguagePreference, getLocalizedPath, resolveSupportedLanguage } from '../../i18n/config';
+import { LANGUAGE_OPTIONS, applyLanguagePreference, getLocalizedPath, resolveSupportedLanguage, stripLanguagePrefix } from '../../i18n/config';
 import { casdoorService } from '../identity/CasdoorService';
 import { getOrCreateProvider } from './SSEChatProvider';
+import { resolveUploadErrorMessage } from './uploadError';
 import type {
   AttachmentItem,
   ChatInput,
@@ -143,11 +144,11 @@ function revokeObjectUrlLater(objectUrl: string): void {
   }, 60_000);
 }
 
-function downloadBlob(blob: Blob, fileName: string): void {
+function downloadBlob(blob: Blob, fileName: string, fallbackFileName: string): void {
   const objectUrl = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = objectUrl;
-  link.download = fileName || 'download';
+  link.download = fileName || fallbackFileName;
   link.rel = 'noopener noreferrer';
   document.body.appendChild(link);
   link.click();
@@ -176,6 +177,7 @@ const AuthenticatedFileCard: React.FC<AuthenticatedFileCardProps> = ({
   loading,
   token,
 }) => {
+  const { t } = useTranslation();
   const [previewSrc, setPreviewSrc] = useState<string>();
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string>();
@@ -206,7 +208,7 @@ const AuthenticatedFileCard: React.FC<AuthenticatedFileCardProps> = ({
       })
       .catch(() => {
         if (!disposed) {
-          setPreviewError('预览加载失败');
+          setPreviewError(t('chat_preview_load_failed'));
         }
       })
       .finally(() => {
@@ -234,8 +236,8 @@ const AuthenticatedFileCard: React.FC<AuthenticatedFileCardProps> = ({
       revokeObjectUrlLater(objectUrl);
       return;
     }
-    downloadBlob(blob, name);
-  }, [type, previewUrl, downloadUrl, token, name]);
+    downloadBlob(blob, name, t('common_download'));
+  }, [type, previewUrl, downloadUrl, token, name, t]);
 
   if (type === 'image') {
     return (
@@ -277,7 +279,7 @@ const AuthenticatedFileCard: React.FC<AuthenticatedFileCardProps> = ({
               fontSize: 12,
             }}
           >
-            {loading || previewLoading ? '图片加载中...' : '图片预览暂不可用'}
+            {loading || previewLoading ? t('chat_image_loading') : t('chat_image_unavailable')}
           </div>
         )}
         <div style={{ marginTop: 8, fontSize: 12, color: '#262626', wordBreak: 'break-all' }}>
@@ -499,10 +501,13 @@ const ConversationPane: React.FC<ConversationPaneProps> = ({
             : upload
         )));
       } catch (error: any) {
-        const errorMessage = error?.response?.data || error?.message || '上传失败';
         setPendingUploads((prev) => prev.map((upload) => (
           upload.uid === item.uid
-            ? { ...upload, status: 'failed', error: String(errorMessage) }
+            ? {
+                ...upload,
+                status: 'failed',
+                error: resolveUploadErrorMessage(error, t('chat_upload_failed')),
+              }
             : upload
         )));
       }
@@ -620,7 +625,7 @@ const ConversationPane: React.FC<ConversationPaneProps> = ({
           ) : null}
           suffix={(oriNode) => (
             <Space size={4}>
-              <Tooltip title="上传附件">
+              <Tooltip title={t('chat_upload_attachment')}>
                 <Button
                   type="text"
                   icon={<PaperClipOutlined />}
@@ -650,7 +655,7 @@ const ChatPage: React.FC = () => {
   const { token } = theme.useToken();
   const navigate = useNavigate();
   const location = useLocation();
-  const currentLanguage = resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language);
+  const currentLanguage = resolveSupportedLanguage(i18n?.resolvedLanguage || i18n?.language);
   const initialVerifyState = ((location.state as VerifyChatState | null) || null);
 
   // Agents
@@ -875,7 +880,7 @@ const ChatPage: React.FC = () => {
       )
     : conversations;
 
-  const currentLanguageLabel = LANGUAGE_OPTIONS.find((option) => option.value === currentLanguage)?.shortLabel || 'EN';
+  const currentLanguageLabel = LANGUAGE_OPTIONS.find((option) => option.value === currentLanguage)?.shortLabel || currentLanguage.toUpperCase();
   const verifyAgent = verifyHint?.verifyAgentId ? agents.find((item) => item.id === verifyHint.verifyAgentId) : null;
 
   // --- No agents ---
@@ -1035,7 +1040,7 @@ const ChatPage: React.FC = () => {
     assistant: {
       placement: 'start' as const,
       avatar: <Avatar size={32} icon={<RobotOutlined />} style={{ background: token.colorPrimary }} />,
-      name: selectedAgent?.agentName || 'Assistant',
+      name: selectedAgent?.agentName || t('chat_assistant_name'),
       contentRender: (_: string, { extraInfo }: { extraInfo?: any }) => {
         const msg: ChatMessage = extraInfo?.chatMsg;
         if (!msg) return null;
@@ -1109,7 +1114,7 @@ const ChatPage: React.FC = () => {
           <div className="chat-header-brand">
             <img
               src="/brand/dotblue-logo.png"
-              alt="dotblue"
+              alt={t('app_name')}
               className="chat-header-brand-logo"
             />
             <div className="chat-header-brand-copy">
@@ -1141,11 +1146,10 @@ const ChatPage: React.FC = () => {
             })),
             onClick: async ({ key }) => {
               const resolved = await applyLanguagePreference(String(key));
-              if (resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language) !== resolved) {
-                window.location.reload();
-              }
+              const normalizedPath = stripLanguagePrefix(location.pathname);
+              navigate(`${getLocalizedPath(normalizedPath, resolved)}${location.search}${location.hash}`, { replace: true });
             },
-          }}>
+          }} trigger={['click']}>
             <Button type="text" size="small" icon={<GlobalOutlined />}>
               {currentLanguageLabel}
             </Button>
@@ -1206,7 +1210,7 @@ const ChatPage: React.FC = () => {
                   },
                 })}
               />
-              {convLoading && <div style={{ textAlign: 'center', padding: 12 }}><Text type="secondary" style={{ fontSize: 12 }}>...</Text></div>}
+              {convLoading && <div style={{ textAlign: 'center', padding: 12 }}><Text type="secondary" style={{ fontSize: 12 }}>{t('chat_loading_messages')}</Text></div>}
             </div>
           </Layout.Sider>
         )}
@@ -1302,3 +1306,4 @@ const ChatPage: React.FC = () => {
 };
 
 export default ChatPage;
+
