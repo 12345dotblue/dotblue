@@ -41,6 +41,11 @@ const CASDOOR_EMAIL_PROVIDER_URL = 'https://casdoor.ai/docs/provider/email/overv
 
 const QUICK_START_CODE = `cd deploy/compose
 cp .env.example .env
+
+# 本地快速体验时，优先只改这两个值
+# DOTBLUE_ADMIN_PASSWORD=change-me-strong-admin-password
+# DOTBLUE_LLM_API_KEY=replace-with-provider-key
+
 ./prepare-config.sh
 docker compose up -d --build`;
 
@@ -68,6 +73,35 @@ Default ports:
 - Web: 19000
 - Backend: 18080
 - Casdoor: 18000`;
+
+const PRODUCTION_PREPARE_CONFIG_CODE = `cd deploy/compose
+cp .env.example .env
+
+# 1) 先填写正式公开地址
+# CASDOOR_PUBLIC_URL=https://auth.example.com
+# DOTBLUE_PUBLIC_URL=https://app.example.com
+# DOTBLUE_BACKEND_PUBLIC_URL=https://api.example.com
+
+# 2) 再填写管理员与模型供应商参数
+# DOTBLUE_ADMIN_USERNAME=admin
+# DOTBLUE_ADMIN_EMAIL=admin@example.com
+# DOTBLUE_ADMIN_PASSWORD=replace-with-a-strong-password
+# DOTBLUE_LLM_PROVIDER_TYPE=openai
+# DOTBLUE_LLM_API_BASE=https://api.openai.com/v1
+# DOTBLUE_LLM_API_KEY=replace-with-provider-key
+# DOTBLUE_LLM_MODEL=gpt-4o-mini
+
+# 3) 用项目脚本自动生成运行时配置
+./prepare-config.sh
+
+# Windows PowerShell:
+# .\\prepare-config.ps1
+
+# 4) 检查脚本生成结果
+ls .generated
+
+# 5) 再启动服务
+docker compose up -d`;
 
 const locales: Record<string, DocsLocale> = {
   en: {
@@ -259,11 +293,11 @@ const locales: Record<string, DocsLocale> = {
       {
         id: 'quick-start',
         title: '5 分钟快速上手',
-        intro: '推荐先用 Compose 跑通全链路，这是最省心的方式。',
+        intro: '这一节的目标不是讲完整生产部署，而是让你以最少介入成本先把本地体验跑起来。',
         steps: [
-          { title: '复制环境变量模板', desc: '把 `.env.example` 复制成 `.env`，填写管理员信息、LLM 配置和公开访问地址。' },
-          { title: '生成运行时配置', desc: '执行 `prepare-config.sh` 或 `prepare-config.ps1`，让 Casdoor 和后端配置保持一致。' },
-          { title: '启动整套服务', desc: '通过 Compose 一次启动 postgres、redis、casdoor、dotblue 和 web。' },
+          { title: '复制环境变量模板', desc: '把 `.env.example` 复制成 `.env`，本地快速体验时通常只需要先改管理员密码和 LLM API Key。' },
+          { title: '执行一键准备脚本', desc: '运行 `prepare-config.sh` 或 `prepare-config.ps1`，把它当作本地快速启动前的自动准备步骤，不需要一开始就手工理解 Casdoor 与后端的全部配置。' },
+          { title: '启动整套服务', desc: '通过 Compose 一次启动 postgres、redis、casdoor、dotblue 和 web，本地优先验证能否完整打开、登录和体验聊天。' },
           { title: '打开产品首页', desc: '先确认首页可访问，再继续进入登录流程。' },
           { title: '使用管理员账号登录', desc: '完成 Casdoor 登录并确认能正确回调到 Dashboard。' },
           { title: '创建第一个助手', desc: '必要时先配置平台模型，然后创建助手并进入 Chat 验证效果。' },
@@ -319,14 +353,20 @@ const locales: Record<string, DocsLocale> = {
           'Web、Backend 和 Casdoor 应该使用正式域名，浏览器访问地址和容器内部访问地址要明确分离。',
           'PostgreSQL 和 Redis 应切换到可备份、可恢复、可监控的长期运行环境，本地默认卷配置不适合长期生产。',
           'Casdoor 的品牌配置、回调地址、生成配置和发布顺序都应该进入正式发布流程，否则最容易出现登录和品牌不一致问题。',
+          '和“快速上手”不同，生产上线时应该把 `prepare-config` 视为正式部署流程的一部分：不要手工分别去改 Casdoor、前端和后端配置，而是统一维护 `deploy/compose/.env`，再执行项目自带脚本自动生成 Casdoor 与后端所需配置。',
+          '`prepare-config` 会把公开访问地址、Casdoor 应用信息、品牌资源路径和后端运行配置串起来，所以生产环境里只要 `.env` 里的正式域名和关键密钥是对的，脚本生成出来的结果就能保持 Web、Backend 和 Casdoor 一致。',
         ],
         bullets: [
           '为 `CASDOOR_PUBLIC_URL`、`DOTBLUE_PUBLIC_URL`、`DOTBLUE_BACKEND_PUBLIC_URL` 统一使用 HTTPS。',
+          '把 `.env` 视为生产环境的输入源，改完公开地址或管理员信息后必须重新执行一次 `prepare-config`。',
+          '生成完成后优先检查 `deploy/compose/.generated/` 是否已刷新，再执行 `docker compose up -d`。',
+          '如果浏览器访问域名已经变化，但没有重新生成配置，最常见的现象就是登录跳错地址或回调回到旧域名。',
           '接入反向代理、TLS 和基础安全头。',
           '通过 Secret 管理注入 API Key、管理员密码和客户端密钥。',
           '为数据库、运行时数据目录和核心存储建立备份与恢复策略。',
           '监控登录成功率、回调失败率、API 错误率和运行时容器状态。',
         ],
+        code: PRODUCTION_PREPARE_CONFIG_CODE,
       },
       {
         id: 'troubleshooting',

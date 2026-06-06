@@ -1,6 +1,8 @@
 package model
 
 import (
+	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/gogf/gf/v2/frame/g"
@@ -25,6 +27,9 @@ func (r *GFRepository) ListByScope(scope, enterpriseId string) ([]LLMModel, erro
 func (r *GFRepository) GetByID(id string) (*LLMModel, error) {
 	var item LLMModel
 	if err := g.DB().Model("llm_models").Where("id = ?", id).Limit(1).Scan(&item); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	if item.Id == "" {
