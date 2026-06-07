@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	HermesImage   = "nousresearch/hermes-agent:latest"
+	HermesImage   = "nousresearch/hermes-agent:v2026.6.5"
 	HermesAPIPort = "8642"
 	HermesDataDir = "/opt/data"
 )
@@ -54,10 +54,14 @@ func (h *HermesEngine) PrepareVolume(_ context.Context, volPath string, agent *A
 
 func (h *HermesEngine) ContainerSpec(agentID, volPath, containerPort string) (*ContainerSpec, error) {
 	runtimeName := strings.TrimSpace(os.Getenv("DOTBLUE_CONTAINER_RUNTIME"))
+	env, err := buildHermesRuntimeEnv(volPath, containerPort)
+	if err != nil {
+		return nil, err
+	}
 	return &ContainerSpec{
 		Image:       HermesImage,
 		Cmd:         []string{"gateway", "run"},
-		Env:         []string{"HERMES_HOME=" + HermesDataDir},
+		Env:         env,
 		ExposedPort: containerPort,
 		Runtime:     runtimeName,
 		DataDir:     HermesDataDir,
@@ -160,6 +164,65 @@ func (h *HermesEngine) writeDotEnv(volPath string, agent *AgentConfig) error {
 
 	envPath := filepath.Join(volPath, ".env")
 	return os.WriteFile(envPath, []byte(buf.String()), 0644)
+}
+
+func buildHermesRuntimeEnv(volPath, containerPort string) ([]string, error) {
+	// Newer Hermes images reliably honor container env vars during gateway boot.
+	// Keep writing .env for backwards compatibility, but also inject the critical
+	// API server switches directly so runtime behavior does not depend on the
+	// image's profile-loading order.
+	values := map[string]string{
+		"HERMES_HOME":             HermesDataDir,
+		"API_SERVER_ENABLED":      "true",
+		"API_SERVER_HOST":         "0.0.0.0",
+		"API_SERVER_PORT":         strings.TrimSpace(containerPort),
+		"API_SERVER_CORS_ORIGINS": "*",
+		"GATEWAY_ALLOW_ALL_USERS": "true",
+	}
+
+	envPath := filepath.Join(volPath, ".env")
+	content, err := os.ReadFile(envPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return hermesEnvList(values), nil
+		}
+		return nil, fmt.Errorf("failed to read hermes .env: %w", err)
+	}
+	for _, rawLine := range strings.Split(string(content), "\n") {
+		line := strings.TrimSpace(rawLine)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+		if key != "" {
+			values[key] = value
+		}
+	}
+	return hermesEnvList(values), nil
+}
+
+func hermesEnvList(values map[string]string) []string {
+	keys := []string{
+		"HERMES_HOME",
+		"API_SERVER_ENABLED",
+		"API_SERVER_HOST",
+		"API_SERVER_PORT",
+		"API_SERVER_KEY",
+		"API_SERVER_CORS_ORIGINS",
+		"GATEWAY_ALLOW_ALL_USERS",
+	}
+	env := make([]string, 0, len(keys))
+	for _, key := range keys {
+		if value, ok := values[key]; ok && strings.TrimSpace(value) != "" {
+			env = append(env, key+"="+value)
+		}
+	}
+	return env
 }
 
 func ensureV1Suffix(url string) string {

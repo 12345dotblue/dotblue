@@ -76,6 +76,30 @@ func TestServiceGetPlatformConfig(t *testing.T) {
 		So(cfg.DataBasePath, ShouldEqual, "/data")
 		So(cfg.ContainerPort, ShouldEqual, 9000)
 	})
+
+	Convey("GetPlatformConfig 会把 legacy Hermes latest 标签收敛到固定版本", t, func() {
+		service := NewService(&stubRepository{
+			getSettingsFunc: func(ctx context.Context) (*SysSettings, error) {
+				raw, _ := json.Marshal(PlatformConfig{
+					DataBasePath: "/data",
+					ContainerPort: 8642,
+					RuntimeEngines: []RuntimeEngineConfig{{
+						EngineType: "hermes",
+						Enabled:    true,
+						Image:      "nousresearch/hermes-agent:latest",
+					}},
+				})
+				return &SysSettings{Platform: raw}, nil
+			},
+		})
+
+		cfg, err := service.GetPlatformConfig()
+
+		So(err, ShouldBeNil)
+		So(cfg, ShouldNotBeNil)
+		So(cfg.RuntimeEngines, ShouldHaveLength, 2)
+		So(cfg.RuntimeEngines[0].Image, ShouldEqual, hermesPinnedImage)
+	})
 }
 
 func TestServiceUpdateProviderConfigPreservesMaskedKey(t *testing.T) {

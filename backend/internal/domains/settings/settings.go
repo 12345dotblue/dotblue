@@ -26,6 +26,8 @@ type RuntimeEngineConfig struct {
 	Image      string `json:"image,omitempty"`
 }
 
+const hermesPinnedImage = "nousresearch/hermes-agent:v2026.6.5"
+
 // ProviderConfig holds the legacy LLM provider configuration (stored as JSONB).
 // Deprecated: new model management should use the model domain instead of sys_settings.provider.
 type ProviderConfig struct {
@@ -94,7 +96,7 @@ func DefaultRuntimeEngines() []RuntimeEngineConfig {
 		{
 			EngineType: "hermes",
 			Enabled:    true,
-			Image:      "nousresearch/hermes-agent:latest",
+			Image:      hermesPinnedImage,
 		},
 		{
 			EngineType: "nanobot",
@@ -142,6 +144,11 @@ func normalizeRuntimeEngines(items []RuntimeEngineConfig) []RuntimeEngineConfig 
 		engineType := normalizeRuntimeEngineType(item.EngineType)
 		if engineType == "" {
 			continue
+		}
+		// Treat the old floating latest tag as legacy default so existing local
+		// configs automatically converge to the pinned Hermes image.
+		if engineType == "hermes" && strings.TrimSpace(item.Image) == "nousresearch/hermes-agent:latest" {
+			item.Image = hermesPinnedImage
 		}
 		item.EngineType = engineType
 		overrides[engineType] = item
