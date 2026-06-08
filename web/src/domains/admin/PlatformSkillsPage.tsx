@@ -186,6 +186,14 @@ interface InstallSuccessState {
   skillName: string;
 }
 
+interface ImportRolloutState {
+  skillId: string;
+  skillVersionId?: string;
+  sourceLocator: string;
+  sourceNamespace?: string;
+  sourceVersion?: string;
+}
+
 interface QuickImportTemplate {
   key: string;
   label: string;
@@ -333,6 +341,7 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
   const [importOpen, setImportOpen] = useState(false);
   const [installToAgentOpen, setInstallToAgentOpen] = useState(false);
   const [installSuccess, setInstallSuccess] = useState<InstallSuccessState | null>(null);
+  const [importRollout, setImportRollout] = useState<ImportRolloutState | null>(null);
   const [saving, setSaving] = useState(false);
   const [referenceLoading, setReferenceLoading] = useState(false);
   const [publishingId, setPublishingId] = useState<string>('');
@@ -860,12 +869,21 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
     const values = await importForm.validateFields();
     setSaving(true);
     try {
-      await axios.post(`${BACKEND_URL}/api/admin/platform/skill-import-jobs`, values, {
+      const res = await axios.post(`${BACKEND_URL}/api/admin/platform/skill-import-jobs`, values, {
         headers: getAuthHeaders(),
       });
       messageApi.success(t('platform_skill_import_create_success'));
       setImportOpen(false);
       importForm.resetFields();
+      if (res.data?.targetSkillId) {
+        setImportRollout({
+          skillId: res.data.targetSkillId,
+          skillVersionId: res.data.targetSkillVersionId,
+          sourceLocator: values.sourceLocator,
+          sourceNamespace: values.sourceNamespace,
+          sourceVersion: values.sourceVersion,
+        });
+      }
       await Promise.all([fetchImportJobs(), fetchSkills()]);
     } catch (error: any) {
       const errorText = error?.response?.data;
@@ -2104,6 +2122,64 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
                 skillName: installSuccess.skillName,
               })}
             </Paragraph>
+          </Space>
+        ) : null}
+      </Modal>
+
+      <Modal
+        title={t('platform_skill_import_rollout_modal_title')}
+        open={!!importRollout}
+        onCancel={() => setImportRollout(null)}
+        footer={importRollout ? [
+          <Button key="close" onClick={() => setImportRollout(null)}>
+            {t('agent_cancel')}
+          </Button>,
+          <Button
+            key="detail"
+            onClick={() => {
+              void fetchDetail(importRollout.skillId);
+              setImportRollout(null);
+            }}
+          >
+            {t('platform_skill_import_rollout_action_review')}
+          </Button>,
+          <Button
+            key="enterprise"
+            type="primary"
+            onClick={() => {
+              navigate(getLocalizedPath(`/admin/enterprise?tab=skills&skillId=${encodeURIComponent(importRollout.skillId)}`, currentLanguage));
+              setImportRollout(null);
+            }}
+          >
+            {t('platform_skill_import_rollout_action_enterprise')}
+          </Button>,
+        ] : undefined}
+        destroyOnHidden
+      >
+        {importRollout ? (
+          <Space direction="vertical" size={12} style={{ width: '100%' }}>
+            <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+              {t('platform_skill_import_rollout_modal_desc')}
+            </Paragraph>
+            <Space wrap size={[8, 8]}>
+              <Tag color="processing">{t('platform_skill_import_rollout_step_publish')}</Tag>
+              <Tag color="gold">{t('platform_skill_import_rollout_step_enable')}</Tag>
+              <Tag>{t('platform_skill_import_rollout_step_install')}</Tag>
+            </Space>
+            <Text strong>{t('platform_skill_import_rollout_locator_label')}</Text>
+            <Text>{importRollout.sourceLocator}</Text>
+            {importRollout.sourceNamespace ? (
+              <>
+                <Text strong>{t('platform_skill_import_rollout_namespace_label')}</Text>
+                <Text>{importRollout.sourceNamespace}</Text>
+              </>
+            ) : null}
+            {importRollout.sourceVersion ? (
+              <>
+                <Text strong>{t('platform_skill_import_rollout_version_label')}</Text>
+                <Text>{importRollout.sourceVersion}</Text>
+              </>
+            ) : null}
           </Space>
         ) : null}
       </Modal>

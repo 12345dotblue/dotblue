@@ -30,8 +30,6 @@ const AgentSkillManagementPage: React.FC = () => {
   const navigate = useNavigate();
   const { agentId = '' } = useParams();
   const currentLanguage = resolveSupportedLanguage(i18n?.resolvedLanguage || i18n?.language);
-  const marketPath = getLocalizedPath('/admin/platform/skill-market', currentLanguage);
-  const builderPath = getLocalizedPath('/admin/platform/skills/new', currentLanguage);
   const [agentName, setAgentName] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -88,8 +86,6 @@ const AgentSkillManagementPage: React.FC = () => {
               <AgentSkillsPanel
                 agentId={agentId}
                 authHeaders={getAgentAuthHeaders()}
-                marketHref={marketPath}
-                builderHref={builderPath}
               />
             </>
           ) : (

@@ -405,6 +405,17 @@ func ListAgentSkillsHandler(r *ghttp.Request) {
 	r.Response.WriteJson(list)
 }
 
+// ListAgentSkillCatalogHandler returns published skills annotated with rollout state for one agent.
+// GET /api/admin/agents/{agentId}/skill-catalog
+func ListAgentSkillCatalogHandler(r *ghttp.Request) {
+	list, err := defaultService.ListAgentSkillCatalog(actorFromRequest(r), r.Get("agentId").String())
+	if err != nil {
+		writeError(r, err)
+		return
+	}
+	r.Response.WriteJson(list)
+}
+
 // InstallSkillOnAgentHandler installs a published and enabled skill on an agent.
 // POST /api/admin/agents/{agentId}/skills/install
 func InstallSkillOnAgentHandler(r *ghttp.Request) {
@@ -414,6 +425,29 @@ func InstallSkillOnAgentHandler(r *ghttp.Request) {
 		return
 	}
 	item, err := defaultService.InstallSkillOnAgent(actorFromRequest(r), r.Get("agentId").String(), InstallSkillInput{
+		SkillId:            req.SkillId,
+		SkillVersionId:     req.SkillVersionId,
+		EntryAlias:         req.EntryAlias,
+		InvokeVisibility:   req.InvokeVisibility,
+		PolicyOverrideJSON: string(req.PolicyOverride),
+		ChannelScopeJSON:   string(req.ChannelScope),
+	})
+	if err != nil {
+		writeError(r, err)
+		return
+	}
+	r.Response.WriteJson(item)
+}
+
+// EnsureSkillOnAgentHandler enables the skill for the enterprise when needed and installs it on the agent.
+// POST /api/admin/agents/{agentId}/skills/ensure-installed
+func EnsureSkillOnAgentHandler(r *ghttp.Request) {
+	var req installSkillReq
+	if err := r.Parse(&req); err != nil {
+		r.Response.WriteStatus(http.StatusBadRequest, err.Error())
+		return
+	}
+	item, err := defaultService.EnsureSkillInstalledOnAgent(actorFromRequest(r), r.Get("agentId").String(), InstallSkillInput{
 		SkillId:            req.SkillId,
 		SkillVersionId:     req.SkillVersionId,
 		EntryAlias:         req.EntryAlias,

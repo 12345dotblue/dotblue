@@ -99,6 +99,20 @@ const (
 	ImportJobStatusNormalizing = "normalizing"
 )
 
+const (
+	AgentSkillDisplayStatusInstallable   = "enabled_installable"
+	AgentSkillDisplayStatusPendingEnable = "imported_pending_enable"
+	AgentSkillDisplayStatusInstalled     = "installed"
+	AgentSkillDisplayStatusBlocked       = "blocked"
+	AgentSkillDisplayStatusUnavailable   = "unavailable"
+)
+
+const (
+	AgentSkillActionInstall          = "install"
+	AgentSkillActionEnableAndInstall = "enable_and_install"
+	AgentSkillActionNone             = "none"
+)
+
 type ActorContext struct {
 	UserId          string
 	EnterpriseId    string
@@ -274,6 +288,29 @@ type AgentSkillBindingView struct {
 	SkillCode    string `json:"skillCode" orm:"skill_code"`
 	SkillName    string `json:"skillName" orm:"skill_name"`
 	VersionLabel string `json:"version" orm:"version"`
+}
+
+// AgentSkillCatalogItem flattens platform publication, enterprise availability,
+// and agent binding state into one DTO so the UI can explain rollout steps.
+type AgentSkillCatalogItem struct {
+	Skill
+	LatestPublishedVersion string `json:"latestPublishedVersion" orm:"latest_published_version"`
+	EnablementStatus       string `json:"enablementStatus" orm:"enablement_status"`
+	AgentInstalled         bool   `json:"agentInstalled"`
+	InstalledBindingStatus string `json:"installedBindingStatus"`
+	InstalledVersion       string `json:"installedVersion"`
+	DisplayStatus          string `json:"displayStatus"`
+	RecommendedAction      string `json:"recommendedAction"`
+	BlockReason            string `json:"blockReason"`
+	BlockMessage           string `json:"blockMessage"`
+}
+
+type EnsureSkillInstalledResult struct {
+	SkillId           string             `json:"skillId"`
+	EnterpriseEnabled bool               `json:"enterpriseEnabled"`
+	Installed         bool               `json:"installed"`
+	ActionTaken       []string           `json:"actionTaken"`
+	Binding           *AgentSkillBinding `json:"binding,omitempty"`
 }
 
 type CreateSkillInput struct {

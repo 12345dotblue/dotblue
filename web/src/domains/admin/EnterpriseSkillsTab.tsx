@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Card, Empty, Form, Input, Modal, Select, Space, Table, Tag, Typography, message } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 import { BACKEND_URL } from '../../config';
 import { casdoorService } from '../identity/CasdoorService';
 
@@ -118,6 +119,7 @@ function getEnterpriseSkillErrorMessage(fallbackMessage: string) {
 
 const EnterpriseSkillsTab: React.FC<EnterpriseSkillsTabProps> = ({ createSignal }) => {
   const { t } = useTranslation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [messageApi, contextHolder] = message.useMessage();
   const [activeView, setActiveView] = useState<EnterpriseSkillView>('governance');
   const [catalogLoading, setCatalogLoading] = useState(true);
@@ -131,10 +133,12 @@ const EnterpriseSkillsTab: React.FC<EnterpriseSkillsTabProps> = ({ createSignal 
   const [saving, setSaving] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [publishingId, setPublishingId] = useState('');
+  const [pendingEnableSkillId, setPendingEnableSkillId] = useState('');
   const [selectedSkill, setSelectedSkill] = useState<GovernedSkillDetail | null>(null);
   const [enableForm] = Form.useForm<EnableSkillFormValues>();
   const [createForm] = Form.useForm<CreateSkillFormValues>();
   const [versionForm] = Form.useForm<CreateVersionFormValues>();
+  const consumedSkillIdRef = useRef('');
 
   const translateWithFallback = (key: string, fallback?: string) => (fallback ? t(key, fallback) : t(key));
 
@@ -217,12 +221,62 @@ const EnterpriseSkillsTab: React.FC<EnterpriseSkillsTabProps> = ({ createSignal 
       return;
     }
     enableForm.resetFields();
-  }, [enableModalOpen, enableForm]);
+    if (pendingEnableSkillId) {
+      enableForm.setFieldsValue({
+        skillId: pendingEnableSkillId,
+        channelScope: [],
+      });
+    }
+  }, [enableModalOpen, enableForm, pendingEnableSkillId]);
+
+  useEffect(() => {
+    if (!searchParams.get('skillId')) {
+      consumedSkillIdRef.current = '';
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    const targetSkillId = searchParams.get('skillId')?.trim() || '';
+    if (!targetSkillId || catalogLoading || !catalogSkills.length) {
+      return;
+    }
+    if (consumedSkillIdRef.current === targetSkillId) {
+      return;
+    }
+    const matchedSkill = catalogSkills.find((item) => item.id === targetSkillId);
+    if (!matchedSkill) {
+      consumedSkillIdRef.current = targetSkillId;
+      clearPendingSkillId();
+      return;
+    }
+    consumedSkillIdRef.current = targetSkillId;
+    setActiveView('catalog');
+    if (matchedSkill.enablementStatus !== 'enabled') {
+      openEnableModal(matchedSkill.id);
+      return;
+    }
+    messageApi.success(t('enterprise_admin_skills_target_already_enabled'));
+    clearPendingSkillId();
+  }, [catalogLoading, catalogSkills, enableForm, messageApi, searchParams, setSearchParams, t]);
 
   const enableableSkills = useMemo(
     () => catalogSkills.filter((item) => item.enablementStatus !== 'enabled'),
     [catalogSkills],
   );
+
+  const clearPendingSkillId = () => {
+    if (!searchParams.get('skillId')) {
+      return;
+    }
+    const nextSearchParams = new URLSearchParams(searchParams);
+    nextSearchParams.delete('skillId');
+    setSearchParams(nextSearchParams, { replace: true });
+  };
+
+  const openEnableModal = (skillId?: string) => {
+    setPendingEnableSkillId(skillId?.trim() || '');
+    setEnableModalOpen(true);
+  };
 
   const handleEnable = async () => {
     const values = await enableForm.validateFields();
@@ -235,7 +289,9 @@ const EnterpriseSkillsTab: React.FC<EnterpriseSkillsTabProps> = ({ createSignal 
       });
       messageApi.success(t('enterprise_admin_skills_enable_success'));
       setEnableModalOpen(false);
+      setPendingEnableSkillId('');
       enableForm.resetFields();
+      clearPendingSkillId();
       await fetchCatalogSkills();
     } catch (error: any) {
       messageApi.error(getEnterpriseSkillErrorMessage(t('enterprise_admin_skills_enable_failed')));
@@ -460,8 +516,7 @@ const EnterpriseSkillsTab: React.FC<EnterpriseSkillsTabProps> = ({ createSignal 
               <Button
                 type="primary"
                 onClick={() => {
-                  enableForm.resetFields();
-                  setEnableModalOpen(true);
+                  openEnableModal();
                 }}
               >
                 {t('enterprise_admin_skills_action_enable')}
@@ -509,10 +564,7 @@ const EnterpriseSkillsTab: React.FC<EnterpriseSkillsTabProps> = ({ createSignal 
                         {t('enterprise_admin_skills_action_disable')}
                       </Button>
                     ) : (
-                      <Button size="small" type="primary" onClick={() => {
-                        enableForm.setFieldValue('skillId', item.id);
-                        setEnableModalOpen(true);
-                      }}>
+                      <Button size="small" type="primary" onClick={() => openEnableModal(item.id)}>
                         {t('enterprise_admin_skills_action_enable')}
                       </Button>
                     )
@@ -527,7 +579,11 @@ const EnterpriseSkillsTab: React.FC<EnterpriseSkillsTabProps> = ({ createSignal 
       <Modal
         title={t('enterprise_admin_skills_action_enable')}
         open={enableModalOpen}
-        onCancel={() => setEnableModalOpen(false)}
+        onCancel={() => {
+          setEnableModalOpen(false);
+          setPendingEnableSkillId('');
+          clearPendingSkillId();
+        }}
         onOk={handleEnable}
         confirmLoading={saving}
         okText={t('enterprise_admin_skills_action_enable')}

@@ -67,7 +67,7 @@ type tencentSkillHubDetailResponse struct {
 }
 
 type tencentSkillHubFilesResponse struct {
-	Count   int `json:"count"`
+	Count   int    `json:"count"`
 	Version string `json:"version"`
 	Files   []struct {
 		Path   string `json:"path"`
@@ -165,19 +165,19 @@ func (s *Service) ImportSkill(actor ActorContext, input ImportSkillInput) (*Skil
 	}
 	now := s.now()
 	job := &SkillImportJob{
-		Id:              s.idGenerator(),
-		HubId:           hub.Id,
-		RequestedBy:     actor.UserId,
-		SourceLocator:   strings.TrimSpace(input.SourceLocator),
-		SourceNamespace: strings.TrimSpace(input.SourceNamespace),
-		SourceVersion:   strings.TrimSpace(input.SourceVersion),
-		JobStatus:       ImportJobStatusNormalizing,
+		Id:                     s.idGenerator(),
+		HubId:                  hub.Id,
+		RequestedBy:            actor.UserId,
+		SourceLocator:          strings.TrimSpace(input.SourceLocator),
+		SourceNamespace:        strings.TrimSpace(input.SourceNamespace),
+		SourceVersion:          strings.TrimSpace(input.SourceVersion),
+		JobStatus:              ImportJobStatusNormalizing,
 		ParsedDescriptorJSON:   "{}",
 		NormalizedManifestJSON: "{}",
 		VerificationReportJSON: "{}",
 		RiskReportJSON:         "{}",
-		StartedAt:       now,
-		CreatedAt:       now,
+		StartedAt:              now,
+		CreatedAt:              now,
 	}
 	if err := s.repo.CreateSkillImportJob(job); err != nil {
 		return nil, err
@@ -302,7 +302,7 @@ func (s *Service) resolveTencentSkillHubImport(hub *SkillHub, job *SkillImportJo
 	}
 
 	version := strings.TrimSpace(job.SourceVersion)
-	if version == "" {
+	if version == "" || strings.EqualFold(version, "latest") {
 		version = firstNonEmpty(detail.LatestVersion.Version, detail.Skill.Tags["latest"])
 	}
 	if version == "" {
@@ -373,14 +373,14 @@ func (s *Service) resolveTencentSkillHubImport(hub *SkillHub, job *SkillImportJo
 		"meta":            metaJSON,
 	}), "{}")
 	manifest := normalizeJSONObjectOrArray(mustJSON(map[string]any{
-		"code":          normalizedCode,
-		"name":          normalizedName,
-		"provider":      hub.HubType,
-		"source":        sourcePageURL,
-		"sourceType":    inferSourceTypeFromHub(hub.HubType),
-		"sourceVersion": version,
-		"homepage":      frontMatter.Homepage,
-		"summary":       description,
+		"code":             normalizedCode,
+		"name":             normalizedName,
+		"provider":         hub.HubType,
+		"source":           sourcePageURL,
+		"sourceType":       inferSourceTypeFromHub(hub.HubType),
+		"sourceVersion":    version,
+		"homepage":         frontMatter.Homepage,
+		"summary":          description,
 		"skillDocMarkdown": skillMarkdown,
 		"skillDocBody":     skillBody,
 		"metadata":         frontMatter.Metadata,

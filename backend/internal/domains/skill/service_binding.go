@@ -3,24 +3,16 @@ package skill
 import (
 	"errors"
 	"strings"
+
+	"dotblue/internal/domains/agent"
 )
 
 func (s *Service) InstallSkillOnAgent(actor ActorContext, agentId string, input InstallSkillInput) (*AgentSkillBinding, error) {
 	if s == nil || s.repo == nil {
 		return nil, errors.New("skill repository is not configured")
 	}
-	agentRecord, err := s.loadAgent(agentId)
-	if err != nil {
+	if _, err := s.loadInstallTargetAgent(actor, agentId); err != nil {
 		return nil, err
-	}
-	if agentRecord == nil {
-		return nil, ErrSkillInstallDenied
-	}
-	// Agents still store enterprise scope in the legacy group_id column.
-	// The binding keeps enterprise_id explicitly so phase-1 skill governance
-	// cannot accidentally cross tenant boundaries during the migration period.
-	if strings.TrimSpace(agentRecord.GroupId) != strings.TrimSpace(actor.EnterpriseId) {
-		return nil, ErrSkillInstallDenied
 	}
 
 	skillId := strings.TrimSpace(input.SkillId)
@@ -91,12 +83,8 @@ func (s *Service) UninstallSkillFromAgent(actor ActorContext, agentId, skillId s
 	if s == nil || s.repo == nil {
 		return errors.New("skill repository is not configured")
 	}
-	agentRecord, err := s.loadAgent(agentId)
-	if err != nil {
+	if _, err := s.loadInstallTargetAgent(actor, agentId); err != nil {
 		return err
-	}
-	if agentRecord == nil || strings.TrimSpace(agentRecord.GroupId) != strings.TrimSpace(actor.EnterpriseId) {
-		return ErrSkillInstallDenied
 	}
 	return s.repo.UpdateAgentSkillBindingStatus(agentId, skillId, BindingStatusRemoved, s.now())
 }
@@ -105,14 +93,27 @@ func (s *Service) ListAgentSkillBindings(actor ActorContext, agentId string) ([]
 	if s == nil || s.repo == nil {
 		return nil, errors.New("skill repository is not configured")
 	}
+	if _, err := s.loadInstallTargetAgent(actor, agentId); err != nil {
+		return nil, err
+	}
+	return s.repo.ListAgentSkillBindings(agentId, actor.EnterpriseId)
+}
+
+func (s *Service) loadInstallTargetAgent(actor ActorContext, agentId string) (*agent.Agent, error) {
 	agentRecord, err := s.loadAgent(agentId)
 	if err != nil {
 		return nil, err
 	}
-	if agentRecord == nil || strings.TrimSpace(agentRecord.GroupId) != strings.TrimSpace(actor.EnterpriseId) {
+	if agentRecord == nil {
 		return nil, ErrSkillInstallDenied
 	}
-	return s.repo.ListAgentSkillBindings(agentId, actor.EnterpriseId)
+	// Agents still store enterprise scope in the legacy group_id column.
+	// The binding keeps enterprise_id explicitly so phase-1 skill governance
+	// cannot accidentally cross tenant boundaries during the migration period.
+	if strings.TrimSpace(agentRecord.GroupId) != strings.TrimSpace(actor.EnterpriseId) {
+		return nil, ErrSkillInstallDenied
+	}
+	return agentRecord, nil
 }
 
 func (s *Service) resolveInstallVersion(item *Skill, requestedVersionId string) (string, error) {

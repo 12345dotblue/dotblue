@@ -182,7 +182,9 @@ var (
 				group.POST("/admin/skills/{skillId}/enable", skill.EnableSkillHandler)
 				group.POST("/admin/skills/{skillId}/disable", skill.DisableSkillHandler)
 				group.GET("/admin/agents/{agentId}/skills", skill.ListAgentSkillsHandler)
+				group.GET("/admin/agents/{agentId}/skill-catalog", skill.ListAgentSkillCatalogHandler)
 				group.POST("/admin/agents/{agentId}/skills/install", skill.InstallSkillOnAgentHandler)
+				group.POST("/admin/agents/{agentId}/skills/ensure-installed", skill.EnsureSkillOnAgentHandler)
 				group.POST("/admin/agents/{agentId}/skills/{skillId}/uninstall", skill.UninstallSkillFromAgentHandler)
 			})
 

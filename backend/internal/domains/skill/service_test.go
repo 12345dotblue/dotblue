@@ -614,6 +614,161 @@ func TestInstallSkillOnAgentAllowsPublishedEnterpriseOwnedSkillWithoutAvailabili
 	}
 }
 
+func TestListAgentSkillCatalogProjectsRolloutStates(t *testing.T) {
+	repo := &stubRepository{
+		listPublishedSkillsForEnterprise: func(enterpriseId string) ([]*AdminSkillListItem, error) {
+			if enterpriseId != "ent-1" {
+				t.Fatalf("expected ent-1, got %q", enterpriseId)
+			}
+			return []*AdminSkillListItem{
+				{
+					Skill: Skill{
+						Id:                       "skill-install",
+						Code:                     "weather",
+						Name:                     "Weather",
+						Status:                   SkillStatusPublished,
+						TrustLevel:               TrustLevelPartnerVerified,
+						LatestPublishedVersionId: "version-1",
+					},
+					LatestPublishedVersion: "1.0.0",
+					EnablementStatus:       EnablementStatusEnabled,
+				},
+				{
+					Skill: Skill{
+						Id:                       "skill-enable",
+						Code:                     "knowledge",
+						Name:                     "Knowledge",
+						Status:                   SkillStatusPublished,
+						TrustLevel:               TrustLevelPartnerVerified,
+						LatestPublishedVersionId: "version-2",
+					},
+					LatestPublishedVersion: "2.0.0",
+				},
+				{
+					Skill: Skill{
+						Id:                       "skill-blocked",
+						Code:                     "blocked",
+						Name:                     "Blocked",
+						Status:                   SkillStatusPublished,
+						TrustLevel:               TrustLevelBlocked,
+						LatestPublishedVersionId: "version-3",
+					},
+					LatestPublishedVersion: "3.0.0",
+					EnablementStatus:       EnablementStatusEnabled,
+				},
+			}, nil
+		},
+		listAgentSkillBindingsFunc: func(agentId, enterpriseId string) ([]*AgentSkillBindingView, error) {
+			return []*AgentSkillBindingView{
+				{
+					AgentSkillBinding: AgentSkillBinding{
+						SkillId:        "skill-install",
+						BindingStatus:  BindingStatusInstalled,
+						SkillVersionId: "version-1",
+					},
+					VersionLabel: "1.0.0",
+				},
+			}, nil
+		},
+	}
+	service := NewService(repo)
+	service.loadAgent = func(id string) (*agent.Agent, error) {
+		return &agent.Agent{Id: id, GroupId: "ent-1"}, nil
+	}
+
+	items, err := service.ListAgentSkillCatalog(ActorContext{UserId: "ent-admin", EnterpriseId: "ent-1"}, "agent-1")
+	if err != nil {
+		t.Fatalf("ListAgentSkillCatalog() error = %v", err)
+	}
+	if len(items) != 3 {
+		t.Fatalf("expected 3 items, got %d", len(items))
+	}
+	if items[0].DisplayStatus != AgentSkillDisplayStatusInstalled {
+		t.Fatalf("expected installed state for first item, got %#v", items[0])
+	}
+	if items[1].DisplayStatus != AgentSkillDisplayStatusPendingEnable || items[1].RecommendedAction != AgentSkillActionEnableAndInstall {
+		t.Fatalf("expected pending enable state for second item, got %#v", items[1])
+	}
+	if items[2].DisplayStatus != AgentSkillDisplayStatusBlocked || items[2].RecommendedAction != AgentSkillActionNone {
+		t.Fatalf("expected blocked state for third item, got %#v", items[2])
+	}
+}
+
+func TestEnsureSkillInstalledOnAgentEnablesThenInstalls(t *testing.T) {
+	var enablementSaved *EnterpriseSkillEnablement
+	var bindingSaved *AgentSkillBinding
+	repo := &stubRepository{
+		getSkillByIdFunc: func(id string) (*Skill, error) {
+			return &Skill{
+				Id:                       id,
+				OwnerScope:               OwnerScopePlatform,
+				Status:                   SkillStatusPublished,
+				TrustLevel:               TrustLevelPartnerVerified,
+				LatestPublishedVersionId: "version-1",
+			}, nil
+		},
+		getEnterpriseEnablementFunc: func(enterpriseId, skillId string) (*EnterpriseSkillEnablement, error) {
+			if enablementSaved != nil {
+				copied := *enablementSaved
+				return &copied, nil
+			}
+			return nil, nil
+		},
+		upsertEnterpriseEnablementFunc: func(item *EnterpriseSkillEnablement) error {
+			copied := *item
+			enablementSaved = &copied
+			return nil
+		},
+		getSkillVersionByIdFunc: func(id string) (*SkillVersion, error) {
+			return &SkillVersion{Id: id, SkillId: "skill-1", ReleaseStatus: VersionStatusPublished}, nil
+		},
+		upsertAgentSkillBindingFunc: func(item *AgentSkillBinding) error {
+			copied := *item
+			bindingSaved = &copied
+			return nil
+		},
+		listAgentSkillBindingsFunc: func(agentId, enterpriseId string) ([]*AgentSkillBindingView, error) {
+			if bindingSaved == nil {
+				return nil, nil
+			}
+			return []*AgentSkillBindingView{
+				{
+					AgentSkillBinding: *bindingSaved,
+					VersionLabel:      "1.0.0",
+				},
+			}, nil
+		},
+	}
+	service := NewService(repo)
+	ids := []string{"enablement-1", "binding-1"}
+	service.idGenerator = func() string {
+		next := ids[0]
+		ids = ids[1:]
+		return next
+	}
+	service.now = func() time.Time { return time.Date(2026, 6, 7, 10, 0, 0, 0, time.UTC) }
+	service.loadAgent = func(id string) (*agent.Agent, error) {
+		return &agent.Agent{Id: id, GroupId: "ent-1"}, nil
+	}
+
+	result, err := service.EnsureSkillInstalledOnAgent(ActorContext{UserId: "ent-admin", EnterpriseId: "ent-1"}, "agent-1", InstallSkillInput{
+		SkillId:          "skill-1",
+		InvokeVisibility: InvokeVisibilitySuggested,
+	})
+	if err != nil {
+		t.Fatalf("EnsureSkillInstalledOnAgent() error = %v", err)
+	}
+	if enablementSaved == nil || enablementSaved.EnablementStatus != EnablementStatusEnabled {
+		t.Fatalf("expected enablement to be created, got %#v", enablementSaved)
+	}
+	if bindingSaved == nil || bindingSaved.SkillId != "skill-1" {
+		t.Fatalf("expected binding to be installed, got %#v", bindingSaved)
+	}
+	if result == nil || len(result.ActionTaken) != 2 || result.ActionTaken[0] != ReleaseActionEnable || result.ActionTaken[1] != ReleaseActionInstall {
+		t.Fatalf("expected enable and install actions, got %#v", result)
+	}
+}
+
 func TestPublishSkillVersionRejectsReferenceCycle(t *testing.T) {
 	repo := &stubRepository{
 		getSkillByIdFunc: func(id string) (*Skill, error) {
@@ -916,5 +1071,66 @@ func TestImportSkillFromTencentSkillHubFetchesRemoteDescriptor(t *testing.T) {
 	}
 	if job == nil || job.TargetSkillId != "skill-tencent" || job.TargetSkillVersionId != "version-tencent" {
 		t.Fatalf("expected completed tencent import result, got %#v", job)
+	}
+}
+
+func TestImportSkillFromTencentSkillHubResolvesLatestVersionAlias(t *testing.T) {
+	var fetchedFilesURL string
+	repo := &stubRepository{
+		getSkillHubByIdFunc: func(id string) (*SkillHub, error) {
+			return &SkillHub{
+				Id:         id,
+				HubType:    HubTypeTencent,
+				BaseURL:    "https://skillhub.cn",
+				TrustLevel: TrustLevelPartnerVerified,
+				ConfigJSON: `{"apiBaseUrl":"https://api.skillhub.cn","fileBaseUrl":"https://skillhub-cdn.example.com"}`,
+			}, nil
+		},
+		createSkillImportJobFunc: func(job *SkillImportJob) error { return nil },
+		updateSkillImportJobFunc: func(job *SkillImportJob) error { return nil },
+		getSkillImportJobByIdFunc: func(id string) (*SkillImportJob, error) {
+			return &SkillImportJob{Id: id, TargetSkillId: "skill-tencent", TargetSkillVersionId: "version-tencent"}, nil
+		},
+		getSkillByCodeFunc:      func(ownerScope, ownerEnterpriseId, code string) (*Skill, error) { return nil, nil },
+		createSkillFunc:         func(skill *Skill) error { return nil },
+		getSkillByIdFunc:        func(id string) (*Skill, error) { return &Skill{Id: id}, nil },
+		listSkillVersionsFunc:   func(skillId string) ([]*SkillVersion, error) { return nil, nil },
+		createSkillVersionFunc:  func(version *SkillVersion) error { return nil },
+		getSkillVersionByIdFunc: func(id string) (*SkillVersion, error) { return &SkillVersion{Id: id}, nil },
+		upsertSkillHubFunc:      func(hub *SkillHub) error { return nil },
+	}
+	service := NewService(repo)
+	ids := []string{"job-latest", "skill-latest", "version-latest"}
+	service.idGenerator = func() string {
+		next := ids[0]
+		ids = ids[1:]
+		return next
+	}
+	service.now = func() time.Time { return time.Date(2026, 6, 7, 11, 0, 0, 0, time.UTC) }
+	service.fetchURL = func(rawURL string) ([]byte, error) {
+		switch rawURL {
+		case "https://api.skillhub.cn/api/v1/skills/weather":
+			return []byte(`{"latestVersion":{"version":"1.0.0"},"skill":{"displayName":"Weather","slug":"weather","tags":{"latest":"1.0.0"}}}`), nil
+		case "https://api.skillhub.cn/api/v1/skills/weather/files?version=1.0.0":
+			fetchedFilesURL = rawURL
+			return []byte(`{"count":1,"version":"1.0.0","files":[{"path":"SKILL.md","sha256":"abc","size":123}]}`), nil
+		case "https://skillhub-cdn.example.com/skills/weather/1.0.0/files/SKILL.md":
+			return []byte("# Weather"), nil
+		default:
+			t.Fatalf("unexpected fetch url %q", rawURL)
+			return nil, nil
+		}
+	}
+
+	_, err := service.ImportSkill(ActorContext{UserId: "admin", IsPlatformAdmin: true}, ImportSkillInput{
+		HubId:         "hub-tencent",
+		SourceLocator: "weather",
+		SourceVersion: "latest",
+	})
+	if err != nil {
+		t.Fatalf("ImportSkill() error = %v", err)
+	}
+	if fetchedFilesURL != "https://api.skillhub.cn/api/v1/skills/weather/files?version=1.0.0" {
+		t.Fatalf("expected latest alias to resolve to concrete version, got %q", fetchedFilesURL)
 	}
 }
