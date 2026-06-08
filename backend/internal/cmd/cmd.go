@@ -95,6 +95,9 @@ var (
 				group.POST("/admin/skills/{id}/references", skill.UpdateSkillVersionReferencesHandler)
 				group.POST("/admin/skills/{id}/submit-review", skill.SubmitSkillReviewHandler)
 				group.POST("/admin/skills/{id}/publish", skill.PublishSkillHandler)
+				group.GET("/admin/skill-hubs", skill.ListSkillHubsHandler)
+				group.GET("/admin/skill-import-jobs", skill.ListSkillImportJobsHandler)
+				group.POST("/admin/skill-import-jobs", skill.ImportSkillHandler)
 			})
 
 			// 平台管理员路由（平台级设置）
@@ -129,6 +132,8 @@ var (
 				group.GET("/admin/platform/skill-hubs", skill.ListSkillHubsHandler)
 				group.POST("/admin/platform/skill-hubs", skill.UpsertSkillHubHandler)
 				group.PUT("/admin/platform/skill-hubs/{id}", skill.UpsertSkillHubHandler)
+				group.GET("/admin/platform/resource-releases", skill.ListResourceReleasesHandler)
+				group.POST("/admin/platform/resource-releases", skill.SetResourceReleaseHandler)
 				group.GET("/admin/platform/skill-import-jobs", skill.ListSkillImportJobsHandler)
 				group.POST("/admin/platform/skill-import-jobs", skill.ImportSkillHandler)
 			})

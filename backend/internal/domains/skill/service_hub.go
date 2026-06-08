@@ -90,11 +90,62 @@ func (s *Service) ListSkillHubs() ([]*SkillHub, error) {
 	return s.repo.ListSkillHubs()
 }
 
-func (s *Service) ListSkillImportJobs() ([]*SkillImportJob, error) {
+func (s *Service) ListSkillHubsForActor(actor ActorContext) ([]*SkillHub, error) {
 	if s == nil || s.repo == nil {
 		return nil, errors.New("skill repository is not configured")
 	}
-	return s.repo.ListSkillImportJobs()
+	if strings.TrimSpace(actor.EnterpriseId) != "" {
+		hubs, err := s.repo.ListSkillHubsByOwner(OwnerScopePlatform, "")
+		if err != nil {
+			return nil, err
+		}
+		filtered := make([]*SkillHub, 0, len(hubs))
+		for _, item := range hubs {
+			if item == nil || item.Id == "" {
+				continue
+			}
+			releases, releaseErr := s.repo.ListSkillResourceReleases(ResourceTypeHub, item.Id)
+			if releaseErr != nil {
+				return nil, releaseErr
+			}
+			if len(releases) > 0 {
+				visible := false
+				for _, release := range releases {
+					if release == nil || release.ReleaseStatus != ReleaseStatusEnabled {
+						continue
+					}
+					if release.ReleaseScope == ReleaseScopeGlobal {
+						visible = true
+						break
+					}
+					if release.ReleaseScope == ReleaseScopeEnterprise && release.TargetEnterpriseId == strings.TrimSpace(actor.EnterpriseId) {
+						visible = true
+						break
+					}
+				}
+				if !visible {
+					continue
+				}
+			}
+			filtered = append(filtered, item)
+		}
+		return filtered, nil
+	}
+	if actor.IsPlatformAdmin {
+		return s.repo.ListSkillHubsByOwner(OwnerScopePlatform, "")
+	}
+	return nil, ErrSkillInstallDenied
+}
+
+func (s *Service) ListSkillImportJobsForActor(actor ActorContext) ([]*SkillImportJob, error) {
+	if s == nil || s.repo == nil {
+		return nil, errors.New("skill repository is not configured")
+	}
+	ownerScope, ownerScopeRefId, _, err := resolveGovernedScope(actor)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.ListSkillImportJobsByOwner(ownerScope, ownerScopeRefId)
 }
 
 func (s *Service) UpsertSkillHub(actor ActorContext, id string, input UpsertSkillHubInput) (*SkillHub, error) {
@@ -111,6 +162,8 @@ func (s *Service) UpsertSkillHub(actor ActorContext, id string, input UpsertSkil
 	now := s.now()
 	item := &SkillHub{
 		Id:                    strings.TrimSpace(id),
+		OwnerScope:            OwnerScopePlatform,
+		OwnerScopeRefId:       "",
 		HubCode:               strings.TrimSpace(strings.ToLower(input.HubCode)),
 		Name:                  strings.TrimSpace(input.Name),
 		HubType:               hubType,
@@ -153,9 +206,6 @@ func (s *Service) ImportSkill(actor ActorContext, input ImportSkillInput) (*Skil
 	if s == nil || s.repo == nil {
 		return nil, errors.New("skill repository is not configured")
 	}
-	if !actor.IsPlatformAdmin {
-		return nil, ErrSkillInstallDenied
-	}
 	hub, err := s.repo.GetSkillHubById(strings.TrimSpace(input.HubId))
 	if err != nil {
 		return nil, err
@@ -163,9 +213,19 @@ func (s *Service) ImportSkill(actor ActorContext, input ImportSkillInput) (*Skil
 	if hub == nil {
 		return nil, ErrSkillHubNotFound
 	}
+	if err := s.ensureActorCanImportFromHub(actor, hub); err != nil {
+		return nil, err
+	}
+	ownerScope, ownerScopeRefId, ownerEnterpriseId, err := resolveGovernedScope(actor)
+	if err != nil {
+		return nil, err
+	}
 	now := s.now()
 	job := &SkillImportJob{
 		Id:                     s.idGenerator(),
+		OwnerScope:             ownerScope,
+		OwnerScopeRefId:        ownerScopeRefId,
+		OwnerEnterpriseId:      ownerEnterpriseId,
 		HubId:                  hub.Id,
 		RequestedBy:            actor.UserId,
 		SourceLocator:          strings.TrimSpace(input.SourceLocator),
@@ -238,6 +298,40 @@ func (s *Service) ImportSkill(actor ActorContext, input ImportSkillInput) (*Skil
 	}
 	s.recordHubSyncResult(hub, nil)
 	return s.repo.GetSkillImportJobById(job.Id)
+}
+
+func (s *Service) ensureActorCanImportFromHub(actor ActorContext, hub *SkillHub) error {
+	if hub == nil {
+		return ErrSkillHubNotFound
+	}
+	if strings.TrimSpace(actor.EnterpriseId) != "" {
+		releases, err := s.repo.ListSkillResourceReleases(ResourceTypeHub, hub.Id)
+		if err != nil {
+			return err
+		}
+		if len(releases) == 0 {
+			return nil
+		}
+		for _, item := range releases {
+			if item == nil || item.ReleaseStatus != ReleaseStatusEnabled {
+				continue
+			}
+			if item.ReleaseScope == ReleaseScopeGlobal {
+				return nil
+			}
+			if item.ReleaseScope == ReleaseScopeEnterprise && item.TargetEnterpriseId == strings.TrimSpace(actor.EnterpriseId) {
+				return nil
+			}
+		}
+		return ErrSkillInstallDenied
+	}
+	if actor.IsPlatformAdmin {
+		ownerScope, ownerScopeRefId := normalizedHubOwner(hub)
+		if actorOwnsScope(actor, ownerScope, ownerScopeRefId) {
+			return nil
+		}
+	}
+	return ErrSkillInstallDenied
 }
 
 func (s *Service) resolveImportedSkill(hub *SkillHub, job *SkillImportJob) (*resolvedImportedSkill, error) {

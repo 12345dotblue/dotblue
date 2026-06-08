@@ -28,10 +28,15 @@ type stubRepository struct {
 	getSkillHubByIdFunc               func(id string) (*SkillHub, error)
 	getSkillHubByCodeFunc             func(code string) (*SkillHub, error)
 	listSkillHubsFunc                 func() ([]*SkillHub, error)
+	listSkillHubsByOwnerFunc          func(ownerScope, ownerScopeRefId string) ([]*SkillHub, error)
 	createSkillImportJobFunc          func(job *SkillImportJob) error
 	updateSkillImportJobFunc          func(job *SkillImportJob) error
 	getSkillImportJobByIdFunc         func(id string) (*SkillImportJob, error)
 	listSkillImportJobsFunc           func() ([]*SkillImportJob, error)
+	listSkillImportJobsByOwnerFunc    func(ownerScope, ownerScopeRefId string) ([]*SkillImportJob, error)
+	upsertSkillResourceReleaseFunc    func(item *SkillResourceRelease) error
+	listSkillResourceReleasesFunc     func(resourceType, resourceId string) ([]*SkillResourceRelease, error)
+	listSkillResourceByEnterpriseFunc func(resourceType, enterpriseId string) ([]*SkillResourceRelease, error)
 	upsertEnterpriseEnablementFunc    func(item *EnterpriseSkillEnablement) error
 	getEnterpriseEnablementFunc       func(enterpriseId, skillId string) (*EnterpriseSkillEnablement, error)
 	listPublishedSkillsForEnterprise  func(enterpriseId string) ([]*AdminSkillListItem, error)
@@ -169,6 +174,19 @@ func (s *stubRepository) ListSkillHubs() ([]*SkillHub, error) {
 	if s.listSkillHubsFunc != nil {
 		return s.listSkillHubsFunc()
 	}
+	if s.listSkillHubsByOwnerFunc != nil {
+		return s.listSkillHubsByOwnerFunc(OwnerScopePlatform, "")
+	}
+	return nil, nil
+}
+
+func (s *stubRepository) ListSkillHubsByOwner(ownerScope, ownerScopeRefId string) ([]*SkillHub, error) {
+	if s.listSkillHubsByOwnerFunc != nil {
+		return s.listSkillHubsByOwnerFunc(ownerScope, ownerScopeRefId)
+	}
+	if s.listSkillHubsFunc != nil && ownerScope == OwnerScopePlatform && ownerScopeRefId == "" {
+		return s.listSkillHubsFunc()
+	}
 	return nil, nil
 }
 
@@ -196,6 +214,40 @@ func (s *stubRepository) GetSkillImportJobById(id string) (*SkillImportJob, erro
 func (s *stubRepository) ListSkillImportJobs() ([]*SkillImportJob, error) {
 	if s.listSkillImportJobsFunc != nil {
 		return s.listSkillImportJobsFunc()
+	}
+	if s.listSkillImportJobsByOwnerFunc != nil {
+		return s.listSkillImportJobsByOwnerFunc(OwnerScopePlatform, "")
+	}
+	return nil, nil
+}
+
+func (s *stubRepository) ListSkillImportJobsByOwner(ownerScope, ownerScopeRefId string) ([]*SkillImportJob, error) {
+	if s.listSkillImportJobsByOwnerFunc != nil {
+		return s.listSkillImportJobsByOwnerFunc(ownerScope, ownerScopeRefId)
+	}
+	if s.listSkillImportJobsFunc != nil && ownerScope == OwnerScopePlatform && ownerScopeRefId == "" {
+		return s.listSkillImportJobsFunc()
+	}
+	return nil, nil
+}
+
+func (s *stubRepository) UpsertSkillResourceRelease(item *SkillResourceRelease) error {
+	if s.upsertSkillResourceReleaseFunc != nil {
+		return s.upsertSkillResourceReleaseFunc(item)
+	}
+	return nil
+}
+
+func (s *stubRepository) ListSkillResourceReleases(resourceType, resourceId string) ([]*SkillResourceRelease, error) {
+	if s.listSkillResourceReleasesFunc != nil {
+		return s.listSkillResourceReleasesFunc(resourceType, resourceId)
+	}
+	return nil, nil
+}
+
+func (s *stubRepository) ListSkillResourceReleasesForEnterprise(resourceType, enterpriseId string) ([]*SkillResourceRelease, error) {
+	if s.listSkillResourceByEnterpriseFunc != nil {
+		return s.listSkillResourceByEnterpriseFunc(resourceType, enterpriseId)
 	}
 	return nil, nil
 }
@@ -766,6 +818,47 @@ func TestEnsureSkillInstalledOnAgentEnablesThenInstalls(t *testing.T) {
 	}
 	if result == nil || len(result.ActionTaken) != 2 || result.ActionTaken[0] != ReleaseActionEnable || result.ActionTaken[1] != ReleaseActionInstall {
 		t.Fatalf("expected enable and install actions, got %#v", result)
+	}
+}
+
+func TestListResourceReleasesReturnsCurrentRules(t *testing.T) {
+	releases := []*SkillResourceRelease{
+		{
+			Id:            "release-1",
+			ResourceType:  ResourceTypeSkill,
+			ResourceId:    "skill-1",
+			ReleaseScope:  ReleaseScopeGlobal,
+			ReleaseStatus: ReleaseStatusEnabled,
+		},
+	}
+	repo := &stubRepository{
+		getSkillByIdFunc: func(id string) (*Skill, error) {
+			return &Skill{Id: id, OwnerScope: OwnerScopePlatform}, nil
+		},
+		listSkillResourceReleasesFunc: func(resourceType, resourceId string) ([]*SkillResourceRelease, error) {
+			if resourceType != ResourceTypeSkill || resourceId != "skill-1" {
+				t.Fatalf("unexpected release lookup: %s %s", resourceType, resourceId)
+			}
+			return releases, nil
+		},
+	}
+	service := NewService(repo)
+
+	list, err := service.ListResourceReleases(ActorContext{UserId: "admin", IsPlatformAdmin: true}, ResourceTypeSkill, "skill-1")
+	if err != nil {
+		t.Fatalf("ListResourceReleases() error = %v", err)
+	}
+	if len(list) != 1 || list[0].Id != "release-1" {
+		t.Fatalf("expected one release rule, got %#v", list)
+	}
+}
+
+func TestListResourceReleasesRejectsEnterpriseActor(t *testing.T) {
+	service := NewService(&stubRepository{})
+
+	_, err := service.ListResourceReleases(ActorContext{UserId: "ent-admin", EnterpriseId: "ent-1", IsPlatformAdmin: true}, ResourceTypeSkill, "skill-1")
+	if !errors.Is(err, ErrSkillInstallDenied) {
+		t.Fatalf("expected ErrSkillInstallDenied, got %v", err)
 	}
 }
 

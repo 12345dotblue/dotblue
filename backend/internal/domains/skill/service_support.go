@@ -33,7 +33,7 @@ func normalizedSkillOwner(item *Skill) (string, string) {
 		return "", ""
 	}
 	ownerScope := strings.TrimSpace(item.OwnerScope)
-	ownerEnterpriseId := strings.TrimSpace(item.OwnerEnterpriseId)
+	ownerEnterpriseId := normalizedOwnerScopeRefId(ownerScope, item.OwnerScopeRefId, item.OwnerEnterpriseId)
 	if ownerScope == "" {
 		if ownerEnterpriseId != "" {
 			return OwnerScopeEnterprise, ownerEnterpriseId

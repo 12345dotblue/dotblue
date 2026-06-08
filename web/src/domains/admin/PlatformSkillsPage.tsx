@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Button,
   Card,
@@ -7,6 +7,7 @@ import {
   Form,
   Input,
   Modal,
+  Radio,
   Select,
   Space,
   Table,
@@ -120,6 +121,19 @@ interface SkillImportJobItem {
   finishedAt?: string;
 }
 
+interface SkillResourceReleaseItem {
+  id: string;
+  resourceType: string;
+  resourceId: string;
+  releaseScope: string;
+  targetEnterpriseId?: string;
+  releaseStatus: string;
+  note?: string;
+  operatedBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 interface SkillFormValues {
   code: string;
   name: string;
@@ -167,11 +181,24 @@ interface ImportJobFormValues {
   sourceVersion: string;
 }
 
+interface ResourceReleaseFormValues {
+  releaseScope: 'global' | 'enterprise';
+  targetEnterpriseId?: string;
+  releaseStatus: 'enabled' | 'disabled';
+  note?: string;
+}
+
 interface AgentInstallTarget {
   id: string;
   agentName: string;
   engineType: 'hermes' | 'nanobot';
   modelName?: string;
+}
+
+interface ReleaseTargetState {
+  resourceId: string;
+  resourceType: 'skill' | 'hub';
+  resourceName: string;
 }
 
 interface InstallToAgentFormValues {
@@ -288,7 +315,7 @@ function translatePlatformSkillError(
   return errorKey ? t(errorKey, { defaultValue: fallbackMessage }) : fallbackMessage;
 }
 
-function renderSummaryCards(items: Array<{ label: string; value: number }>) {
+function renderSummaryCards(items: Array<{ label: string; value: number; active?: boolean; onClick?: () => void }>) {
   return (
     <div
       style={{
@@ -299,7 +326,17 @@ function renderSummaryCards(items: Array<{ label: string; value: number }>) {
       }}
     >
       {items.map((item) => (
-        <Card key={item.label} size="small">
+        <Card
+          key={item.label}
+          size="small"
+          hoverable={Boolean(item.onClick)}
+          onClick={item.onClick}
+          style={{
+            cursor: item.onClick ? 'pointer' : 'default',
+            borderColor: item.active ? '#1677ff' : undefined,
+            boxShadow: item.active ? '0 0 0 1px rgba(22, 119, 255, 0.15)' : undefined,
+          }}
+        >
           <Text type="secondary">{item.label}</Text>
           <Title level={4} style={{ margin: '8px 0 0' }}>{item.value}</Title>
         </Card>
@@ -339,6 +376,7 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
   const [detailOpen, setDetailOpen] = useState(false);
   const [hubOpen, setHubOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [releaseOpen, setReleaseOpen] = useState(false);
   const [installToAgentOpen, setInstallToAgentOpen] = useState(false);
   const [installSuccess, setInstallSuccess] = useState<InstallSuccessState | null>(null);
   const [importRollout, setImportRollout] = useState<ImportRolloutState | null>(null);
@@ -350,20 +388,28 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
   const [installTargets, setInstallTargets] = useState<AgentInstallTarget[]>([]);
   const [installTargetsLoading, setInstallTargetsLoading] = useState(false);
   const [editingHub, setEditingHub] = useState<SkillHubItem | null>(null);
+  const [releaseTarget, setReleaseTarget] = useState<ReleaseTargetState | null>(null);
+  const [releaseRecords, setReleaseRecords] = useState<SkillResourceReleaseItem[]>([]);
+  const [releaseRecordsLoading, setReleaseRecordsLoading] = useState(false);
   const [createForm] = Form.useForm<SkillFormValues>();
   const [versionForm] = Form.useForm<SkillVersionFormValues>();
   const [referenceEditorForm] = Form.useForm<ReferenceEditorFormValues>();
   const [hubForm] = Form.useForm<SkillHubFormValues>();
   const [importForm] = Form.useForm<ImportJobFormValues>();
+  const [releaseForm] = Form.useForm<ResourceReleaseFormValues>();
   const [installToAgentForm] = Form.useForm<InstallToAgentFormValues>();
   const [editingVersion, setEditingVersion] = useState<SkillVersionItem | null>(null);
   const [searchText, setSearchText] = useState('');
   const [skillSourceFilter, setSkillSourceFilter] = useState<string>('all');
   const [skillStatusFilter, setSkillStatusFilter] = useState<string>('all');
+  const [skillSummaryFilter, setSkillSummaryFilter] = useState<string>('all');
   const [hubTypeFilter, setHubTypeFilter] = useState<string>('all');
+  const [hubSummaryFilter, setHubSummaryFilter] = useState<string>('all');
   const [importStatusFilter, setImportStatusFilter] = useState<string>('all');
+  const [importSummaryFilter, setImportSummaryFilter] = useState<string>('all');
   const initialRouteBehaviorApplied = useRef(false);
   const selectedImportHubId = Form.useWatch('hubId', importForm);
+  const selectedReleaseScope = Form.useWatch('releaseScope', releaseForm);
 
   const translateStatus = (status?: string) => {
     if (!status) {
@@ -549,8 +595,9 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
     );
     const matchesSource = skillSourceFilter === 'all' || item.sourceType === skillSourceFilter;
     const matchesStatus = skillStatusFilter === 'all' || item.status === skillStatusFilter;
-    return matchesKeyword && matchesSource && matchesStatus;
-  }), [skills, normalizedSearch, skillSourceFilter, skillStatusFilter]);
+    const matchesSummary = skillSummaryFilter === 'all' || item.status === skillSummaryFilter;
+    return matchesKeyword && matchesSource && matchesStatus && matchesSummary;
+  }), [skills, normalizedSearch, skillSourceFilter, skillStatusFilter, skillSummaryFilter]);
 
   const filteredHubs = useMemo(() => hubs.filter((item) => {
     const matchesKeyword = matchesSearch(
@@ -562,8 +609,12 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
       item.trustLevel,
     );
     const matchesType = hubTypeFilter === 'all' || item.hubType === hubTypeFilter;
-    return matchesKeyword && matchesType;
-  }), [hubs, normalizedSearch, hubTypeFilter]);
+    const matchesSummary = hubSummaryFilter === 'all'
+      || (hubSummaryFilter === 'enabled' && item.status === 'enabled')
+      || (hubSummaryFilter === 'openapi' && item.hubType === 'openapi_hub')
+      || (hubSummaryFilter === 'mcp' && item.hubType === 'mcp_hub');
+    return matchesKeyword && matchesType && matchesSummary;
+  }), [hubs, normalizedSearch, hubTypeFilter, hubSummaryFilter]);
 
   const filteredImportJobs = useMemo(() => importJobs.filter((item) => {
     const matchesKeyword = matchesSearch(
@@ -575,8 +626,12 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
       item.errorMessage,
     );
     const matchesStatus = importStatusFilter === 'all' || item.jobStatus === importStatusFilter;
-    return matchesKeyword && matchesStatus;
-  }), [hubNameMap, importJobs, normalizedSearch, importStatusFilter]);
+    const matchesSummary = importSummaryFilter === 'all'
+      || (importSummaryFilter === 'completed' && item.jobStatus === 'completed')
+      || (importSummaryFilter === 'running' && item.jobStatus === 'normalizing')
+      || (importSummaryFilter === 'failed' && item.jobStatus === 'failed');
+    return matchesKeyword && matchesStatus && matchesSummary;
+  }), [hubNameMap, importJobs, normalizedSearch, importStatusFilter, importSummaryFilter]);
 
   const skillSourceOptions = useMemo<MarketFilterOption[]>(() => (
     [
@@ -647,14 +702,52 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
   };
 
   const openImportJob = (preset?: Partial<ImportJobFormValues>) => {
+    const defaultHubId = preset?.hubId || (hubs.length === 1 ? hubs[0].id : '');
     importForm.resetFields();
     importForm.setFieldsValue({
+      hubId: defaultHubId,
       sourceLocator: '',
       sourceNamespace: '',
       sourceVersion: '',
       ...preset,
     });
     setImportOpen(true);
+  };
+
+  const openReleaseSettings = (target: ReleaseTargetState) => {
+    setReleaseTarget(target);
+    setReleaseRecords([]);
+    releaseForm.resetFields();
+    releaseForm.setFieldsValue({
+      releaseScope: 'global',
+      targetEnterpriseId: '',
+      releaseStatus: 'enabled',
+      note: '',
+    });
+    setReleaseOpen(true);
+    void fetchReleaseRecords(target);
+  };
+
+  const fetchReleaseRecords = async (target: ReleaseTargetState) => {
+    setReleaseRecordsLoading(true);
+    try {
+      const res = await axios.get(`${BACKEND_URL}/api/admin/platform/resource-releases`, {
+        headers: getAuthHeaders(),
+        params: {
+          resourceType: target.resourceType,
+          resourceId: target.resourceId,
+        },
+      });
+      setReleaseRecords(Array.isArray(res.data) ? res.data : []);
+    } catch (error: any) {
+      const errorText = error?.response?.data;
+      messageApi.error(
+        translatePlatformSkillError(errorText, t('platform_resource_release_load_failed'), t),
+      );
+      setReleaseRecords([]);
+    } finally {
+      setReleaseRecordsLoading(false);
+    }
   };
 
   const handleCreateSkill = async () => {
@@ -895,6 +988,41 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
     }
   };
 
+  const handleSaveRelease = async () => {
+    if (!releaseTarget) {
+      return;
+    }
+    const values = await releaseForm.validateFields();
+    setSaving(true);
+    try {
+      await axios.post(`${BACKEND_URL}/api/admin/platform/resource-releases`, {
+        resourceId: releaseTarget.resourceId,
+        resourceType: releaseTarget.resourceType,
+        releaseScope: values.releaseScope,
+        targetEnterpriseId: values.releaseScope === 'enterprise' ? (values.targetEnterpriseId || '') : '',
+        releaseStatus: values.releaseStatus,
+        note: values.note || '',
+      }, {
+        headers: getAuthHeaders(),
+      });
+      messageApi.success(t('platform_resource_release_success'));
+      await fetchReleaseRecords(releaseTarget);
+      releaseForm.setFieldsValue({
+        releaseScope: values.releaseScope,
+        targetEnterpriseId: values.releaseScope === 'enterprise' ? (values.targetEnterpriseId || '') : '',
+        releaseStatus: values.releaseStatus,
+        note: values.note || '',
+      });
+    } catch (error: any) {
+      const errorText = error?.response?.data;
+      messageApi.error(
+        translatePlatformSkillError(errorText, t('platform_resource_release_failed'), t),
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const fetchInstallTargets = async () => {
     setInstallTargetsLoading(true);
     try {
@@ -1033,7 +1161,7 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
         border: '1px solid rgba(22,119,255,0.12)',
       }}
     >
-      <Space direction="vertical" size={10} style={{ width: '100%' }}>
+      <Space orientation="vertical" size={10} style={{ width: '100%' }}>
         <Text strong>{t('platform_skill_import_guide_title')}</Text>
         <Paragraph type="secondary" style={{ marginBottom: 0 }}>
           {t('platform_skill_import_guide_desc')}
@@ -1126,7 +1254,7 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
       <Empty
         image={Empty.PRESENTED_IMAGE_SIMPLE}
         description={
-          <Space direction="vertical" size={4}>
+          <Space orientation="vertical" size={4}>
             <Text strong>{title}</Text>
             <Text type="secondary">{description}</Text>
           </Space>
@@ -1151,7 +1279,7 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
         {filteredSkills.map((item) => (
           <Card key={item.id} hoverable style={{ borderRadius: 20 }}>
-            <Space direction="vertical" size={14} style={{ width: '100%' }}>
+            <Space orientation="vertical" size={14} style={{ width: '100%' }}>
               <Space align="start" style={{ width: '100%', justifyContent: 'space-between' }}>
                 <div>
                   <Text type="secondary">{item.code}</Text>
@@ -1220,7 +1348,7 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
         {filteredHubs.map((item) => (
           <Card key={item.id} hoverable style={{ borderRadius: 20 }}>
-            <Space direction="vertical" size={14} style={{ width: '100%' }}>
+            <Space orientation="vertical" size={14} style={{ width: '100%' }}>
               <Space align="start" style={{ width: '100%', justifyContent: 'space-between' }}>
                 <div>
                   <Text type="secondary">{item.hubCode}</Text>
@@ -1235,7 +1363,7 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
               <Paragraph type="secondary" style={{ marginBottom: 0 }}>
                 {item.baseUrl || emptyPlaceholder}
               </Paragraph>
-              <Space direction="vertical" size={2}>
+              <Space orientation="vertical" size={2}>
                 <Text type="secondary">{t('platform_skill_market_card_sync_mode', { value: translateSyncMode(item.syncMode) })}</Text>
                 <Text type="secondary">{t('platform_skill_market_card_auth_scheme', { value: translateAuthScheme(item.authScheme) })}</Text>
               </Space>
@@ -1273,7 +1401,7 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
         {filteredImportJobs.map((item) => (
           <Card key={item.id} hoverable style={{ borderRadius: 20 }}>
-            <Space direction="vertical" size={14} style={{ width: '100%' }}>
+            <Space orientation="vertical" size={14} style={{ width: '100%' }}>
               <Space align="start" style={{ width: '100%', justifyContent: 'space-between' }}>
                 <div>
                   <Text type="secondary">{hubNameMap[item.hubId] || emptyPlaceholder}</Text>
@@ -1281,7 +1409,7 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
                 </div>
                 {renderStatusTag(item.jobStatus, translateStatus(item.jobStatus), emptyPlaceholder)}
               </Space>
-              <Space direction="vertical" size={2}>
+              <Space orientation="vertical" size={2}>
                 <Text type="secondary">{t('platform_skill_import_jobs_column_source_namespace')}: {item.sourceNamespace || emptyPlaceholder}</Text>
                 <Text type="secondary">{t('platform_skill_import_jobs_column_source_version')}: {item.sourceVersion || emptyPlaceholder}</Text>
                 <Text type="secondary">{t('platform_skill_import_jobs_column_target_skill')}: {item.targetSkillId || emptyPlaceholder}</Text>
@@ -1383,7 +1511,7 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
             flexWrap: 'wrap',
           }}
         >
-          <Space direction="vertical" size={8} style={{ maxWidth: 760 }}>
+          <Space orientation="vertical" size={8} style={{ maxWidth: 760 }}>
             <Text strong>{t('platform_skill_market_recommended_title')}</Text>
             <Title level={4} style={{ margin: 0 }}>{title}</Title>
             <Paragraph type="secondary" style={{ marginBottom: 0 }}>
@@ -1477,7 +1605,7 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
       {isMarketExperience ? renderMarketRecommendationCard() : null}
 
       <Card size="small" style={{ marginBottom: 16, borderRadius: 16 }}>
-        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+        <Space orientation="vertical" size={12} style={{ width: '100%' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
             <Space wrap size={12}>
             {tabItems.map((item) => (
@@ -1508,10 +1636,10 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
       {activeTab === 'skills' ? (
         <>
           {renderSummaryCards([
-            { label: t('platform_skills_summary_total'), value: skillSummary.total },
-            { label: t('platform_skills_summary_published'), value: skillSummary.published },
-            { label: t('platform_skills_summary_draft'), value: skillSummary.draft },
-            { label: t('platform_skills_summary_disabled'), value: skillSummary.disabled },
+            { label: t('platform_skills_summary_total'), value: skillSummary.total, active: skillSummaryFilter === 'all', onClick: () => setSkillSummaryFilter('all') },
+            { label: t('platform_skills_summary_published'), value: skillSummary.published, active: skillSummaryFilter === 'published', onClick: () => setSkillSummaryFilter('published') },
+            { label: t('platform_skills_summary_draft'), value: skillSummary.draft, active: skillSummaryFilter === 'draft', onClick: () => setSkillSummaryFilter('draft') },
+            { label: t('platform_skills_summary_disabled'), value: skillSummary.disabled, active: skillSummaryFilter === 'disabled', onClick: () => setSkillSummaryFilter('disabled') },
           ])}
 
           {isMarketExperience ? (
@@ -1588,17 +1716,32 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
                   {
                     title: t('platform_skills_column_actions'),
                     key: 'actions',
-                    width: 140,
+                    width: 240,
                     render: (_: unknown, record: SkillItem) => (
-                      <Button
-                        size="small"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          void fetchDetail(record.id);
-                        }}
-                      >
-                        {t('platform_skills_view_detail')}
-                      </Button>
+                      <Space>
+                        <Button
+                          size="small"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void fetchDetail(record.id);
+                          }}
+                        >
+                          {t('platform_skills_view_detail')}
+                        </Button>
+                        <Button
+                          size="small"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            openReleaseSettings({
+                              resourceId: record.id,
+                              resourceType: 'skill',
+                              resourceName: record.name || record.code,
+                            });
+                          }}
+                        >
+                          {t('platform_resource_release_action')}
+                        </Button>
+                      </Space>
                     ),
                   },
                 ]}
@@ -1611,10 +1754,10 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
       {activeTab === 'hubs' ? (
         <>
           {renderSummaryCards([
-            { label: t('platform_skill_hubs_summary_total'), value: hubSummary.total },
-            { label: t('platform_skill_hubs_summary_enabled'), value: hubSummary.enabled },
-            { label: t('platform_skill_hubs_summary_openapi'), value: hubSummary.openapi },
-            { label: t('platform_skill_hubs_summary_mcp'), value: hubSummary.mcp },
+            { label: t('platform_skill_hubs_summary_total'), value: hubSummary.total, active: hubSummaryFilter === 'all', onClick: () => setHubSummaryFilter('all') },
+            { label: t('platform_skill_hubs_summary_enabled'), value: hubSummary.enabled, active: hubSummaryFilter === 'enabled', onClick: () => setHubSummaryFilter('enabled') },
+            { label: t('platform_skill_hubs_summary_openapi'), value: hubSummary.openapi, active: hubSummaryFilter === 'openapi', onClick: () => setHubSummaryFilter('openapi') },
+            { label: t('platform_skill_hubs_summary_mcp'), value: hubSummary.mcp, active: hubSummaryFilter === 'mcp', onClick: () => setHubSummaryFilter('mcp') },
           ])}
 
           {isMarketExperience ? (
@@ -1679,11 +1822,23 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
                   {
                     title: t('platform_skills_column_actions'),
                     key: 'actions',
-                    width: 120,
+                    width: 240,
                     render: (_: unknown, record: SkillHubItem) => (
-                      <Button size="small" onClick={() => openCreateHub(record)}>
-                        {t('platform_skills_edit')}
-                      </Button>
+                      <Space>
+                        <Button size="small" onClick={() => openCreateHub(record)}>
+                          {t('platform_skills_edit')}
+                        </Button>
+                        <Button
+                          size="small"
+                          onClick={() => openReleaseSettings({
+                            resourceId: record.id,
+                            resourceType: 'hub',
+                            resourceName: record.name || record.hubCode,
+                          })}
+                        >
+                          {t('platform_resource_release_action')}
+                        </Button>
+                      </Space>
                     ),
                   },
                 ]}
@@ -1696,10 +1851,10 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
       {activeTab === 'imports' ? (
         <>
           {renderSummaryCards([
-            { label: t('platform_skill_import_jobs_summary_total'), value: importSummary.total },
-            { label: t('platform_skill_import_jobs_summary_completed'), value: importSummary.completed },
-            { label: t('platform_skill_import_jobs_summary_running'), value: importSummary.running },
-            { label: t('platform_skill_import_jobs_summary_failed'), value: importSummary.failed },
+            { label: t('platform_skill_import_jobs_summary_total'), value: importSummary.total, active: importSummaryFilter === 'all', onClick: () => setImportSummaryFilter('all') },
+            { label: t('platform_skill_import_jobs_summary_completed'), value: importSummary.completed, active: importSummaryFilter === 'completed', onClick: () => setImportSummaryFilter('completed') },
+            { label: t('platform_skill_import_jobs_summary_running'), value: importSummary.running, active: importSummaryFilter === 'running', onClick: () => setImportSummaryFilter('running') },
+            { label: t('platform_skill_import_jobs_summary_failed'), value: importSummary.failed, active: importSummaryFilter === 'failed', onClick: () => setImportSummaryFilter('failed') },
           ])}
 
           {isMarketExperience ? (
@@ -1968,13 +2123,13 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
             <Input placeholder={t('platform_skill_import_jobs_form_source_version_placeholder')} />
           </Form.Item>
           <Card size="small" style={{ borderRadius: 16 }}>
-            <Space direction="vertical" size={8} style={{ width: '100%' }}>
+            <Space orientation="vertical" size={8} style={{ width: '100%' }}>
               <Text strong>{t('platform_skill_import_examples_title')}</Text>
               <Text type="secondary">{t('platform_skill_import_examples_desc')}</Text>
-              <Space direction="vertical" size={6} style={{ width: '100%' }}>
+              <Space orientation="vertical" size={6} style={{ width: '100%' }}>
                 {quickImportTemplates.map((template) => (
                   <Card key={template.key} size="small" style={{ borderRadius: 12 }}>
-                    <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                    <Space orientation="vertical" size={4} style={{ width: '100%' }}>
                       <Space wrap style={{ justifyContent: 'space-between', width: '100%' }}>
                         <Text strong>{template.label}</Text>
                         <Button size="small" onClick={() => applyImportTemplate(template)}>
@@ -2012,7 +2167,7 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
         cancelText={t('agent_cancel')}
         destroyOnHidden
       >
-        <Space direction="vertical" size={16} style={{ width: '100%' }}>
+        <Space orientation="vertical" size={16} style={{ width: '100%' }}>
           <Card
             size="small"
             style={{
@@ -2021,7 +2176,7 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
               border: '1px solid rgba(22,119,255,0.12)',
             }}
           >
-            <Space direction="vertical" size={6} style={{ width: '100%' }}>
+            <Space orientation="vertical" size={6} style={{ width: '100%' }}>
               <Text strong>{t('platform_skill_install_agent_selected_skill')}</Text>
               <Text>{installSkill ? `${installSkill.name} (${installSkill.code})` : emptyPlaceholder}</Text>
               <Text type="secondary">{t('platform_skill_install_agent_modal_desc')}</Text>
@@ -2113,7 +2268,7 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
         destroyOnHidden
       >
         {installSuccess ? (
-          <Space direction="vertical" size={12} style={{ width: '100%' }}>
+          <Space orientation="vertical" size={12} style={{ width: '100%' }}>
             <Text strong>{t('platform_skill_install_success_selected_skill')}</Text>
             <Text>{installSuccess.skillName}</Text>
             <Paragraph type="secondary" style={{ marginBottom: 0 }}>
@@ -2157,7 +2312,7 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
         destroyOnHidden
       >
         {importRollout ? (
-          <Space direction="vertical" size={12} style={{ width: '100%' }}>
+          <Space orientation="vertical" size={12} style={{ width: '100%' }}>
             <Paragraph type="secondary" style={{ marginBottom: 0 }}>
               {t('platform_skill_import_rollout_modal_desc')}
             </Paragraph>
@@ -2184,28 +2339,129 @@ const PlatformSkillsPage: React.FC<PlatformSkillsPageProps> = ({
         ) : null}
       </Modal>
 
+      <Modal
+        title={t(
+          releaseTarget?.resourceType === 'hub'
+            ? 'platform_resource_release_hub_title'
+            : 'platform_resource_release_skill_title',
+        )}
+        open={releaseOpen}
+        onCancel={() => {
+          setReleaseOpen(false);
+          setReleaseTarget(null);
+          setReleaseRecords([]);
+        }}
+        onOk={handleSaveRelease}
+        confirmLoading={saving}
+        okText={t('agent_save')}
+        cancelText={t('agent_cancel')}
+        destroyOnHidden
+      >
+        <Space orientation="vertical" size={12} style={{ width: '100%' }}>
+          <Card size="small" loading={releaseRecordsLoading} style={{ borderRadius: 16, background: '#fafafa' }}>
+            <Space orientation="vertical" size={10} style={{ width: '100%' }}>
+              <Text strong>{t('platform_resource_release_current_title')}</Text>
+              {releaseRecords.length ? releaseRecords.map((item) => (
+                <Card key={item.id} size="small" style={{ borderRadius: 12 }}>
+                  <Space orientation="vertical" size={4} style={{ width: '100%' }}>
+                    <Space wrap size={[8, 8]}>
+                      <Tag color={item.releaseScope === 'global' ? 'blue' : 'purple'}>
+                        {item.releaseScope === 'global'
+                          ? t('platform_resource_release_scope_global')
+                          : t('platform_resource_release_scope_enterprise')}
+                      </Tag>
+                      <Tag color={item.releaseStatus === 'enabled' ? 'success' : 'default'}>
+                        {translateStatus(item.releaseStatus)}
+                      </Tag>
+                      {item.targetEnterpriseId ? <Tag>{item.targetEnterpriseId}</Tag> : null}
+                    </Space>
+                    <Text type="secondary">
+                      {t('platform_resource_release_meta_line', {
+                        operator: item.operatedBy || '-',
+                        updatedAt: formatDateTime(item.updatedAt, currentLanguage),
+                      })}
+                    </Text>
+                    {item.note ? <Paragraph style={{ marginBottom: 0 }}>{item.note}</Paragraph> : null}
+                  </Space>
+                </Card>
+              )) : (
+                <Text type="secondary">{t('platform_resource_release_current_empty')}</Text>
+              )}
+            </Space>
+          </Card>
+        <Form form={releaseForm} layout="vertical">
+          <Paragraph type="secondary" style={{ marginBottom: 12 }}>
+            {t('platform_resource_release_desc', { name: releaseTarget?.resourceName || '-' })}
+          </Paragraph>
+          <Form.Item label={t('platform_resource_release_scope')} name="releaseScope" rules={[{ required: true }]}>
+            <Radio.Group
+              optionType="button"
+              buttonStyle="solid"
+              options={[
+                { label: t('platform_resource_release_scope_global'), value: 'global' },
+                { label: t('platform_resource_release_scope_enterprise'), value: 'enterprise' },
+              ]}
+            />
+          </Form.Item>
+          {selectedReleaseScope === 'enterprise' ? (
+            <Form.Item
+              label={t('platform_resource_release_target_enterprise')}
+              name="targetEnterpriseId"
+              rules={[{ required: true, message: t('platform_resource_release_target_enterprise_required') }]}
+            >
+              <Input placeholder={t('platform_resource_release_target_enterprise_placeholder')} />
+            </Form.Item>
+          ) : null}
+          <Form.Item label={t('platform_resource_release_status')} name="releaseStatus" rules={[{ required: true }]}>
+            <Select
+              options={[
+                { label: translateStatus('enabled'), value: 'enabled' },
+                { label: translateStatus('disabled'), value: 'disabled' },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item label={t('platform_resource_release_note')} name="note">
+            <TextArea rows={3} placeholder={t('platform_resource_release_note_placeholder')} />
+          </Form.Item>
+        </Form>
+        </Space>
+      </Modal>
+
       <Drawer
         title={selectedSkill?.skill?.name || t('platform_skill_detail_title')}
         open={detailOpen}
         onClose={() => setDetailOpen(false)}
         width={960}
         extra={
-          <Button
-            icon={<PlusOutlined />}
-            onClick={() => {
-              versionForm.setFieldsValue({
-                manifest: '{}',
-                inputSchema: '{}',
-                outputSchema: '{}',
-                defaultPolicy: '{}',
-                runtimeContract: '{}',
-                references: '[]',
-              });
-              setVersionOpen(true);
-            }}
-          >
-            {t('platform_skills_new_version')}
-          </Button>
+          <Space>
+            {selectedSkill?.skill ? (
+              <Button
+                onClick={() => openReleaseSettings({
+                  resourceId: selectedSkill.skill.id,
+                  resourceType: 'skill',
+                  resourceName: selectedSkill.skill.name || selectedSkill.skill.code,
+                })}
+              >
+                {t('platform_resource_release_action')}
+              </Button>
+            ) : null}
+            <Button
+              icon={<PlusOutlined />}
+              onClick={() => {
+                versionForm.setFieldsValue({
+                  manifest: '{}',
+                  inputSchema: '{}',
+                  outputSchema: '{}',
+                  defaultPolicy: '{}',
+                  runtimeContract: '{}',
+                  references: '[]',
+                });
+                setVersionOpen(true);
+              }}
+            >
+              {t('platform_skills_new_version')}
+            </Button>
+          </Space>
         }
       >
         {selectedSkill?.skill ? (

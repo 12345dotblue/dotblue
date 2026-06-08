@@ -175,6 +175,7 @@ func postgresSchemaStatements() []statement {
 					name                        VARCHAR(255) NOT NULL,
 					description                 TEXT NOT NULL DEFAULT '',
 					owner_scope                 VARCHAR(32) NOT NULL,
+					owner_scope_ref_id          VARCHAR(128) NOT NULL DEFAULT '',
 					owner_enterprise_id         VARCHAR(128) NOT NULL DEFAULT '',
 					source_type                 VARCHAR(32) NOT NULL,
 					provider_type               VARCHAR(32) NOT NULL DEFAULT 'native',
@@ -191,6 +192,10 @@ func postgresSchemaStatements() []statement {
 					updated_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 				)
 			`,
+		},
+		{
+			name: "alter skills add owner_scope_ref_id column",
+			sql:  `ALTER TABLE skills ADD COLUMN IF NOT EXISTS owner_scope_ref_id VARCHAR(128) NOT NULL DEFAULT ''`,
 		},
 		{
 			name: "create skills scope_code unique index",
@@ -271,6 +276,8 @@ func postgresSchemaStatements() []statement {
 			sql: `
 				CREATE TABLE IF NOT EXISTS skill_hubs (
 					id                      UUID PRIMARY KEY DEFAULT uuidv7(),
+					owner_scope             VARCHAR(32) NOT NULL DEFAULT 'platform',
+					owner_scope_ref_id      VARCHAR(128) NOT NULL DEFAULT '',
 					hub_code                VARCHAR(128) NOT NULL,
 					name                    VARCHAR(255) NOT NULL,
 					hub_type                VARCHAR(64) NOT NULL,
@@ -291,6 +298,14 @@ func postgresSchemaStatements() []statement {
 					created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 					updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
 				)
+			`,
+		},
+		{
+			name: "alter skill_hubs add owner scope columns",
+			sql: `
+				ALTER TABLE skill_hubs
+				ADD COLUMN IF NOT EXISTS owner_scope VARCHAR(32) NOT NULL DEFAULT 'platform',
+				ADD COLUMN IF NOT EXISTS owner_scope_ref_id VARCHAR(128) NOT NULL DEFAULT ''
 			`,
 		},
 		{
@@ -774,6 +789,9 @@ func postgresSchemaStatements() []statement {
 			sql: `
 				CREATE TABLE IF NOT EXISTS skill_import_jobs (
 					id                       UUID PRIMARY KEY DEFAULT uuidv7(),
+					owner_scope              VARCHAR(32) NOT NULL DEFAULT 'platform',
+					owner_scope_ref_id       VARCHAR(128) NOT NULL DEFAULT '',
+					owner_enterprise_id      VARCHAR(128) NOT NULL DEFAULT '',
 					hub_id                    UUID NOT NULL REFERENCES skill_hubs(id) ON DELETE CASCADE,
 					requested_by              VARCHAR(128) NOT NULL DEFAULT '',
 					source_locator            TEXT NOT NULL,
@@ -794,12 +812,51 @@ func postgresSchemaStatements() []statement {
 			`,
 		},
 		{
+			name: "alter skill_import_jobs add owner scope columns",
+			sql: `
+				ALTER TABLE skill_import_jobs
+				ADD COLUMN IF NOT EXISTS owner_scope VARCHAR(32) NOT NULL DEFAULT 'platform',
+				ADD COLUMN IF NOT EXISTS owner_scope_ref_id VARCHAR(128) NOT NULL DEFAULT '',
+				ADD COLUMN IF NOT EXISTS owner_enterprise_id VARCHAR(128) NOT NULL DEFAULT ''
+			`,
+		},
+		{
 			name: "create skill_import_jobs hub_created index",
 			sql:  `CREATE INDEX IF NOT EXISTS idx_skill_import_jobs_hub_created ON skill_import_jobs(hub_id, created_at DESC)`,
 		},
 		{
 			name: "create skill_import_jobs status_created index",
 			sql:  `CREATE INDEX IF NOT EXISTS idx_skill_import_jobs_status_created ON skill_import_jobs(job_status, created_at DESC)`,
+		},
+		{
+			name: "create skill_import_jobs owner_created index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_skill_import_jobs_owner_created ON skill_import_jobs(owner_scope, owner_scope_ref_id, created_at DESC)`,
+		},
+		{
+			name: "create skill_resource_releases table",
+			sql: `
+				CREATE TABLE IF NOT EXISTS skill_resource_releases (
+					id                   UUID PRIMARY KEY DEFAULT uuidv7(),
+					resource_type        VARCHAR(24) NOT NULL,
+					resource_id          UUID NOT NULL,
+					release_scope        VARCHAR(24) NOT NULL DEFAULT 'global',
+					target_enterprise_id VARCHAR(128) NOT NULL DEFAULT '',
+					release_status       VARCHAR(24) NOT NULL DEFAULT 'enabled',
+					note                 TEXT NOT NULL DEFAULT '',
+					operated_by          VARCHAR(128) NOT NULL DEFAULT '',
+					created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+					updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+					UNIQUE(resource_type, resource_id, release_scope, target_enterprise_id)
+				)
+			`,
+		},
+		{
+			name: "create skill_resource_releases resource index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_skill_resource_releases_resource ON skill_resource_releases(resource_type, resource_id, updated_at DESC)`,
+		},
+		{
+			name: "create skill_resource_releases enterprise index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_skill_resource_releases_enterprise ON skill_resource_releases(resource_type, target_enterprise_id, release_status, updated_at DESC)`,
 		},
 		{
 			name: "create im_connections table",

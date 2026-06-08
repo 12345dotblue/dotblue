@@ -30,10 +30,15 @@ type HubRepository interface {
 	GetSkillHubById(id string) (*SkillHub, error)
 	GetSkillHubByCode(code string) (*SkillHub, error)
 	ListSkillHubs() ([]*SkillHub, error)
+	ListSkillHubsByOwner(ownerScope, ownerScopeRefId string) ([]*SkillHub, error)
 	CreateSkillImportJob(job *SkillImportJob) error
 	UpdateSkillImportJob(job *SkillImportJob) error
 	GetSkillImportJobById(id string) (*SkillImportJob, error)
 	ListSkillImportJobs() ([]*SkillImportJob, error)
+	ListSkillImportJobsByOwner(ownerScope, ownerScopeRefId string) ([]*SkillImportJob, error)
+	UpsertSkillResourceRelease(item *SkillResourceRelease) error
+	ListSkillResourceReleases(resourceType, resourceId string) ([]*SkillResourceRelease, error)
+	ListSkillResourceReleasesForEnterprise(resourceType, enterpriseId string) ([]*SkillResourceRelease, error)
 }
 
 // AvailabilityRepository stores tenant-scoped availability decisions for skills.

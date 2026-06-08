@@ -5,6 +5,7 @@ import "time"
 const (
 	OwnerScopePlatform   = "platform"
 	OwnerScopeEnterprise = "enterprise"
+	OwnerScopePartner    = "partner"
 )
 
 const (
@@ -100,6 +101,21 @@ const (
 )
 
 const (
+	ResourceTypeSkill = "skill"
+	ResourceTypeHub   = "hub"
+)
+
+const (
+	ReleaseScopeGlobal     = "global"
+	ReleaseScopeEnterprise = "enterprise"
+)
+
+const (
+	ReleaseStatusEnabled  = "enabled"
+	ReleaseStatusDisabled = "disabled"
+)
+
+const (
 	AgentSkillDisplayStatusInstallable   = "enabled_installable"
 	AgentSkillDisplayStatusPendingEnable = "imported_pending_enable"
 	AgentSkillDisplayStatusInstalled     = "installed"
@@ -126,6 +142,7 @@ type Skill struct {
 	Name                     string    `json:"name"`
 	Description              string    `json:"description"`
 	OwnerScope               string    `json:"ownerScope" orm:"owner_scope"`
+	OwnerScopeRefId          string    `json:"ownerScopeRefId" orm:"owner_scope_ref_id"`
 	OwnerEnterpriseId        string    `json:"ownerEnterpriseId" orm:"owner_enterprise_id"`
 	SourceType               string    `json:"sourceType" orm:"source_type"`
 	ProviderType             string    `json:"providerType" orm:"provider_type"`
@@ -227,6 +244,8 @@ type SkillReference struct {
 
 type SkillHub struct {
 	Id                    string    `json:"id"`
+	OwnerScope            string    `json:"ownerScope" orm:"owner_scope"`
+	OwnerScopeRefId       string    `json:"ownerScopeRefId" orm:"owner_scope_ref_id"`
 	HubCode               string    `json:"hubCode" orm:"hub_code"`
 	Name                  string    `json:"name"`
 	HubType               string    `json:"hubType" orm:"hub_type"`
@@ -250,6 +269,9 @@ type SkillHub struct {
 
 type SkillImportJob struct {
 	Id                     string    `json:"id"`
+	OwnerScope             string    `json:"ownerScope" orm:"owner_scope"`
+	OwnerScopeRefId        string    `json:"ownerScopeRefId" orm:"owner_scope_ref_id"`
+	OwnerEnterpriseId      string    `json:"ownerEnterpriseId" orm:"owner_enterprise_id"`
 	HubId                  string    `json:"hubId" orm:"hub_id"`
 	RequestedBy            string    `json:"requestedBy" orm:"requested_by"`
 	SourceLocator          string    `json:"sourceLocator" orm:"source_locator"`
@@ -266,6 +288,19 @@ type SkillImportJob struct {
 	StartedAt              time.Time `json:"startedAt" orm:"started_at"`
 	FinishedAt             time.Time `json:"finishedAt" orm:"finished_at"`
 	CreatedAt              time.Time `json:"createdAt" orm:"created_at"`
+}
+
+type SkillResourceRelease struct {
+	Id                 string    `json:"id"`
+	ResourceType       string    `json:"resourceType" orm:"resource_type"`
+	ResourceId         string    `json:"resourceId" orm:"resource_id"`
+	ReleaseScope       string    `json:"releaseScope" orm:"release_scope"`
+	TargetEnterpriseId string    `json:"targetEnterpriseId" orm:"target_enterprise_id"`
+	ReleaseStatus      string    `json:"releaseStatus" orm:"release_status"`
+	Note               string    `json:"note"`
+	OperatedBy         string    `json:"operatedBy" orm:"operated_by"`
+	CreatedAt          time.Time `json:"createdAt" orm:"created_at"`
+	UpdatedAt          time.Time `json:"updatedAt" orm:"updated_at"`
 }
 
 type SkillDetail struct {
@@ -390,6 +425,15 @@ type UpsertSkillHubInput struct {
 	AllowedNamespacesJSON string
 	NetworkPolicyJSON     string
 	SignaturePolicyJSON   string
+}
+
+type SetResourceReleaseInput struct {
+	ResourceType       string
+	ResourceId         string
+	ReleaseScope       string
+	TargetEnterpriseId string
+	ReleaseStatus      string
+	Note               string
 }
 
 type ImportSkillInput struct {

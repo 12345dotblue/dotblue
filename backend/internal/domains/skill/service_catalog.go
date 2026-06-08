@@ -70,7 +70,7 @@ func (s *Service) CreateSkill(actor ActorContext, input CreateSkillInput) (*Skil
 	if s == nil || s.repo == nil {
 		return nil, errors.New("skill repository is not configured")
 	}
-	ownerScope, ownerEnterpriseId, err := resolveGovernedOwner(actor)
+	ownerScope, ownerScopeRefId, ownerEnterpriseId, err := resolveGovernedScope(actor)
 	if err != nil {
 		return nil, err
 	}
@@ -106,6 +106,7 @@ func (s *Service) CreateSkill(actor ActorContext, input CreateSkillInput) (*Skil
 		Name:              name,
 		Description:       strings.TrimSpace(input.Description),
 		OwnerScope:        ownerScope,
+		OwnerScopeRefId:   ownerScopeRefId,
 		OwnerEnterpriseId: ownerEnterpriseId,
 		SourceType:        sourceType,
 		ProviderType:      providerType,

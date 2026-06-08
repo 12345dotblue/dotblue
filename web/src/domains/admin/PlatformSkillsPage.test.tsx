@@ -43,6 +43,37 @@ function installDomMocks() {
   Element.prototype.scrollIntoView = vi.fn();
 }
 
+function mockPlatformPageGets(options?: {
+  skills?: any[];
+  hubs?: any[];
+  imports?: any[];
+  detail?: any;
+}) {
+  const {
+    skills = [],
+    hubs = [],
+    imports = [],
+    detail = null,
+  } = options || {};
+
+  mockedAxiosGet.mockImplementation((url) => {
+    const target = String(url);
+    if (target.includes('/api/admin/skills?view=governance')) {
+      return Promise.resolve({ data: skills } as any);
+    }
+    if (target.includes('/api/admin/platform/skill-hubs')) {
+      return Promise.resolve({ data: hubs } as any);
+    }
+    if (target.includes('/api/admin/platform/skill-import-jobs')) {
+      return Promise.resolve({ data: imports } as any);
+    }
+    if (/\/api\/admin\/skills\/[^/]+$/.test(target) && detail) {
+      return Promise.resolve({ data: detail } as any);
+    }
+    return Promise.resolve({ data: [] } as any);
+  });
+}
+
 describe('PlatformSkillsPage', () => {
   beforeEach(async () => {
     localStorage.clear();
@@ -60,26 +91,20 @@ describe('PlatformSkillsPage', () => {
   });
 
   it('加载平台 skill 列表', async () => {
-    mockedAxiosGet.mockImplementation((url) => {
-      const target = String(url);
-      if (target.includes('/api/admin/skills?view=governance')) {
-        return Promise.resolve({
-          data: [
-            {
-              id: 'skill-1',
-              code: 'knowledge.search',
-              name: '知识检索',
-              description: 'desc',
-              sourceType: 'builtin',
-              providerType: 'native',
-              trustLevel: 'platform_trusted',
-              status: 'published',
-              updatedAt: new Date().toISOString(),
-            },
-          ],
-        } as any);
-      }
-      return Promise.resolve({ data: [] } as any);
+    mockPlatformPageGets({
+      skills: [
+        {
+          id: 'skill-1',
+          code: 'knowledge.search',
+          name: '知识检索',
+          description: 'desc',
+          sourceType: 'builtin',
+          providerType: 'native',
+          trustLevel: 'platform_trusted',
+          status: 'published',
+          updatedAt: new Date().toISOString(),
+        },
+      ],
     });
 
     renderPage();
@@ -91,7 +116,7 @@ describe('PlatformSkillsPage', () => {
   it('在 zh-CN 下展示中文文案', async () => {
     localStorage.setItem('i18nextLng', 'zh-CN');
     await i18n.changeLanguage('zh-CN');
-    mockedAxiosGet.mockImplementation(() => Promise.resolve({ data: [] } as any));
+    mockPlatformPageGets();
 
     renderPage();
 
@@ -102,7 +127,7 @@ describe('PlatformSkillsPage', () => {
 
   it('创建 skill 时提交表单到后端', async () => {
     const user = userEvent.setup();
-    mockedAxiosGet.mockImplementation(() => Promise.resolve({ data: [] } as any));
+    mockPlatformPageGets();
     mockedAxiosPost.mockResolvedValue({ data: { id: 'skill-1' } } as any);
 
     renderPage();
@@ -128,26 +153,20 @@ describe('PlatformSkillsPage', () => {
 
   it('可以从 import jobs 标签页发起导入', async () => {
     const user = userEvent.setup();
-    mockedAxiosGet.mockImplementation((url) => {
-      const target = String(url);
-      if (target.includes('/api/admin/platform/skill-hubs')) {
-        return Promise.resolve({
-          data: [
-            {
-              id: 'hub-1',
-              hubCode: 'partner-openapi',
-              name: 'Partner Hub',
-              hubType: 'openapi_hub',
-              status: 'enabled',
-              trustLevel: 'partner_verified',
-              syncMode: 'manual',
-              authScheme: 'none',
-              updatedAt: new Date().toISOString(),
-            },
-          ],
-        } as any);
-      }
-      return Promise.resolve({ data: [] } as any);
+    mockPlatformPageGets({
+      hubs: [
+        {
+          id: 'hub-1',
+          hubCode: 'partner-openapi',
+          name: 'Partner Hub',
+          hubType: 'openapi_hub',
+          status: 'enabled',
+          trustLevel: 'partner_verified',
+          syncMode: 'manual',
+          authScheme: 'none',
+          updatedAt: new Date().toISOString(),
+        },
+      ],
     });
     mockedAxiosPost.mockResolvedValue({ data: { id: 'job-1', jobStatus: 'completed' } } as any);
 
@@ -160,8 +179,6 @@ describe('PlatformSkillsPage', () => {
 
     const dialogs = await screen.findAllByRole('dialog');
     const dialog = dialogs[dialogs.length - 1];
-    await user.click(within(dialog).getByRole('combobox'));
-    await user.click(await screen.findByText(/Partner Hub/));
     await user.type(within(dialog).getByPlaceholderText('For example: https://skillhub.cn/skills/weather'), 'petstore/openapi.yaml');
     await user.type(within(dialog).getByPlaceholderText('For example: weather or partner.petstore'), 'partner.petstore');
     await user.type(within(dialog).getByPlaceholderText('For example: latest or 1.0.0'), '1.2.3');
@@ -175,6 +192,66 @@ describe('PlatformSkillsPage', () => {
       sourceLocator: 'petstore/openapi.yaml',
       sourceNamespace: 'partner.petstore',
       sourceVersion: '1.2.3',
+    });
+  }, 10000);
+
+  it('平台可以给技能设置指定企业开放范围', async () => {
+    const user = userEvent.setup();
+    mockPlatformPageGets({
+      skills: [
+        {
+          id: 'skill-1',
+          code: 'knowledge.search',
+          name: 'Knowledge Search',
+          description: 'desc',
+          sourceType: 'builtin',
+          providerType: 'native',
+          trustLevel: 'platform_trusted',
+          status: 'published',
+          updatedAt: new Date().toISOString(),
+        },
+      ],
+      detail: {
+        skill: {
+          id: 'skill-1',
+          code: 'knowledge.search',
+          name: 'Knowledge Search',
+          description: 'desc',
+          sourceType: 'builtin',
+          providerType: 'native',
+          trustLevel: 'platform_trusted',
+          status: 'published',
+          updatedAt: new Date().toISOString(),
+        },
+        versions: [],
+        references: [],
+      },
+    });
+    mockedAxiosPost.mockResolvedValue({ data: {} } as any);
+
+    renderPage();
+
+    const firstSkillCell = (await screen.findAllByText('knowledge.search'))[0];
+    await user.click(firstSkillCell);
+    const releaseButton = (await screen.findAllByRole('button', { name: 'Release Settings' })).at(-1);
+    expect(releaseButton).toBeTruthy();
+    await user.click(releaseButton as HTMLElement);
+
+    const dialog = (await screen.findAllByRole('dialog')).at(-1);
+    expect(dialog).toBeTruthy();
+    await user.click(within(dialog as HTMLElement).getByText('Specific Enterprise'));
+    await user.type(await within(dialog as HTMLElement).findByPlaceholderText('For example: ent_demo'), 'ent-demo');
+    await user.click(within(dialog as HTMLElement).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(mockedAxiosPost).toHaveBeenCalled());
+    const releaseCall = mockedAxiosPost.mock.calls.find(([url]) => String(url).includes('/api/admin/platform/resource-releases'));
+    expect(releaseCall).toBeTruthy();
+    expect(releaseCall?.[1]).toMatchObject({
+      resourceId: 'skill-1',
+      resourceType: 'skill',
+      releaseScope: 'enterprise',
+      targetEnterpriseId: 'ent-demo',
+      releaseStatus: 'enabled',
     });
   }, 10000);
 });

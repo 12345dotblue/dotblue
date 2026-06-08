@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Card, Empty, Form, Input, Modal, Select, Space, Table, Tag, Typography, message } from 'antd';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Button, Card, Drawer, Empty, Form, Input, Modal, Select, Space, Table, Tag, Typography, message } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import { useTranslation } from 'react-i18next';
@@ -21,6 +21,35 @@ interface SkillItem {
   status: string;
   latestPublishedVersion: string;
   enablementStatus: string;
+}
+
+interface SkillHubItem {
+  id: string;
+  hubCode: string;
+  name: string;
+  hubType: string;
+  baseUrl: string;
+  status: string;
+  trustLevel: string;
+  syncMode: string;
+  authScheme: string;
+  updatedAt: string;
+}
+
+interface SkillImportJobItem {
+  id: string;
+  hubId: string;
+  requestedBy: string;
+  sourceLocator: string;
+  sourceNamespace: string;
+  sourceVersion: string;
+  jobStatus: string;
+  targetSkillId?: string;
+  targetSkillVersionId?: string;
+  errorMessage?: string;
+  createdAt: string;
+  startedAt?: string;
+  finishedAt?: string;
 }
 
 interface SkillVersionItem {
@@ -66,7 +95,14 @@ interface CreateVersionFormValues {
   changeLog?: string;
 }
 
-type EnterpriseSkillView = 'governance' | 'catalog';
+interface ImportSkillFormValues {
+  hubId: string;
+  sourceLocator: string;
+  sourceNamespace?: string;
+  sourceVersion?: string;
+}
+
+type EnterpriseSkillView = 'governance' | 'catalog' | 'imports' | 'hubs';
 const CURRENT_ENTERPRISE_STORAGE_KEY = 'dotblue_current_enterprise_id';
 
 function getAuthHeaders() {
@@ -117,6 +153,23 @@ function getEnterpriseSkillErrorMessage(fallbackMessage: string) {
   return fallbackMessage;
 }
 
+function formatDateTime(value?: string) {
+  if (!value) {
+    return '-';
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '-';
+  }
+  return new Intl.DateTimeFormat(undefined, {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
+
 const EnterpriseSkillsTab: React.FC<EnterpriseSkillsTabProps> = ({ createSignal }) => {
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -124,23 +177,40 @@ const EnterpriseSkillsTab: React.FC<EnterpriseSkillsTabProps> = ({ createSignal 
   const [activeView, setActiveView] = useState<EnterpriseSkillView>('governance');
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [governanceLoading, setGovernanceLoading] = useState(true);
+  const [hubsLoading, setHubsLoading] = useState(true);
+  const [importJobsLoading, setImportJobsLoading] = useState(true);
   const [catalogSkills, setCatalogSkills] = useState<SkillItem[]>([]);
   const [governedSkills, setGovernedSkills] = useState<SkillItem[]>([]);
+  const [hubs, setHubs] = useState<SkillHubItem[]>([]);
+  const [importJobs, setImportJobs] = useState<SkillImportJobItem[]>([]);
   const [enableModalOpen, setEnableModalOpen] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [versionModalOpen, setVersionModalOpen] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [importDetailOpen, setImportDetailOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [publishingId, setPublishingId] = useState('');
   const [pendingEnableSkillId, setPendingEnableSkillId] = useState('');
   const [selectedSkill, setSelectedSkill] = useState<GovernedSkillDetail | null>(null);
+  const [selectedImportJob, setSelectedImportJob] = useState<SkillImportJobItem | null>(null);
   const [enableForm] = Form.useForm<EnableSkillFormValues>();
   const [createForm] = Form.useForm<CreateSkillFormValues>();
   const [versionForm] = Form.useForm<CreateVersionFormValues>();
+  const [importForm] = Form.useForm<ImportSkillFormValues>();
   const consumedSkillIdRef = useRef('');
 
   const translateWithFallback = (key: string, fallback?: string) => (fallback ? t(key, fallback) : t(key));
+  const hubNameMap = useMemo(
+    () => hubs.reduce<Record<string, string>>((acc, item) => {
+      if (item?.id) {
+        acc[item.id] = item.name || item.hubCode || item.id;
+      }
+      return acc;
+    }, {}),
+    [hubs],
+  );
 
   const fetchCatalogSkills = async () => {
     setCatalogLoading(true);
@@ -172,6 +242,36 @@ const EnterpriseSkillsTab: React.FC<EnterpriseSkillsTabProps> = ({ createSignal 
     }
   };
 
+  const fetchVisibleHubs = async () => {
+    setHubsLoading(true);
+    try {
+      const res = await axios.get(`${BACKEND_URL}/api/admin/skill-hubs`, {
+        headers: getAuthHeaders(),
+      });
+      setHubs(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      messageApi.error(t('enterprise_admin_skills_hubs_load_failed'));
+      setHubs([]);
+    } finally {
+      setHubsLoading(false);
+    }
+  };
+
+  const fetchImportJobs = async () => {
+    setImportJobsLoading(true);
+    try {
+      const res = await axios.get(`${BACKEND_URL}/api/admin/skill-import-jobs`, {
+        headers: getAuthHeaders(),
+      });
+      setImportJobs(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      messageApi.error(t('enterprise_admin_skills_import_jobs_load_failed'));
+      setImportJobs([]);
+    } finally {
+      setImportJobsLoading(false);
+    }
+  };
+
   const fetchSkillDetail = async (skillId: string) => {
     setDetailLoading(true);
     try {
@@ -188,7 +288,7 @@ const EnterpriseSkillsTab: React.FC<EnterpriseSkillsTabProps> = ({ createSignal 
   };
 
   useEffect(() => {
-    void Promise.all([fetchCatalogSkills(), fetchGovernedSkills()]);
+    void Promise.all([fetchCatalogSkills(), fetchGovernedSkills(), fetchVisibleHubs(), fetchImportJobs()]);
   }, []);
 
   useEffect(() => {
@@ -215,6 +315,16 @@ const EnterpriseSkillsTab: React.FC<EnterpriseSkillsTabProps> = ({ createSignal 
     }
     versionForm.resetFields();
   }, [versionModalOpen, versionForm]);
+
+  useEffect(() => {
+    if (!importModalOpen) {
+      return;
+    }
+    importForm.resetFields();
+    if (hubs.length === 1 && hubs[0]?.id) {
+      importForm.setFieldsValue({ hubId: hubs[0].id });
+    }
+  }, [importModalOpen, importForm, hubs]);
 
   useEffect(() => {
     if (!enableModalOpen) {
@@ -402,6 +512,35 @@ const EnterpriseSkillsTab: React.FC<EnterpriseSkillsTabProps> = ({ createSignal 
     }
   };
 
+  const handleCreateImportJob = async () => {
+    const values = await importForm.validateFields();
+    setSaving(true);
+    try {
+      await axios.post(`${BACKEND_URL}/api/admin/skill-import-jobs`, {
+        hubId: values.hubId,
+        sourceLocator: values.sourceLocator,
+        sourceNamespace: values.sourceNamespace || '',
+        sourceVersion: values.sourceVersion || '',
+      }, {
+        headers: getAuthHeaders(),
+      });
+      messageApi.success(t('enterprise_admin_skills_import_create_success'));
+      setImportModalOpen(false);
+      importForm.resetFields();
+      setActiveView('imports');
+      await Promise.all([fetchGovernedSkills(), fetchImportJobs()]);
+    } catch {
+      messageApi.error(getEnterpriseSkillErrorMessage(t('enterprise_admin_skills_import_create_failed')));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openImportDetail = (job: SkillImportJobItem) => {
+    setSelectedImportJob(job);
+    setImportDetailOpen(true);
+  };
+
   return (
     <div>
       {contextHolder}
@@ -432,6 +571,18 @@ const EnterpriseSkillsTab: React.FC<EnterpriseSkillsTabProps> = ({ createSignal 
               onClick={() => setActiveView('catalog')}
             >
               {t('enterprise_admin_skills_view_catalog')} ({catalogSkills.length})
+            </Button>
+            <Button
+              type={activeView === 'imports' ? 'primary' : 'default'}
+              onClick={() => setActiveView('imports')}
+            >
+              {t('enterprise_admin_skills_view_imports')} ({importJobs.length})
+            </Button>
+            <Button
+              type={activeView === 'hubs' ? 'primary' : 'default'}
+              onClick={() => setActiveView('hubs')}
+            >
+              {t('enterprise_admin_skills_view_hubs')} ({hubs.length})
             </Button>
           </Space>
         </Card>
@@ -502,7 +653,7 @@ const EnterpriseSkillsTab: React.FC<EnterpriseSkillsTabProps> = ({ createSignal 
               ]}
             />
           </Space>
-        ) : (
+        ) : activeView === 'catalog' ? (
           <Space orientation="vertical" size={16} style={{ width: '100%' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
               <div>
@@ -573,8 +724,320 @@ const EnterpriseSkillsTab: React.FC<EnterpriseSkillsTabProps> = ({ createSignal 
               ]}
             />
           </Space>
+        ) : activeView === 'imports' ? (
+          <Space orientation="vertical" size={16} style={{ width: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <div>
+                <Title level={5} style={{ marginBottom: 4 }}>
+                  {t('enterprise_admin_skills_imports_title')}
+                </Title>
+                <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+                  {t('enterprise_admin_skills_imports_desc')}
+                </Paragraph>
+              </div>
+              <Space wrap size={[8, 8]}>
+                <Button
+                  onClick={() => void fetchImportJobs()}
+                >
+                  {t('enterprise_admin_skills_action_refresh')}
+                </Button>
+                <Button
+                  type="primary"
+                  disabled={!hubs.length}
+                  onClick={() => setImportModalOpen(true)}
+                >
+                  {t('enterprise_admin_skills_action_import')}
+                </Button>
+              </Space>
+            </div>
+            <Table
+              rowKey="id"
+              loading={importJobsLoading}
+              dataSource={importJobs}
+              locale={{
+                emptyText: <Empty description={t('enterprise_admin_skills_imports_empty')} image={Empty.PRESENTED_IMAGE_SIMPLE} />,
+              }}
+              expandable={{
+                expandedRowRender: (record) => (
+                  <Space orientation="vertical" size={8} style={{ width: '100%' }}>
+                    <Text strong>{t('enterprise_admin_skills_import_detail_title')}</Text>
+                    <Text type="secondary">
+                      {t('enterprise_admin_skills_import_detail_time_range', {
+                        createdAt: formatDateTime(record.createdAt),
+                        startedAt: formatDateTime(record.startedAt),
+                        finishedAt: formatDateTime(record.finishedAt),
+                      })}
+                    </Text>
+                    <Text type="secondary">
+                      {t('enterprise_admin_skills_import_detail_requested_by', { userId: record.requestedBy || '-' })}
+                    </Text>
+                    {record.errorMessage ? (
+                      <Card size="small" style={{ borderRadius: 12, borderColor: '#ffccc7', background: '#fff2f0' }}>
+                        <Text strong style={{ display: 'block', marginBottom: 4 }}>
+                          {t('enterprise_admin_skills_import_failure_title')}
+                        </Text>
+                        <Paragraph style={{ marginBottom: 0, whiteSpace: 'pre-wrap' }}>
+                          {record.errorMessage}
+                        </Paragraph>
+                      </Card>
+                    ) : (
+                      <Text type="secondary">{t('enterprise_admin_skills_import_failure_empty')}</Text>
+                    )}
+                  </Space>
+                ),
+                rowExpandable: (record) => Boolean(record.errorMessage || record.startedAt || record.finishedAt || record.requestedBy),
+              }}
+              columns={[
+                {
+                  title: t('platform_skill_import_jobs_column_hub'),
+                  dataIndex: 'hubId',
+                  key: 'hubId',
+                  width: 180,
+                  render: (value: string) => hubNameMap[value] || value || '-',
+                },
+                {
+                  title: t('platform_skill_import_jobs_column_source_locator'),
+                  dataIndex: 'sourceLocator',
+                  key: 'sourceLocator',
+                  width: 220,
+                  render: (value?: string) => value || '-',
+                },
+                {
+                  title: t('platform_skill_import_jobs_column_source_namespace'),
+                  dataIndex: 'sourceNamespace',
+                  key: 'sourceNamespace',
+                  width: 180,
+                  render: (value?: string) => value || '-',
+                },
+                {
+                  title: t('platform_skill_import_jobs_column_source_version'),
+                  dataIndex: 'sourceVersion',
+                  key: 'sourceVersion',
+                  width: 140,
+                  render: (value?: string) => value || '-',
+                },
+                {
+                  title: t('platform_skills_column_status'),
+                  dataIndex: 'jobStatus',
+                  key: 'jobStatus',
+                  width: 140,
+                  render: (value: string) => renderStatusTag(value, translateWithFallback),
+                },
+                {
+                  title: t('platform_skill_import_jobs_column_target_skill'),
+                  dataIndex: 'targetSkillId',
+                  key: 'targetSkillId',
+                  width: 160,
+                  render: (value?: string) => value || '-',
+                },
+                {
+                  title: t('platform_skill_import_jobs_column_error_message'),
+                  dataIndex: 'errorMessage',
+                  key: 'errorMessage',
+                  render: (value?: string) => value ? (
+                    <Text type="danger" ellipsis={{ tooltip: value }}>{value}</Text>
+                  ) : (
+                    <Text type="secondary">-</Text>
+                  ),
+                },
+                {
+                  title: t('platform_skills_column_actions'),
+                  key: 'actions',
+                  width: 140,
+                  render: (_: unknown, item: SkillImportJobItem) => (
+                    <Button size="small" onClick={() => openImportDetail(item)}>
+                      {t('platform_skills_view_detail')}
+                    </Button>
+                  ),
+                },
+              ]}
+            />
+          </Space>
+        ) : (
+          <Space orientation="vertical" size={16} style={{ width: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <div>
+                <Title level={5} style={{ marginBottom: 4 }}>
+                  {t('enterprise_admin_skills_hubs_title')}
+                </Title>
+                <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+                  {t('enterprise_admin_skills_hubs_desc')}
+                </Paragraph>
+              </div>
+              <Button
+                type="primary"
+                disabled={!hubs.length}
+                onClick={() => {
+                  setActiveView('imports');
+                  setImportModalOpen(true);
+                }}
+              >
+                {t('enterprise_admin_skills_action_import')}
+              </Button>
+            </div>
+            <Table
+              rowKey="id"
+              loading={hubsLoading}
+              dataSource={hubs}
+              locale={{
+                emptyText: <Empty description={t('enterprise_admin_skills_hubs_empty')} image={Empty.PRESENTED_IMAGE_SIMPLE} />,
+              }}
+              columns={[
+                {
+                  title: t('platform_skills_form_code'),
+                  dataIndex: 'hubCode',
+                  key: 'hubCode',
+                  width: 180,
+                },
+                {
+                  title: t('platform_skills_column_name'),
+                  dataIndex: 'name',
+                  key: 'name',
+                  width: 220,
+                },
+                {
+                  title: t('platform_skill_hubs_column_type'),
+                  dataIndex: 'hubType',
+                  key: 'hubType',
+                  width: 160,
+                  render: (value: string) => t(`platform_skills_hub_type_${value}`, value || '-'),
+                },
+                {
+                  title: t('platform_skill_hubs_column_base_url'),
+                  dataIndex: 'baseUrl',
+                  key: 'baseUrl',
+                  render: (value?: string) => value || '-',
+                },
+                {
+                  title: t('platform_skills_column_status'),
+                  dataIndex: 'status',
+                  key: 'status',
+                  width: 140,
+                  render: (value: string) => renderStatusTag(value, translateWithFallback),
+                },
+                {
+                  title: t('platform_skills_column_actions'),
+                  key: 'actions',
+                  width: 160,
+                  render: (_: unknown, item: SkillHubItem) => (
+                    <Button
+                      size="small"
+                      type="primary"
+                      onClick={() => {
+                        setActiveView('imports');
+                        setImportModalOpen(true);
+                        importForm.setFieldsValue({ hubId: item.id });
+                      }}
+                    >
+                      {t('enterprise_admin_skills_action_import')}
+                    </Button>
+                  ),
+                },
+              ]}
+            />
+          </Space>
         )}
       </Card>
+
+      <Modal
+        title={t('enterprise_admin_skills_action_import')}
+        open={importModalOpen}
+        onCancel={() => setImportModalOpen(false)}
+        onOk={handleCreateImportJob}
+        confirmLoading={saving}
+        okText={t('enterprise_admin_skills_action_import')}
+        destroyOnHidden
+      >
+        <Form form={importForm} layout="vertical">
+          <Form.Item
+            label={t('platform_skill_import_jobs_form_hub')}
+            name="hubId"
+            rules={[{ required: true, message: t('platform_skill_import_jobs_form_hub_required') }]}
+          >
+            <Select
+              showSearch
+              optionFilterProp="label"
+              placeholder={t('platform_skill_import_jobs_form_hub_placeholder')}
+              options={hubs.map((item) => ({
+                label: `${item.name} · ${t(`platform_skills_hub_type_${item.hubType}`, item.hubType)}`,
+                value: item.id,
+              }))}
+            />
+          </Form.Item>
+          <Form.Item
+            label={t('platform_skill_import_jobs_form_source_locator')}
+            name="sourceLocator"
+            rules={[{ required: true, message: t('platform_skill_import_jobs_form_source_locator_required') }]}
+          >
+            <Input placeholder={t('platform_skill_import_jobs_form_source_locator_placeholder')} />
+          </Form.Item>
+          <Form.Item
+            label={t('platform_skill_import_jobs_form_source_namespace')}
+            name="sourceNamespace"
+          >
+            <Input placeholder={t('platform_skill_import_jobs_form_source_namespace_placeholder')} />
+          </Form.Item>
+          <Form.Item
+            label={t('platform_skill_import_jobs_form_source_version')}
+            name="sourceVersion"
+          >
+            <Input placeholder={t('platform_skill_import_jobs_form_source_version_placeholder')} />
+          </Form.Item>
+          <Text type="secondary">{t('enterprise_admin_skills_import_hint')}</Text>
+        </Form>
+      </Modal>
+
+      <Drawer
+        title={t('enterprise_admin_skills_import_detail_title')}
+        open={importDetailOpen}
+        onClose={() => {
+          setImportDetailOpen(false);
+          setSelectedImportJob(null);
+        }}
+        width={520}
+      >
+        {selectedImportJob ? (
+          <Space orientation="vertical" size={12} style={{ width: '100%' }}>
+            <Card size="small" style={{ borderRadius: 16 }}>
+              <Space orientation="vertical" size={6} style={{ width: '100%' }}>
+                <Text strong>{hubNameMap[selectedImportJob.hubId] || selectedImportJob.hubId || '-'}</Text>
+                <Text type="secondary">{selectedImportJob.sourceLocator || '-'}</Text>
+                <Space wrap size={[8, 8]}>
+                  {renderStatusTag(selectedImportJob.jobStatus, translateWithFallback)}
+                  {selectedImportJob.sourceNamespace ? <Tag>{selectedImportJob.sourceNamespace}</Tag> : null}
+                  {selectedImportJob.sourceVersion ? <Tag>{selectedImportJob.sourceVersion}</Tag> : null}
+                </Space>
+              </Space>
+            </Card>
+            <Card size="small" style={{ borderRadius: 16 }}>
+              <Space orientation="vertical" size={8} style={{ width: '100%' }}>
+                <Text strong>{t('enterprise_admin_skills_import_detail_progress_title')}</Text>
+                <Text>{t('enterprise_admin_skills_import_detail_requested_by', { userId: selectedImportJob.requestedBy || '-' })}</Text>
+                <Text>{t('enterprise_admin_skills_import_detail_created_at', { value: formatDateTime(selectedImportJob.createdAt) })}</Text>
+                <Text>{t('enterprise_admin_skills_import_detail_started_at', { value: formatDateTime(selectedImportJob.startedAt) })}</Text>
+                <Text>{t('enterprise_admin_skills_import_detail_finished_at', { value: formatDateTime(selectedImportJob.finishedAt) })}</Text>
+                <Text>{t('enterprise_admin_skills_import_detail_target_skill', { value: selectedImportJob.targetSkillId || '-' })}</Text>
+                <Text>{t('enterprise_admin_skills_import_detail_target_version', { value: selectedImportJob.targetSkillVersionId || '-' })}</Text>
+              </Space>
+            </Card>
+            <Card
+              size="small"
+              style={{
+                borderRadius: 16,
+                borderColor: selectedImportJob.errorMessage ? '#ffccc7' : undefined,
+                background: selectedImportJob.errorMessage ? '#fff2f0' : undefined,
+              }}
+            >
+              <Space orientation="vertical" size={8} style={{ width: '100%' }}>
+                <Text strong>{t('enterprise_admin_skills_import_failure_title')}</Text>
+                <Paragraph style={{ marginBottom: 0, whiteSpace: 'pre-wrap' }}>
+                  {selectedImportJob.errorMessage || t('enterprise_admin_skills_import_failure_empty')}
+                </Paragraph>
+              </Space>
+            </Card>
+          </Space>
+        ) : null}
+      </Drawer>
 
       <Modal
         title={t('enterprise_admin_skills_action_enable')}

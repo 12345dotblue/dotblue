@@ -97,6 +97,15 @@ type importSkillReq struct {
 	SourceVersion   string `json:"sourceVersion"`
 }
 
+type setResourceReleaseReq struct {
+	ResourceId         string `json:"resourceId"`
+	ResourceType       string `json:"resourceType"`
+	ReleaseScope       string `json:"releaseScope"`
+	TargetEnterpriseId string `json:"targetEnterpriseId"`
+	ReleaseStatus      string `json:"releaseStatus"`
+	Note               string `json:"note"`
+}
+
 func actorFromRequest(r *ghttp.Request) ActorContext {
 	return ActorContext{
 		UserId:          identity.GetUserId(r),
@@ -290,10 +299,10 @@ func ListEnterpriseSkillsHandler(r *ghttp.Request) {
 	r.Response.WriteJson(list)
 }
 
-// ListSkillHubsHandler returns all registered platform skill hubs.
-// GET /api/admin/platform/skill-hubs
+// ListSkillHubsHandler returns actor-visible skill hubs.
+// GET /api/admin/skill-hubs
 func ListSkillHubsHandler(r *ghttp.Request) {
-	list, err := defaultService.ListSkillHubs()
+	list, err := defaultService.ListSkillHubsForActor(actorFromRequest(r))
 	if err != nil {
 		writeError(r, err)
 		return
@@ -301,10 +310,10 @@ func ListSkillHubsHandler(r *ghttp.Request) {
 	r.Response.WriteJson(list)
 }
 
-// ListSkillImportJobsHandler returns platform skill import jobs ordered by newest first.
-// GET /api/admin/platform/skill-import-jobs
+// ListSkillImportJobsHandler returns actor-visible import jobs ordered by newest first.
+// GET /api/admin/skill-import-jobs
 func ListSkillImportJobsHandler(r *ghttp.Request) {
-	list, err := defaultService.ListSkillImportJobs()
+	list, err := defaultService.ListSkillImportJobsForActor(actorFromRequest(r))
 	if err != nil {
 		writeError(r, err)
 		return
@@ -341,6 +350,44 @@ func UpsertSkillHubHandler(r *ghttp.Request) {
 		return
 	}
 	r.Response.WriteJson(item)
+}
+
+// SetResourceReleaseHandler opens or restricts a platform-owned skill or hub.
+// POST /api/admin/platform/resource-releases
+func SetResourceReleaseHandler(r *ghttp.Request) {
+	var req setResourceReleaseReq
+	if err := r.Parse(&req); err != nil {
+		r.Response.WriteStatus(http.StatusBadRequest, err.Error())
+		return
+	}
+	item, err := defaultService.SetResourceRelease(actorFromRequest(r), SetResourceReleaseInput{
+		ResourceType:       req.ResourceType,
+		ResourceId:         firstNonEmpty(req.ResourceId, r.Get("resourceId").String(), r.Get("id").String()),
+		ReleaseScope:       req.ReleaseScope,
+		TargetEnterpriseId: req.TargetEnterpriseId,
+		ReleaseStatus:      req.ReleaseStatus,
+		Note:               req.Note,
+	})
+	if err != nil {
+		writeError(r, err)
+		return
+	}
+	r.Response.WriteJson(item)
+}
+
+// ListResourceReleasesHandler returns the current release rules for one platform-owned skill or hub.
+// GET /api/admin/platform/resource-releases
+func ListResourceReleasesHandler(r *ghttp.Request) {
+	list, err := defaultService.ListResourceReleases(
+		actorFromRequest(r),
+		firstNonEmpty(r.Get("resourceType").String(), r.GetQuery("resourceType").String()),
+		firstNonEmpty(r.Get("resourceId").String(), r.GetQuery("resourceId").String(), r.Get("id").String()),
+	)
+	if err != nil {
+		writeError(r, err)
+		return
+	}
+	r.Response.WriteJson(list)
 }
 
 // ImportSkillHandler imports an external capability into a draft skill and version.

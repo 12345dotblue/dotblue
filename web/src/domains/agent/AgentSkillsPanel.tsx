@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Button, Card, Empty, Form, Input, Modal, Select, Space, Table, Tabs, Tag, Typography, message } from 'antd';
+﻿import React, { useEffect, useMemo, useState } from 'react';
+import { Button, Card, Empty, Form, Input, Modal, Select, Space, Table, Tag, Typography, message } from 'antd';
+import { ReloadOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import { useTranslation } from 'react-i18next';
 import { BACKEND_URL } from '../../config';
@@ -55,6 +56,8 @@ const AgentSkillsPanel: React.FC<AgentSkillsPanelProps> = ({ agentId, authHeader
   const [selectedCatalogSkill, setSelectedCatalogSkill] = useState<PublishedSkillItem | null>(null);
   const [installedSkills, setInstalledSkills] = useState<InstalledSkillItem[]>([]);
   const [catalogSkills, setCatalogSkills] = useState<PublishedSkillItem[]>([]);
+  const [catalogFilter, setCatalogFilter] = useState<'all' | 'installable' | 'pending' | 'installed'>('all');
+  const [searchText, setSearchText] = useState('');
   const [installForm] = Form.useForm<InstallSkillFormValues>();
 
   const loadData = async () => {
@@ -108,6 +111,39 @@ const AgentSkillsPanel: React.FC<AgentSkillsPanelProps> = ({ agentId, authHeader
     () => catalogSkills.filter((item) => item.displayStatus === 'installed').length,
     [catalogSkills],
   );
+
+  const actionableCatalogCount = useMemo(
+    () => catalogSkills.filter((item) => item.displayStatus === 'enabled_installable' || item.displayStatus === 'imported_pending_enable').length,
+    [catalogSkills],
+  );
+
+  const normalizedSearch = searchText.trim().toLowerCase();
+
+  const filteredCatalogSkills = useMemo(() => {
+    return catalogSkills.filter((item) => {
+      const matchesSearch = !normalizedSearch || [
+        item.code,
+        item.name,
+        item.sourceType,
+        item.latestPublishedVersion,
+        item.blockMessage,
+      ].some((value) => String(value || '').toLowerCase().includes(normalizedSearch));
+      const matchesFilter = catalogFilter === 'all'
+        || (catalogFilter === 'installable' && item.displayStatus === 'enabled_installable')
+        || (catalogFilter === 'pending' && item.displayStatus === 'imported_pending_enable')
+        || (catalogFilter === 'installed' && item.displayStatus === 'installed');
+      return matchesSearch && matchesFilter;
+    });
+  }, [catalogFilter, catalogSkills, normalizedSearch]);
+
+  const filteredInstalledSkills = useMemo(() => {
+    return installedSkills.filter((item) => !normalizedSearch || [
+      item.skillCode,
+      item.skillName,
+      item.version,
+      item.entryAlias,
+    ].some((value) => String(value || '').toLowerCase().includes(normalizedSearch)));
+  }, [installedSkills, normalizedSearch]);
 
   const openInstallFlow = (skill: PublishedSkillItem) => {
     setSelectedCatalogSkill(skill);
@@ -255,19 +291,19 @@ const AgentSkillsPanel: React.FC<AgentSkillsPanelProps> = ({ agentId, authHeader
             gap: 12,
           }}
         >
-          <Card size="small" style={{ borderRadius: 16 }}>
+          <Card size="small" style={{ borderRadius: 16, cursor: 'pointer', borderColor: catalogFilter === 'all' ? '#1677ff' : undefined }} onClick={() => setCatalogFilter('all')}>
             <Text type="secondary">{t('agent_skill_panel_summary_installed')}</Text>
             <Paragraph style={{ fontSize: 24, fontWeight: 600, margin: '8px 0 0' }}>{installedSkills.length}</Paragraph>
           </Card>
-          <Card size="small" style={{ borderRadius: 16 }}>
+          <Card size="small" style={{ borderRadius: 16, cursor: 'pointer', borderColor: catalogFilter === 'installable' ? '#1677ff' : undefined }} onClick={() => setCatalogFilter('installable')}>
             <Text type="secondary">{t('agent_skill_panel_summary_installable')}</Text>
             <Paragraph style={{ fontSize: 24, fontWeight: 600, margin: '8px 0 0' }}>{installableSkills.length}</Paragraph>
           </Card>
-          <Card size="small" style={{ borderRadius: 16 }}>
+          <Card size="small" style={{ borderRadius: 16, cursor: 'pointer', borderColor: catalogFilter === 'pending' ? '#1677ff' : undefined }} onClick={() => setCatalogFilter('pending')}>
             <Text type="secondary">{t('agent_skill_panel_summary_pending_enable')}</Text>
             <Paragraph style={{ fontSize: 24, fontWeight: 600, margin: '8px 0 0' }}>{pendingEnableSkills.length}</Paragraph>
           </Card>
-          <Card size="small" style={{ borderRadius: 16 }}>
+          <Card size="small" style={{ borderRadius: 16, cursor: 'pointer', borderColor: catalogFilter === 'installed' ? '#1677ff' : undefined }} onClick={() => setCatalogFilter('installed')}>
             <Text type="secondary">{t('agent_skill_panel_summary_catalog_installed')}</Text>
             <Paragraph style={{ fontSize: 24, fontWeight: 600, margin: '8px 0 0' }}>{catalogInstalledCount}</Paragraph>
           </Card>
@@ -280,8 +316,18 @@ const AgentSkillsPanel: React.FC<AgentSkillsPanelProps> = ({ agentId, authHeader
             border: '1px solid rgba(22,119,255,0.12)',
           }}
         >
-          <Space direction="vertical" size={10} style={{ width: '100%' }}>
-            <Text strong>{t('agent_skill_panel_guide_title')}</Text>
+          <Space orientation="vertical" size={10} style={{ width: '100%' }}>
+            <Space style={{ width: '100%', justifyContent: 'space-between' }} wrap>
+              <Text strong>{t('agent_skill_panel_guide_title')}</Text>
+              <Space wrap size={[8, 8]}>
+                <Tag color={actionableCatalogCount > 0 ? 'processing' : 'default'}>
+                  {t('agent_skill_panel_actionable_count', { count: actionableCatalogCount })}
+                </Tag>
+                <Button icon={<ReloadOutlined />} onClick={() => void loadData()}>
+                  {t('agent_skill_panel_action_refresh')}
+                </Button>
+              </Space>
+            </Space>
             <Paragraph type="secondary" style={{ marginBottom: 0 }}>
               {t('agent_skill_panel_guide_desc')}
             </Paragraph>
@@ -296,126 +342,138 @@ const AgentSkillsPanel: React.FC<AgentSkillsPanelProps> = ({ agentId, authHeader
         <Paragraph type="secondary" style={{ marginBottom: 0, maxWidth: 860 }}>
           {t('agent_skill_panel_helper_text')}
         </Paragraph>
-        <Tabs
-          defaultActiveKey="catalog"
-          items={[
-            {
-              key: 'catalog',
-              label: t('agent_skill_panel_tab_catalog'),
-              children: (
-                <Table
-                  rowKey="id"
-                  loading={loading}
-                  dataSource={catalogSkills}
-                  locale={{
-                    emptyText: <Empty description={t('agent_skill_catalog_empty')} image={Empty.PRESENTED_IMAGE_SIMPLE} />,
-                  }}
-                  pagination={false}
-                  columns={[
-                    { title: t('agent_skills_panel_code_column'), dataIndex: 'code', key: 'code', width: 220 },
-                    { title: t('agent_skills_panel_name_column'), dataIndex: 'name', key: 'name', width: 220 },
-                    {
-                      title: t('agent_skill_catalog_source_column'),
-                      dataIndex: 'sourceType',
-                      key: 'sourceType',
-                      width: 140,
-                      render: (value: string) => translateSourceType(value),
-                    },
-                    {
-                      title: t('agent_skill_catalog_version_column'),
-                      dataIndex: 'latestPublishedVersion',
-                      key: 'latestPublishedVersion',
-                      width: 120,
-                      render: (value: string) => value || <Text type="secondary">-</Text>,
-                    },
-                    {
-                      title: t('agent_skill_catalog_status_column'),
-                      dataIndex: 'displayStatus',
-                      key: 'displayStatus',
-                      width: 160,
-                      render: (value: string) => renderCatalogStatusTag(value),
-                    },
-                    {
-                      title: t('agent_skill_catalog_hint_column'),
-                      dataIndex: 'blockMessage',
-                      key: 'blockMessage',
-                      render: (_value: string, record: PublishedSkillItem) => (
-                        <Text type="secondary">
-                          {getCatalogHint(record)}
-                        </Text>
-                      ),
-                    },
-                    {
-                      title: t('agent_skills_panel_actions_column'),
-                      key: 'actions',
-                      width: 180,
-                      render: (_: unknown, record: PublishedSkillItem) => renderCatalogAction(record),
-                    },
-                  ]}
-                />
-              ),
-            },
-            {
-              key: 'installed',
-              label: t('agent_skill_panel_tab_installed'),
-              children: (
-                <Table
-                  rowKey="id"
-                  loading={loading}
-                  dataSource={installedSkills}
-                  locale={{
-                    emptyText: <Empty description={t('agent_skill_panel_table_empty')} image={Empty.PRESENTED_IMAGE_SIMPLE} />,
-                  }}
-                  pagination={false}
-                  columns={[
-                    { title: t('agent_skills_panel_code_column'), dataIndex: 'skillCode', key: 'skillCode', width: 220 },
-                    { title: t('agent_skills_panel_name_column'), dataIndex: 'skillName', key: 'skillName', width: 220 },
-                    { title: t('agent_skills_panel_version_column'), dataIndex: 'version', key: 'version', width: 140 },
-                    {
-                      title: t('agent_skills_panel_invoke_mode_column'),
-                      dataIndex: 'invokeVisibility',
-                      key: 'invokeVisibility',
-                      width: 120,
-                      render: (value: string) => (
-                        <Tag color={value === 'manual' ? 'default' : value === 'suggested' ? 'processing' : 'success'}>
-                          {value === 'manual'
-                            ? t('agent_skill_panel_visibility_manual')
-                            : value === 'suggested'
-                              ? t('agent_skill_panel_visibility_suggested')
-                              : t('agent_skill_panel_visibility_auto')}
-                        </Tag>
-                      ),
-                    },
-                    {
-                      title: t('agent_skills_panel_alias'),
-                      dataIndex: 'entryAlias',
-                      key: 'entryAlias',
-                      width: 160,
-                      render: (value?: string) => value || <Text type="secondary">-</Text>,
-                    },
-                    {
-                      title: t('agent_skills_panel_status_column'),
-                      dataIndex: 'bindingStatus',
-                      key: 'bindingStatus',
-                      width: 120,
-                      render: (value: string) => <Tag color={value === 'installed' ? 'success' : 'default'}>{value === 'installed' ? t('agent_skills_panel_installed_status') : value}</Tag>,
-                    },
-                    {
-                      title: t('agent_skills_panel_actions_column'),
-                      key: 'actions',
-                      width: 120,
-                      render: (_: unknown, record: InstalledSkillItem) => (
-                        <Button danger size="small" onClick={() => handleUninstall(record.skillId)}>
-                          {t('agent_skills_panel_uninstall_action')}
-                        </Button>
-                      ),
-                    },
-                  ]}
-                />
-              ),
-            },
-          ]}
-        />
+        <Space wrap size={[12, 12]} style={{ width: '100%', justifyContent: 'space-between' }}>
+          <Input.Search
+            allowClear
+            value={searchText}
+            onChange={(event) => setSearchText(event.target.value)}
+            placeholder={t('agent_skill_panel_search_placeholder')}
+            style={{ maxWidth: 420 }}
+          />
+        </Space>
+        <Card size="small" style={{ borderRadius: 20 }}>
+          <Space orientation="vertical" size={12} style={{ width: '100%' }}>
+            <div>
+              <Text strong>{t('agent_skill_panel_catalog_title')}</Text>
+              <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+                {t('agent_skill_panel_catalog_desc')}
+              </Paragraph>
+            </div>
+            <Table
+              rowKey="id"
+              loading={loading}
+              dataSource={filteredCatalogSkills}
+              locale={{
+                emptyText: <Empty description={t('agent_skill_catalog_empty')} image={Empty.PRESENTED_IMAGE_SIMPLE} />,
+              }}
+              pagination={false}
+              columns={[
+                { title: t('agent_skills_panel_code_column'), dataIndex: 'code', key: 'code', width: 220 },
+                { title: t('agent_skills_panel_name_column'), dataIndex: 'name', key: 'name', width: 220 },
+                {
+                  title: t('agent_skill_catalog_source_column'),
+                  dataIndex: 'sourceType',
+                  key: 'sourceType',
+                  width: 140,
+                  render: (value: string) => translateSourceType(value),
+                },
+                {
+                  title: t('agent_skill_catalog_version_column'),
+                  dataIndex: 'latestPublishedVersion',
+                  key: 'latestPublishedVersion',
+                  width: 120,
+                  render: (value: string) => value || <Text type="secondary">-</Text>,
+                },
+                {
+                  title: t('agent_skill_catalog_status_column'),
+                  dataIndex: 'displayStatus',
+                  key: 'displayStatus',
+                  width: 160,
+                  render: (value: string) => renderCatalogStatusTag(value),
+                },
+                {
+                  title: t('agent_skill_catalog_hint_column'),
+                  dataIndex: 'blockMessage',
+                  key: 'blockMessage',
+                  render: (_value: string, record: PublishedSkillItem) => (
+                    <Text type="secondary">
+                      {getCatalogHint(record)}
+                    </Text>
+                  ),
+                },
+                {
+                  title: t('agent_skills_panel_actions_column'),
+                  key: 'actions',
+                  width: 180,
+                  render: (_: unknown, record: PublishedSkillItem) => renderCatalogAction(record),
+                },
+              ]}
+            />
+          </Space>
+        </Card>
+        <Card size="small" style={{ borderRadius: 20 }}>
+          <Space orientation="vertical" size={12} style={{ width: '100%' }}>
+            <div>
+              <Text strong>{t('agent_skill_panel_installed_title')}</Text>
+              <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+                {t('agent_skill_panel_installed_desc')}
+              </Paragraph>
+            </div>
+            <Table
+              rowKey="id"
+              loading={loading}
+              dataSource={filteredInstalledSkills}
+              locale={{
+                emptyText: <Empty description={t('agent_skill_panel_table_empty')} image={Empty.PRESENTED_IMAGE_SIMPLE} />,
+              }}
+              pagination={false}
+              columns={[
+                { title: t('agent_skills_panel_code_column'), dataIndex: 'skillCode', key: 'skillCode', width: 220 },
+                { title: t('agent_skills_panel_name_column'), dataIndex: 'skillName', key: 'skillName', width: 220 },
+                { title: t('agent_skills_panel_version_column'), dataIndex: 'version', key: 'version', width: 140 },
+                {
+                  title: t('agent_skills_panel_invoke_mode_column'),
+                  dataIndex: 'invokeVisibility',
+                  key: 'invokeVisibility',
+                  width: 120,
+                  render: (value: string) => (
+                    <Tag color={value === 'manual' ? 'default' : value === 'suggested' ? 'processing' : 'success'}>
+                      {value === 'manual'
+                        ? t('agent_skill_panel_visibility_manual')
+                        : value === 'suggested'
+                          ? t('agent_skill_panel_visibility_suggested')
+                          : t('agent_skill_panel_visibility_auto')}
+                    </Tag>
+                  ),
+                },
+                {
+                  title: t('agent_skills_panel_alias'),
+                  dataIndex: 'entryAlias',
+                  key: 'entryAlias',
+                  width: 160,
+                  render: (value?: string) => value || <Text type="secondary">-</Text>,
+                },
+                {
+                  title: t('agent_skills_panel_status_column'),
+                  dataIndex: 'bindingStatus',
+                  key: 'bindingStatus',
+                  width: 120,
+                  render: (value: string) => <Tag color={value === 'installed' ? 'success' : 'default'}>{value === 'installed' ? t('agent_skills_panel_installed_status') : value}</Tag>,
+                },
+                {
+                  title: t('agent_skills_panel_actions_column'),
+                  key: 'actions',
+                  width: 120,
+                  render: (_: unknown, record: InstalledSkillItem) => (
+                    <Button danger size="small" onClick={() => handleUninstall(record.skillId)}>
+                      {t('agent_skills_panel_uninstall_action')}
+                    </Button>
+                  ),
+                },
+              ]}
+            />
+          </Space>
+        </Card>
       </Space>
 
       <Modal

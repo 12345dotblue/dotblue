@@ -22,6 +22,7 @@ func (r *GFRepository) CreateSkill(skill *Skill) error {
 		"name":                        skill.Name,
 		"description":                 skill.Description,
 		"owner_scope":                 skill.OwnerScope,
+		"owner_scope_ref_id":          skill.OwnerScopeRefId,
 		"owner_enterprise_id":         skill.OwnerEnterpriseId,
 		"source_type":                 skill.SourceType,
 		"provider_type":               skill.ProviderType,
@@ -93,7 +94,7 @@ func (r *GFRepository) ListSkillsByOwner(ownerScope, ownerEnterpriseId string) (
 	var list []*AdminSkillListItem
 	err := g.DB().Model("skills").
 		Fields(`
-			id, code, name, description, owner_scope, owner_enterprise_id,
+			id, code, name, description, owner_scope, owner_scope_ref_id, owner_enterprise_id,
 			source_type, provider_type, trust_level, status,
 			latest_version_id, latest_published_version_id, latest_stable_version_id,
 			tags_json, metadata_json, created_by, updated_by, created_at, updated_at,
@@ -240,6 +241,8 @@ func (r *GFRepository) UpsertSkillHub(hub *SkillHub) error {
 		return err
 	}
 	data := g.Map{
+		"owner_scope":             hub.OwnerScope,
+		"owner_scope_ref_id":      hub.OwnerScopeRefId,
 		"hub_code":                hub.HubCode,
 		"name":                    hub.Name,
 		"hub_type":                hub.HubType,
@@ -308,9 +311,24 @@ func (r *GFRepository) ListSkillHubs() ([]*SkillHub, error) {
 	return list, nil
 }
 
+func (r *GFRepository) ListSkillHubsByOwner(ownerScope, ownerScopeRefId string) ([]*SkillHub, error) {
+	var list []*SkillHub
+	err := g.DB().Model("skill_hubs").
+		Where("owner_scope = ? AND owner_scope_ref_id = ?", ownerScope, ownerScopeRefId).
+		Order("created_at DESC").
+		Scan(&list)
+	if err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
 func (r *GFRepository) CreateSkillImportJob(job *SkillImportJob) error {
 	_, err := g.DB().Model("skill_import_jobs").Data(g.Map{
 		"id":                       job.Id,
+		"owner_scope":              job.OwnerScope,
+		"owner_scope_ref_id":       job.OwnerScopeRefId,
+		"owner_enterprise_id":      job.OwnerEnterpriseId,
 		"hub_id":                   job.HubId,
 		"requested_by":             job.RequestedBy,
 		"source_locator":           job.SourceLocator,
@@ -333,6 +351,9 @@ func (r *GFRepository) CreateSkillImportJob(job *SkillImportJob) error {
 
 func (r *GFRepository) UpdateSkillImportJob(job *SkillImportJob) error {
 	_, err := g.DB().Model("skill_import_jobs").Data(g.Map{
+		"owner_scope":              job.OwnerScope,
+		"owner_scope_ref_id":       job.OwnerScopeRefId,
+		"owner_enterprise_id":      job.OwnerEnterpriseId,
 		"job_status":               job.JobStatus,
 		"parsed_descriptor_json":   job.ParsedDescriptorJSON,
 		"normalized_manifest_json": job.NormalizedManifestJSON,
@@ -365,6 +386,75 @@ func (r *GFRepository) GetSkillImportJobById(id string) (*SkillImportJob, error)
 func (r *GFRepository) ListSkillImportJobs() ([]*SkillImportJob, error) {
 	var list []*SkillImportJob
 	err := g.DB().Model("skill_import_jobs").Order("created_at DESC").Scan(&list)
+	if err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
+func (r *GFRepository) ListSkillImportJobsByOwner(ownerScope, ownerScopeRefId string) ([]*SkillImportJob, error) {
+	var list []*SkillImportJob
+	err := g.DB().Model("skill_import_jobs").
+		Where("owner_scope = ? AND owner_scope_ref_id = ?", ownerScope, ownerScopeRefId).
+		Order("created_at DESC").
+		Scan(&list)
+	if err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
+func (r *GFRepository) UpsertSkillResourceRelease(item *SkillResourceRelease) error {
+	count, err := g.DB().Model("skill_resource_releases").
+		Where("resource_type = ? AND resource_id = ? AND release_scope = ? AND target_enterprise_id = ?",
+			item.ResourceType, item.ResourceId, item.ReleaseScope, item.TargetEnterpriseId).
+		Count()
+	if err != nil {
+		return err
+	}
+	data := g.Map{
+		"resource_type":        item.ResourceType,
+		"resource_id":          item.ResourceId,
+		"release_scope":        item.ReleaseScope,
+		"target_enterprise_id": item.TargetEnterpriseId,
+		"release_status":       item.ReleaseStatus,
+		"note":                 item.Note,
+		"operated_by":          item.OperatedBy,
+		"updated_at":           item.UpdatedAt,
+	}
+	if count > 0 {
+		_, err = g.DB().Model("skill_resource_releases").
+			Data(data).
+			Where("resource_type = ? AND resource_id = ? AND release_scope = ? AND target_enterprise_id = ?",
+				item.ResourceType, item.ResourceId, item.ReleaseScope, item.TargetEnterpriseId).
+			Update()
+		return err
+	}
+	data["id"] = item.Id
+	data["created_at"] = item.CreatedAt
+	_, err = g.DB().Model("skill_resource_releases").Data(data).Insert()
+	return err
+}
+
+func (r *GFRepository) ListSkillResourceReleases(resourceType, resourceId string) ([]*SkillResourceRelease, error) {
+	var list []*SkillResourceRelease
+	err := g.DB().Model("skill_resource_releases").
+		Where("resource_type = ? AND resource_id = ?", resourceType, resourceId).
+		Order("updated_at DESC").
+		Scan(&list)
+	if err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
+func (r *GFRepository) ListSkillResourceReleasesForEnterprise(resourceType, enterpriseId string) ([]*SkillResourceRelease, error) {
+	var list []*SkillResourceRelease
+	err := g.DB().Model("skill_resource_releases").
+		Where("resource_type = ? AND release_status = ? AND (release_scope = ? OR (release_scope = ? AND target_enterprise_id = ?))",
+			resourceType, ReleaseStatusEnabled, ReleaseScopeGlobal, ReleaseScopeEnterprise, enterpriseId).
+		Order("updated_at DESC").
+		Scan(&list)
 	if err != nil {
 		return nil, err
 	}
@@ -425,7 +515,7 @@ func (r *GFRepository) ListPublishedSkillsForEnterprise(enterpriseId string) ([]
 	var platformList []*AdminSkillListItem
 	err := g.DB().Model("skills s").
 		Fields(`
-			s.id, s.code, s.name, s.description, s.owner_scope, s.owner_enterprise_id,
+			s.id, s.code, s.name, s.description, s.owner_scope, s.owner_scope_ref_id, s.owner_enterprise_id,
 			s.source_type, s.provider_type, s.trust_level, s.status,
 			s.latest_version_id, s.latest_published_version_id, s.latest_stable_version_id,
 			s.tags_json, s.metadata_json, s.created_by, s.updated_by, s.created_at, s.updated_at,
@@ -439,9 +529,33 @@ func (r *GFRepository) ListPublishedSkillsForEnterprise(enterpriseId string) ([]
 	if err != nil {
 		return nil, err
 	}
+	filteredPlatformList := make([]*AdminSkillListItem, 0, len(platformList))
 	for _, item := range platformList {
 		if item == nil || item.Id == "" {
 			continue
+		}
+		releases, releaseErr := r.ListSkillResourceReleases(ResourceTypeSkill, item.Id)
+		if releaseErr != nil {
+			return nil, releaseErr
+		}
+		if len(releases) > 0 {
+			visible := false
+			for _, release := range releases {
+				if release == nil || release.ReleaseStatus != ReleaseStatusEnabled {
+					continue
+				}
+				if release.ReleaseScope == ReleaseScopeGlobal {
+					visible = true
+					break
+				}
+				if release.ReleaseScope == ReleaseScopeEnterprise && release.TargetEnterpriseId == enterpriseId {
+					visible = true
+					break
+				}
+			}
+			if !visible {
+				continue
+			}
 		}
 		enablement, enablementErr := r.GetEnterpriseEnablement(enterpriseId, item.Id)
 		if enablementErr != nil {
@@ -450,12 +564,13 @@ func (r *GFRepository) ListPublishedSkillsForEnterprise(enterpriseId string) ([]
 		if enablement != nil {
 			item.EnablementStatus = strings.TrimSpace(enablement.EnablementStatus)
 		}
+		filteredPlatformList = append(filteredPlatformList, item)
 	}
 
 	var enterpriseOwnedList []*AdminSkillListItem
 	err = g.DB().Model("skills s").
 		Fields(`
-			s.id, s.code, s.name, s.description, s.owner_scope, s.owner_enterprise_id,
+			s.id, s.code, s.name, s.description, s.owner_scope, s.owner_scope_ref_id, s.owner_enterprise_id,
 			s.source_type, s.provider_type, s.trust_level, s.status,
 			s.latest_version_id, s.latest_published_version_id, s.latest_stable_version_id,
 			s.tags_json, s.metadata_json, s.created_by, s.updated_by, s.created_at, s.updated_at,
@@ -476,7 +591,7 @@ func (r *GFRepository) ListPublishedSkillsForEnterprise(enterpriseId string) ([]
 		item.EnablementStatus = EnablementStatusEnabled
 	}
 
-	list := append(platformList, enterpriseOwnedList...)
+	list := append(filteredPlatformList, enterpriseOwnedList...)
 	sort.SliceStable(list, func(i, j int) bool {
 		return list[i].UpdatedAt.After(list[j].UpdatedAt)
 	})
