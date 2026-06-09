@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button, Card, Col, Form, Input, InputNumber, Row, Select, Switch, Typography, message } from 'antd';
 import { DatabaseOutlined, SettingOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
@@ -7,6 +7,7 @@ import { BACKEND_URL } from '../../config';
 import { casdoorService } from '../identity/CasdoorService';
 import PlatformLLMSettingsCard from './PlatformLLMSettingsCard';
 import PlatformUsageSettingsCard from './PlatformUsageSettingsCard';
+import { useThemeMode } from '../../theme/themeMode';
 
 const { Paragraph, Title } = Typography;
 
@@ -71,10 +72,12 @@ function getAuthHeaders() {
 
 const PlatformSettingsPage: React.FC = () => {
   const { t } = useTranslation();
+  const { resolvedTheme } = useThemeMode();
   const [messageApi, contextHolder] = message.useMessage();
   const [fetching, setFetching] = useState(true);
   const [savingPlatform, setSavingPlatform] = useState(false);
   const [platformForm] = Form.useForm<PlatformFormValues>();
+  const isDark = resolvedTheme === 'dark';
 
   useEffect(() => {
     axios.get(`${BACKEND_URL}/api/admin/settings`, {
@@ -207,7 +210,14 @@ const PlatformSettingsPage: React.FC = () => {
               </Form.Item>
               <Card
                 size="small"
-                style={{ marginBottom: 16, background: '#fafafa' }}
+                style={{
+                  marginBottom: 16,
+                  borderRadius: 16,
+                  background: isDark
+                    ? 'linear-gradient(180deg, #132033 0%, #101a2b 100%)'
+                    : 'linear-gradient(180deg, #fcfdff 0%, #f8fbff 100%)',
+                  border: '1px solid var(--app-shell-border)',
+                }}
                 title={t('platform_settings_runtime_engines_title')}
               >
                 <Paragraph type="secondary">

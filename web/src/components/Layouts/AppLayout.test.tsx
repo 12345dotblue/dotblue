@@ -7,6 +7,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import AppLayout from './AppLayout';
+import { ThemeModeProvider } from '../../theme/themeMode';
 
 vi.mock('axios');
 vi.mock('react-i18next', async () => {
@@ -49,7 +50,7 @@ describe('AppLayout', () => {
           data: {
             enterpriseId: 'ent-1',
           },
-        } as any);
+        });
       }
       if (url.includes('/api/enterprises')) {
         return Promise.resolve({
@@ -60,25 +61,32 @@ describe('AppLayout', () => {
               role: 'owner',
             },
           ],
-        } as any);
+        });
       }
-      return Promise.resolve({ data: [] } as any);
+      return Promise.resolve({ data: [] });
     });
-    (globalThis as any).matchMedia = (query: string) => ({
-      matches: false,
-      media: query,
-      onchange: null,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: (query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }),
     });
-    (globalThis as any).ResizeObserver = class {
+    class MockResizeObserver {
       observe() {}
       unobserve() {}
       disconnect() {}
-    };
+    }
+    Object.defineProperty(window, 'ResizeObserver', {
+      writable: true,
+      value: MockResizeObserver,
+    });
     Element.prototype.scrollIntoView = vi.fn();
   });
 
@@ -86,21 +94,23 @@ describe('AppLayout', () => {
     const user = userEvent.setup();
 
     render(
-      <MemoryRouter initialEntries={['/zh-CN/admin/platform']}>
-        <Routes>
-          <Route
-            path="/:lng/*"
-            element={(
-              <>
-                <LocationProbe />
-                <AppLayout>
-                  <div>content</div>
-                </AppLayout>
-              </>
-            )}
-          />
-        </Routes>
-      </MemoryRouter>,
+      <ThemeModeProvider>
+        <MemoryRouter initialEntries={['/zh-CN/admin/platform']}>
+          <Routes>
+            <Route
+              path="/:lng/*"
+              element={(
+                <>
+                  <LocationProbe />
+                  <AppLayout>
+                    <div>content</div>
+                  </AppLayout>
+                </>
+              )}
+            />
+          </Routes>
+        </MemoryRouter>
+      </ThemeModeProvider>,
     );
 
     await waitFor(() => expect(mockedAxios.get).toHaveBeenCalled());

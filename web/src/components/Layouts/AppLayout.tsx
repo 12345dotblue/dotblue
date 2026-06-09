@@ -17,6 +17,8 @@ import axios from 'axios';
 import { casdoorService } from '../../domains/identity/CasdoorService';
 import { BACKEND_URL } from '../../config';
 import { LANGUAGE_OPTIONS, applyLanguagePreference, getLocalizedPath, resolveSupportedLanguage, stripLanguagePrefix } from '../../i18n/config';
+import ThemeModeDropdown from '../ThemeModeDropdown';
+import { useThemeMode } from '../../theme/themeMode';
 
 const { Header, Content, Sider } = Layout;
 const { Title, Text } = Typography;
@@ -43,6 +45,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { token } = theme.useToken();
+  const { resolvedTheme } = useThemeMode();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileVisible, setMobileVisible] = useState(false);
   const [enterpriseLoading, setEnterpriseLoading] = React.useState(false);
@@ -210,22 +213,20 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   }
 
   const sideContent = (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#001529' }}>
+    <div className="app-sider-shell" style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--app-nav-bg)' }}>
       <div className={`app-sider-brand ${collapsed && !mobileVisible ? 'app-sider-brand--collapsed' : ''}`}>
         <img
-          src="/brand/dotblue-logo.png"
+          src={collapsed && !mobileVisible ? '/brand/dotblue-favicon.svg' : resolvedTheme === 'dark' ? '/brand/dotblue-logo-dark.svg' : '/brand/dotblue-logo-light.svg'}
           alt={t('app_name')}
           className="app-sider-brand-logo"
+          onClick={() => {
+            navigate(getLocalizedPath('/', currentLanguage));
+            setMobileVisible(false);
+          }}
         />
-        {(!collapsed || mobileVisible) && (
-          <div className="app-sider-brand-copy">
-            <Text className="app-sider-brand-title">{t('brand_header_badge')}</Text>
-            <Text className="app-sider-brand-subtitle">{t('brand_header_subtitle')}</Text>
-          </div>
-        )}
       </div>
       <Menu
-        theme="dark"
+        theme={resolvedTheme === 'dark' ? 'dark' : 'light'}
         mode="inline"
         inlineCollapsed={collapsed}
         selectedKeys={[selectedMenuKey]}
@@ -250,7 +251,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         collapsed={collapsed}
         breakpoint="lg"
         onBreakpoint={(broken) => setCollapsed(broken)}
-        theme="dark"
+        theme={resolvedTheme === 'dark' ? 'dark' : 'light'}
         className="desktop-sider"
         width={240}
         style={{
@@ -259,7 +260,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           left: 0,
           top: 0,
           bottom: 0,
-          boxShadow: '4px 0 10px rgba(0,0,0,0.1)',
+          boxShadow: '0 18px 48px rgba(2, 8, 23, 0.24)',
           zIndex: 20,
         }}
       >
@@ -280,16 +281,16 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       <Layout style={{
         marginLeft: collapsed ? 80 : 240,
         transition: 'all 0.2s cubic-bezier(0.645, 0.045, 0.355, 1)',
-        background: '#f4f7f9',
+        background: 'var(--app-shell-bg)',
       }} className="main-layout">
         <Header style={{
-          background: 'rgba(255, 255, 255, 0.7)',
+          background: 'var(--app-header-bg)',
           backdropFilter: 'blur(12px)',
           padding: '0 24px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          borderBottom: '1px solid rgba(0,0,0,0.05)',
+          borderBottom: '1px solid var(--app-shell-border)',
           position: 'sticky',
           top: 0,
           zIndex: 10,
@@ -332,6 +333,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           </Space>
 
           <Space size="middle">
+            <ThemeModeDropdown />
             <Dropdown menu={{
               items: LANGUAGE_OPTIONS.map((item) => ({
                 key: item.value,
@@ -366,7 +368,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           </Space>
         </Header>
 
-        <Content style={{ padding: '24px', maxWidth: 1400, margin: '0 auto', width: '100%' }}>
+        <Content style={{ padding: '24px', maxWidth: 1400, margin: '0 auto', width: '100%', color: token.colorText }}>
           <div style={{ marginBottom: 24 }}>
             <Breadcrumb
               items={[
@@ -387,11 +389,16 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
       <style>
         {`
+          .app-sider-shell {
+            background: var(--app-nav-bg);
+            color: var(--app-nav-text);
+          }
+
           .app-sider-brand {
             min-height: 72px;
             display: flex;
             align-items: center;
-            gap: 14px;
+            justify-content: flex-start;
             padding: 14px 20px 10px;
             overflow: hidden;
             transition: all 0.2s ease;
@@ -407,6 +414,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             height: 40px;
             object-fit: contain;
             flex-shrink: 0;
+            cursor: pointer;
           }
 
           .app-sider-brand--collapsed .app-sider-brand-logo {
@@ -414,37 +422,94 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             height: 38px;
           }
 
-          .app-sider-brand-copy {
-            min-width: 0;
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
+          .app-sider-shell .ant-menu {
+            background: transparent !important;
           }
 
-          .app-sider-brand-title {
-            color: #f8fafc !important;
-            font-size: 13px;
-            line-height: 1.2;
-            font-weight: 600;
-            white-space: nowrap;
+          .app-sider-shell .ant-menu-item,
+          .app-sider-shell .ant-menu-submenu-title {
+            color: var(--app-nav-text) !important;
+            margin-bottom: 8px;
           }
 
-          .app-sider-brand-subtitle {
-            color: rgba(226, 232, 240, 0.72) !important;
-            font-size: 11px;
-            line-height: 1.2;
-            white-space: nowrap;
+          .app-sider-shell .ant-menu-submenu-selected > .ant-menu-submenu-title,
+          .app-sider-shell .ant-menu-item:hover,
+          .app-sider-shell .ant-menu-submenu-title:hover {
+            color: var(--app-nav-text-strong) !important;
+            background: var(--app-nav-item-hover) !important;
+            border-radius: 10px !important;
           }
 
           .desktop-sider .ant-menu-item-selected {
-            background: rgba(22, 119, 255, 0.15) !important;
+            background: var(--app-nav-item-active) !important;
             border-radius: 8px !important;
             width: calc(100% - 16px) !important;
             margin-left: 8px !important;
           }
-          .ant-menu-dark .ant-menu-item {
-             margin-bottom: 8px;
+
+          .desktop-sider .ant-menu-item-selected::after {
+            border-inline-end-color: transparent !important;
           }
+
+          .main-layout .ant-layout-header,
+          .main-layout .ant-layout-content,
+          .main-layout .ant-breadcrumb,
+          .main-layout .ant-select,
+          .main-layout .ant-typography {
+            color: var(--app-panel-text);
+          }
+
+          .main-layout .ant-breadcrumb a,
+          .main-layout .ant-breadcrumb-separator {
+            color: var(--app-panel-text-muted);
+          }
+
+          .main-layout .ant-select-selector,
+          .main-layout .ant-btn:not(.ant-btn-primary):not(.ant-btn-link) {
+            background: var(--app-panel-bg);
+            border-color: var(--app-shell-border);
+          }
+
+          .main-layout .ant-card,
+          .main-layout .ant-table-wrapper .ant-table,
+          .main-layout .ant-table-wrapper .ant-table-container,
+          .main-layout .ant-collapse,
+          .main-layout .ant-tabs-nav,
+          .main-layout .ant-list,
+          .main-layout .ant-descriptions-view {
+            background: var(--app-panel-bg);
+            border-color: var(--app-shell-border);
+            color: var(--app-panel-text);
+          }
+
+          .main-layout .ant-table-wrapper .ant-table-thead > tr > th,
+          .main-layout .ant-table-wrapper .ant-table-tbody > tr > td,
+          .main-layout .ant-collapse > .ant-collapse-item > .ant-collapse-header,
+          .main-layout .ant-collapse-content-box,
+          .main-layout .ant-tabs-tab,
+          .main-layout .ant-card .ant-card-head,
+          .main-layout .ant-card .ant-card-body {
+            background: transparent;
+            color: var(--app-panel-text);
+            border-color: var(--app-shell-border);
+          }
+
+          .main-layout .ant-table-wrapper .ant-table-tbody > tr.ant-table-row:hover > td,
+          .main-layout .ant-tabs-tab:hover,
+          .main-layout .ant-list-item:hover {
+            background: var(--app-panel-muted-bg);
+          }
+
+          .main-layout .ant-btn-text {
+            border-color: transparent !important;
+            background: transparent !important;
+            color: var(--app-panel-text);
+          }
+
+          .main-layout .ant-btn-text:hover {
+            background: var(--app-panel-muted-bg) !important;
+          }
+
           @keyframes contentFadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }

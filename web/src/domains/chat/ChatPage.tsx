@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Bubble, Sender, Welcome, Conversations, FileCard } from '@ant-design/x';
 import {
   Typography, Space, theme, Tooltip, Avatar, Button, Empty, Collapse,
@@ -17,6 +17,8 @@ import axios from 'axios';
 import { useXChat } from '@ant-design/x-sdk';
 import { BACKEND_URL } from '../../config';
 import { LANGUAGE_OPTIONS, applyLanguagePreference, getLocalizedPath, resolveSupportedLanguage, stripLanguagePrefix } from '../../i18n/config';
+import ThemeModeDropdown from '../../components/ThemeModeDropdown';
+import { useThemeMode } from '../../theme/themeMode';
 import { casdoorService } from '../identity/CasdoorService';
 import { getOrCreateProvider } from './SSEChatProvider';
 import { resolveUploadErrorMessage } from './uploadError';
@@ -116,6 +118,8 @@ function resolveBackendAssetUrl(url?: string): string | undefined {
 }
 
 const CURRENT_ENTERPRISE_STORAGE_KEY = 'dotblue_current_enterprise_id';
+const CHAT_SIDEBAR_WIDTH = 296;
+const CHAT_SIDEBAR_COLLAPSED_WIDTH = 92;
 
 function getChatAuthHeaderMap(tokenOverride?: string | null): Record<string, string> {
   const token = tokenOverride ?? localStorage.getItem('casdoor_token');
@@ -246,10 +250,10 @@ const AuthenticatedFileCard: React.FC<AuthenticatedFileCardProps> = ({
         style={{
           width: '100%',
           maxWidth: 360,
-          border: '1px solid #f0f0f0',
+          border: '1px solid var(--chat-card-border)',
           borderRadius: 14,
           padding: 8,
-          background: '#fff',
+          background: 'var(--chat-card-bg)',
           cursor: 'pointer',
         }}
       >
@@ -263,7 +267,7 @@ const AuthenticatedFileCard: React.FC<AuthenticatedFileCardProps> = ({
               maxHeight: 220,
               objectFit: 'contain',
               borderRadius: 10,
-              background: '#fafafa',
+              background: 'var(--chat-muted-bg)',
             }}
           />
         ) : (
@@ -274,18 +278,18 @@ const AuthenticatedFileCard: React.FC<AuthenticatedFileCardProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               borderRadius: 10,
-              background: '#fafafa',
-              color: '#8c8c8c',
+              background: 'var(--chat-muted-bg)',
+              color: 'var(--app-panel-text-muted)',
               fontSize: 12,
             }}
           >
             {loading || previewLoading ? t('chat_image_loading') : t('chat_image_unavailable')}
           </div>
         )}
-        <div style={{ marginTop: 8, fontSize: 12, color: '#262626', wordBreak: 'break-all' }}>
+        <div style={{ marginTop: 8, fontSize: 12, color: 'var(--app-panel-text)', wordBreak: 'break-all' }}>
           {name}
         </div>
-        <div style={{ marginTop: 4, fontSize: 12, color: '#8c8c8c' }}>
+        <div style={{ marginTop: 4, fontSize: 12, color: 'var(--app-panel-text-muted)' }}>
           {previewError || description}
         </div>
       </div>
@@ -352,23 +356,23 @@ function getToolStatusMeta(status: string, t: any): { label: string; color: stri
     case 'running':
       return {
         label: t('chat_tool_status_running'),
-        color: '#1677ff',
-        background: '#e6f4ff',
-        border: '#91caff',
+        color: '#60a5fa',
+        background: 'rgba(59, 130, 246, 0.14)',
+        border: 'rgba(96, 165, 250, 0.28)',
       };
     case 'done':
       return {
         label: t('chat_tool_status_done'),
-        color: '#389e0d',
-        background: '#f6ffed',
-        border: '#b7eb8f',
+        color: '#4ade80',
+        background: 'rgba(34, 197, 94, 0.14)',
+        border: 'rgba(74, 222, 128, 0.26)',
       };
     default:
       return {
         label: t('chat_tool_status_recorded'),
-        color: '#595959',
-        background: '#fafafa',
-        border: '#d9d9d9',
+        color: 'var(--app-panel-text-muted)',
+        background: 'var(--app-panel-muted-bg)',
+        border: 'var(--app-shell-border)',
       };
   }
 }
@@ -407,6 +411,7 @@ const ConversationPane: React.FC<ConversationPaneProps> = ({
 }) => {
   const senderRef = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const { token } = theme.useToken();
   const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
   const [reloadSeq, setReloadSeq] = useState(0);
   const previousRequestingRef = useRef(false);
@@ -549,34 +554,57 @@ const ConversationPane: React.FC<ConversationPaneProps> = ({
   });
 
   return (
-    <>
-      {parsedMessages.length === 0 ? (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>
-          <div style={{ width: '100%', maxWidth: 760, borderRadius: 24, border: '1px solid #eef2f6', background: 'linear-gradient(180deg, #ffffff 0%, #f7fbff 100%)', boxShadow: '0 20px 60px rgba(15,52,96,0.08)', padding: '32px 28px' }}>
-            <Welcome
-              variant="borderless"
-              icon={<ThunderboltOutlined style={{ color: '#1677ff', fontSize: 48 }} />}
-              title={selectedAgentName || t('welcome')}
-              description={t('hero_subtitle')}
-            />
-            <Space wrap size={[8, 8]} style={{ marginTop: 20 }}>
-              <Tag color="blue">{t('hero_stat_security')}</Tag>
-              <Tag color="gold">{t('highlight_runtime_metric')}</Tag>
-              <Tag color="purple">{t('feat_api_title')}</Tag>
-            </Space>
+    <div
+      className="chat-conversation-shell"
+      style={{
+        flex: 1,
+        minHeight: 0,
+        margin: 20,
+        borderRadius: 24,
+        border: '1px solid var(--chat-card-border)',
+        background: 'var(--chat-card-bg)',
+        boxShadow: 'var(--chat-card-shadow)',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+      }}
+    >
+      <div
+        className="chat-conversation-body"
+        style={{
+          flex: 1,
+          minHeight: 0,
+          background: parsedMessages.length === 0 ? 'var(--chat-card-bg-soft)' : 'var(--chat-card-bg)',
+        }}
+      >
+        {parsedMessages.length === 0 ? (
+          <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>
+            <div style={{ width: '100%', maxWidth: 760, borderRadius: 24, border: '1px solid var(--chat-card-border)', background: 'var(--chat-card-bg-soft)', padding: '32px 28px' }}>
+              <Welcome
+                variant="borderless"
+                icon={<ThunderboltOutlined style={{ color: token.colorPrimary, fontSize: 48 }} />}
+                title={selectedAgentName || t('welcome')}
+                description={t('hero_subtitle')}
+              />
+              <Space wrap size={[8, 8]} style={{ marginTop: 20 }}>
+                <Tag color="blue">{t('hero_stat_security')}</Tag>
+                <Tag color="gold">{t('highlight_runtime_metric')}</Tag>
+                <Tag color="purple">{t('feat_api_title')}</Tag>
+              </Space>
+            </div>
           </div>
-        </div>
-      ) : (
-        <Bubble.List
-          items={bubbleItems}
-          role={bubbleRole}
-          autoScroll
-          style={{ flex: 1, padding: '24px' }}
-          styles={{ root: { maxWidth: 940 } }}
-        />
-      )}
+        ) : (
+          <Bubble.List
+            items={bubbleItems}
+            role={bubbleRole}
+            autoScroll
+            style={{ height: '100%', padding: '24px' }}
+            styles={{ root: { maxWidth: 940 } }}
+          />
+        )}
+      </div>
 
-      <div style={{ padding: '16px 24px', borderTop: '1px solid #f0f0f0' }}>
+      <div style={{ padding: '16px 24px', borderTop: '1px solid var(--chat-input-border)', background: 'var(--chat-card-bg)' }}>
         <input
           ref={fileInputRef}
           type="file"
@@ -644,7 +672,7 @@ const ConversationPane: React.FC<ConversationPaneProps> = ({
           </Text>
         </div>
       </div>
-    </>
+    </div>
   );
 };
 
@@ -653,6 +681,7 @@ const ConversationPane: React.FC<ConversationPaneProps> = ({
 const ChatPage: React.FC = () => {
   const { t, i18n } = useTranslation();
   const { token } = theme.useToken();
+  const { resolvedTheme } = useThemeMode();
   const navigate = useNavigate();
   const location = useLocation();
   const currentLanguage = resolveSupportedLanguage(i18n?.resolvedLanguage || i18n?.language);
@@ -886,8 +915,8 @@ const ChatPage: React.FC = () => {
   // --- No agents ---
   if (!agentsLoading && agents.length === 0) {
     return (
-      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(180deg, #f4f7f9 0%, #ffffff 100%)', padding: 24 }}>
-        <div style={{ width: '100%', maxWidth: 560, borderRadius: 24, background: '#fff', border: '1px solid #eef2f6', boxShadow: '0 20px 60px rgba(15,52,96,0.08)', padding: 32, textAlign: 'center' }}>
+      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--chat-card-bg-soft)', padding: 24 }}>
+        <div style={{ width: '100%', maxWidth: 560, borderRadius: 24, background: 'var(--chat-card-bg)', border: '1px solid var(--chat-card-border)', boxShadow: 'var(--chat-card-shadow)', padding: 32, textAlign: 'center' }}>
           <Space wrap size={[8, 8]} style={{ justifyContent: 'center', marginBottom: 16 }}>
             <Tag color="blue">{t('hero_stat_security')}</Tag>
             <Tag color="cyan">{t('feat_multi_title')}</Tag>
@@ -925,10 +954,9 @@ const ChatPage: React.FC = () => {
       <div style={{
         marginBottom: 12,
         padding: '10px 12px',
-        border: '1px solid #eef2f6',
+        border: '1px solid var(--chat-tool-border)',
         borderRadius: 14,
-        background: 'linear-gradient(180deg, #fcfdff 0%, #f7faff 100%)',
-        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.8)',
+        background: 'var(--chat-tool-shell-bg)',
       }}
       >
         <div style={{
@@ -958,8 +986,8 @@ const ChatPage: React.FC = () => {
                   gap: 12,
                   padding: '8px 10px',
                   borderRadius: 12,
-                  background: '#fff',
-                  border: '1px solid #f0f0f0',
+                  background: 'var(--chat-tool-bg)',
+                  border: '1px solid var(--chat-tool-border)',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
@@ -970,7 +998,7 @@ const ChatPage: React.FC = () => {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    background: '#f5f7fa',
+                    background: 'var(--app-panel-muted-bg)',
                     fontSize: 15,
                     flexShrink: 0,
                   }}
@@ -1054,9 +1082,9 @@ const ChatPage: React.FC = () => {
                 style={{ marginBottom: 10, background: 'transparent' }}
                 items={[{
                   key: 'thinking',
-                  label: <Space><BulbOutlined style={{ color: '#faad14' }} /><Text type="secondary" style={{ fontSize: 12 }}>{t('chat_thinking_process')}</Text></Space>,
+                  label: <Space><BulbOutlined style={{ color: '#fbbf24' }} /><Text type="secondary" style={{ fontSize: 12 }}>{t('chat_thinking_process')}</Text></Space>,
                   children: (
-                    <div style={{ fontSize: 13, color: '#595959' }}>
+                    <div style={{ fontSize: 13, color: 'var(--app-panel-text-muted)' }}>
                       <Markdown>{msg.thinking}</Markdown>
                     </div>
                   ),
@@ -1074,7 +1102,7 @@ const ChatPage: React.FC = () => {
     },
     user: {
       placement: 'end' as const,
-      avatar: <Avatar size={32} icon={<UserOutlined />} style={{ background: '#87d068' }} />,
+      avatar: <Avatar size={32} icon={<UserOutlined />} style={{ background: token.colorPrimary }} />,
       contentRender: (_: string, { extraInfo }: { extraInfo?: any }) => {
         const msg: ChatMessage = extraInfo?.chatMsg;
         if (!msg) return null;
@@ -1102,34 +1130,24 @@ const ChatPage: React.FC = () => {
   };
 
   return (
-    <Layout style={{ height: '100vh', background: '#fff' }}>
+    <Layout style={{ height: '100vh', background: token.colorBgLayout }}>
       {/* Top bar */}
       <Layout.Header style={{
         height: 64, padding: '0 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        background: '#fff', borderBottom: '1px solid #f0f0f0', zIndex: 10,
-      }}>
+        background: 'var(--app-panel-bg)', borderBottom: '1px solid var(--app-shell-border)', zIndex: 10,
+      }} data-testid="chat-topbar">
         <Space size={12} style={{ minWidth: 0 }}>
-          <Button type="text" icon={sidebarCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)} />
           <div className="chat-header-brand">
             <img
-              src="/brand/dotblue-logo.png"
+              src={resolvedTheme === 'dark' ? '/brand/dotblue-logo-dark.svg' : '/brand/dotblue-logo-light.svg'}
               alt={t('app_name')}
               className="chat-header-brand-logo"
+              onClick={() => navigate(getLocalizedPath('/', currentLanguage))}
             />
-            <div className="chat-header-brand-copy">
-              <Text className="chat-header-brand-title">{t('brand_header_badge')}</Text>
-              <Text className="chat-header-brand-subtitle">{t('brand_header_subtitle')}</Text>
-            </div>
           </div>
         </Space>
         <Space size="middle">
-          <Space size={6}>
-            <RobotOutlined style={{ color: token.colorPrimary }} />
-            <Text style={{ fontSize: 13 }}>
-              {curConvId ? (selectedAgent?.agentName || t('chat_select_agent')) : t('chat_select_conversation_first')}
-            </Text>
-          </Space>
+          <ThemeModeDropdown />
           <Button
             type="default"
             size="small"
@@ -1166,57 +1184,82 @@ const ChatPage: React.FC = () => {
 
       <Layout>
         {/* Sidebar — Conversations */}
-        {!sidebarCollapsed && (
-          <Layout.Sider width={280} theme="light" style={{
-            borderRight: '1px solid #f0f0f0', height: 'calc(100vh - 64px)', overflow: 'hidden',
-            display: 'flex', flexDirection: 'column',
-          }}>
-            <div style={{ padding: '12px 12px 8px' }}>
-              <Dropdown menu={newChatMenu} trigger={['click']}>
-                <Button type="primary" icon={<PlusOutlined />} block>{t('chat_new_conversation')}</Button>
-              </Dropdown>
-              <Input
-                prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
-                placeholder={t('chat_search_conversations')}
-                value={searchText}
-                onChange={e => setSearchText(e.target.value)}
-                allowClear
-                style={{ marginTop: 8 }}
-                size="small"
-              />
-            </div>
+        <Layout.Sider
+          width={CHAT_SIDEBAR_WIDTH}
+          collapsedWidth={CHAT_SIDEBAR_COLLAPSED_WIDTH}
+          collapsed={sidebarCollapsed}
+          trigger={null}
+          theme={resolvedTheme === 'dark' ? 'dark' : 'light'}
+          style={{
+            height: 'calc(100vh - 64px)',
+            overflow: 'visible',
+            boxShadow: 'inset -1px 0 0 var(--chat-sidebar-border)',
+          }}
+        >
+          <div className={`chat-sidebar-shell ${sidebarCollapsed ? 'chat-sidebar-shell--collapsed' : ''}`}>
+            <div className={`chat-sidebar-panel ${sidebarCollapsed ? 'chat-sidebar-panel--collapsed' : ''}`} data-testid="chat-sidebar-panel">
+              <Tooltip title={sidebarCollapsed ? t('chat_expand_sidebar') : t('chat_collapse_sidebar')}>
+                <Button
+                  type="text"
+                  size="small"
+                  className="chat-sidebar-toggle chat-sidebar-toggle--attached"
+                  data-testid="chat-sidebar-toggle"
+                  aria-label={sidebarCollapsed ? t('chat_expand_sidebar') : t('chat_collapse_sidebar')}
+                  icon={sidebarCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+                  onClick={() => setSidebarCollapsed((value) => !value)}
+                />
+              </Tooltip>
+              {!sidebarCollapsed && (
+                <>
+                <div className="chat-sidebar-controls">
+                  <Dropdown menu={newChatMenu} trigger={['click']}>
+                    <Button type="primary" icon={<PlusOutlined />} block>{t('chat_new_conversation')}</Button>
+                  </Dropdown>
+                  <Input
+                    prefix={<SearchOutlined style={{ color: 'var(--app-nav-text-muted)' }} />}
+                    placeholder={t('chat_search_conversations')}
+                    value={searchText}
+                    onChange={e => setSearchText(e.target.value)}
+                    allowClear
+                    size="small"
+                  />
+                </div>
 
-            <div style={{ flex: 1, overflowY: 'auto' }}
-              onScroll={(e) => {
-                const el = e.currentTarget;
-                if (el.scrollHeight - el.scrollTop - el.clientHeight < 50 && convHasMore && !convLoading) {
-                  handleLoadMoreConvs();
-                }
-              }}
-            >
-              <Conversations
-                items={filteredConversations}
-                activeKey={curConvId || undefined}
-                onActiveChange={(key) => setCurConvId(key as string)}
-                groupable
-                menu={(conv) => ({
-                  items: [
-                    { key: 'delete', label: t('chat_delete_conversation'), icon: <DeleteOutlined />, danger: true },
-                  ],
-                  onClick: ({ key: actionKey }) => {
-                    if (actionKey === 'delete') {
-                      handleDeleteConversation(conv.key as string);
+                <div
+                  className="chat-sidebar-conversations"
+                  onScroll={(e) => {
+                    const el = e.currentTarget;
+                    if (el.scrollHeight - el.scrollTop - el.clientHeight < 50 && convHasMore && !convLoading) {
+                      handleLoadMoreConvs();
                     }
-                  },
-                })}
-              />
-              {convLoading && <div style={{ textAlign: 'center', padding: 12 }}><Text type="secondary" style={{ fontSize: 12 }}>{t('chat_loading_messages')}</Text></div>}
+                  }}
+                >
+                  <Conversations
+                    items={filteredConversations}
+                    activeKey={curConvId || undefined}
+                    onActiveChange={(key) => setCurConvId(key as string)}
+                    groupable
+                    menu={(conv) => ({
+                      items: [
+                        { key: 'delete', label: t('chat_delete_conversation'), icon: <DeleteOutlined />, danger: true },
+                      ],
+                      onClick: ({ key: actionKey }) => {
+                        if (actionKey === 'delete') {
+                          handleDeleteConversation(conv.key as string);
+                        }
+                      },
+                    })}
+                  />
+                  {convLoading && <div style={{ textAlign: 'center', padding: 12 }}><Text style={{ fontSize: 12, color: 'var(--app-nav-text-muted)' }}>{t('chat_loading_messages')}</Text></div>}
+                </div>
+                </>
+              )}
             </div>
-          </Layout.Sider>
-        )}
+          </div>
+        </Layout.Sider>
 
         {/* Chat area */}
-        <Layout.Content style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 56px)', background: '#fff' }}>
+        <Layout.Content style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 64px)', background: 'var(--app-panel-bg)' }}>
           {verifyHint ? (
             <div style={{ padding: '16px 24px 0' }}>
               <Alert
@@ -1253,50 +1296,146 @@ const ChatPage: React.FC = () => {
           .chat-header-brand {
             display: flex;
             align-items: center;
-            gap: 12px;
-            min-width: 0;
-          }
-
-          .chat-header-brand-logo {
-            width: 118px;
-            height: 36px;
-            object-fit: contain;
+            justify-content: center;
             flex-shrink: 0;
           }
 
-          .chat-header-brand-copy {
+          .chat-header-brand-logo {
+            width: 112px;
+            height: 34px;
+            object-fit: contain;
+            display: block;
+            cursor: pointer;
+          }
+
+          .chat-sidebar-shell {
             display: flex;
             flex-direction: column;
-            gap: 1px;
-            min-width: 0;
+            height: 100%;
+            background: var(--chat-sidebar-bg);
+            overflow: visible;
           }
 
-          .chat-header-brand-title {
-            color: #0f172a !important;
-            font-size: 12px;
-            font-weight: 600;
-            line-height: 1.2;
-            white-space: nowrap;
+          .chat-sidebar-shell--collapsed {
+            align-items: center;
           }
 
-          .chat-header-brand-subtitle {
-            color: #64748b !important;
-            font-size: 11px;
-            line-height: 1.2;
-            white-space: nowrap;
+          .chat-sidebar-panel {
+            position: relative;
+            display: flex;
+            flex: 1;
+            min-height: 0;
+            flex-direction: column;
+          }
+
+          .chat-sidebar-panel--collapsed {
+            align-items: center;
+          }
+
+          .chat-sidebar-toggle {
+            color: var(--app-nav-text-strong) !important;
+            border: 1px solid var(--chat-sidebar-border) !important;
+            background: var(--chat-sidebar-surface) !important;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+          }
+
+          .chat-sidebar-toggle:hover {
+            color: var(--app-nav-text-strong) !important;
+            border-color: rgba(96, 165, 250, 0.4) !important;
+            background: var(--chat-sidebar-item-hover) !important;
+          }
+
+          .chat-sidebar-toggle--attached {
+            position: absolute !important;
+            top: 18px;
+            right: -14px;
+            width: 28px;
+            height: 36px;
+            border-radius: 0 12px 12px 0 !important;
+            z-index: 2;
+          }
+
+          .chat-sidebar-controls {
+            padding: 16px 12px 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+          }
+
+          .chat-sidebar-conversations {
+            flex: 1;
+            overflow-y: auto;
+            padding-bottom: 12px;
+          }
+
+          .chat-sidebar-shell .ant-input-affix-wrapper {
+            background: var(--chat-sidebar-surface);
+            border-color: var(--chat-sidebar-border);
+            box-shadow: none;
+          }
+
+          .chat-sidebar-shell .ant-input-affix-wrapper .ant-input {
+            background: transparent;
+            color: var(--app-nav-text-strong);
+          }
+
+          .chat-sidebar-shell .ant-input-affix-wrapper .ant-input::placeholder {
+            color: var(--app-nav-text-muted);
+          }
+
+          .chat-sidebar-shell .ant-input-affix-wrapper .ant-input-clear-icon {
+            color: var(--app-nav-text-muted);
+          }
+
+          .chat-sidebar-shell .ant-conversations {
+            background: transparent;
+          }
+
+          .chat-sidebar-shell .ant-conversations-group-title {
+            color: var(--app-nav-text-muted) !important;
+            padding-inline: 16px !important;
+          }
+
+          .chat-sidebar-shell .ant-conversations-item {
+            margin: 4px 8px !important;
+            border-radius: 12px !important;
+            background: transparent !important;
+            color: var(--app-nav-text) !important;
+          }
+
+          .chat-sidebar-shell .ant-conversations-item:hover {
+            background: var(--chat-sidebar-item-hover) !important;
+          }
+
+          .chat-sidebar-shell .ant-conversations-item-active,
+          .chat-sidebar-shell .ant-conversations-item-selected {
+            background: var(--chat-sidebar-item-active) !important;
+            box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.16);
+          }
+
+          .chat-sidebar-shell .ant-conversations-item .ant-typography,
+          .chat-sidebar-shell .ant-conversations-item .ant-dropdown-trigger,
+          .chat-sidebar-shell .ant-conversations-item .anticon {
+            color: inherit !important;
+          }
+
+          .chat-sidebar-shell .ant-conversations-item .ant-avatar {
+            background: var(--chat-sidebar-item-hover) !important;
           }
 
           @media (max-width: 900px) {
-            .chat-header-brand-copy,
+            .chat-header-brand-logo {
+              width: 92px;
+            }
+
             .chat-header-dashboard-button {
               display: none !important;
             }
           }
 
           @media (max-width: 640px) {
-            .chat-header-brand-logo {
-              width: 108px;
-              height: 34px;
+            .chat-sidebar-toggle--attached {
+              top: 14px;
             }
           }
         `}

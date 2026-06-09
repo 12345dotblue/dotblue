@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="128" viewBox="0 0 520 128" fill="none" role="img" aria-labelledby="dotblue-wordmark-b-dark-title">
+  <title id="dotblue-wordmark-b-dark-title">dotblue wordmark B dark</title>
+  <style>
+    .wordmark {
+      font-family: "Avenir Next", Inter, Manrope, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      font-size: 106px;
+      font-weight: 650;
+      letter-spacing: -4px;
+      fill: #d8e8ff;
+    }
+  </style>
+  <circle cx="35" cy="75" r="21" fill="#49a2ff" />
+  <text class="wordmark" x="72" y="94">blue</text>
+</svg>

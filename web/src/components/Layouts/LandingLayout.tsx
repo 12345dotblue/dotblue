@@ -1,11 +1,11 @@
 import React from 'react';
 import { Layout, Button, Space, Typography, Row, Col, Divider, Dropdown } from 'antd';
-import { AppstoreOutlined, GithubOutlined, GlobalOutlined, LogoutOutlined } from '@ant-design/icons';
+import { AppstoreOutlined, GithubOutlined, GlobalOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
-import { casdoorService } from '../../domains/identity/CasdoorService';
-import { useAuthState } from '../../domains/identity/useAuthState';
 import { LANGUAGE_OPTIONS, applyLanguagePreference, getLocalizedPath, resolveSupportedLanguage, stripLanguagePrefix } from '../../i18n/config';
+import ThemeModeDropdown from '../ThemeModeDropdown';
+import { useThemeMode } from '../../theme/themeMode';
 
 const { Header, Content, Footer } = Layout;
 const { Title, Text, Paragraph } = Typography;
@@ -13,9 +13,10 @@ const { Title, Text, Paragraph } = Typography;
 const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  const isAuthenticated = useAuthState();
+  const { resolvedTheme } = useThemeMode();
   const currentLanguage = resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language);
   const currentLanguageLabel = LANGUAGE_OPTIONS.find((item) => item.value === currentLanguage)?.shortLabel || currentLanguage.toUpperCase();
+  const isDark = resolvedTheme === 'dark';
 
   const changeLanguage = async (lng: string) => {
     const currentPath = stripLanguagePrefix(window.location.pathname);
@@ -45,15 +46,15 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   }, []);
 
   return (
-    <Layout style={{ minHeight: '100vh', background: '#fff' }}>
+    <Layout style={{ minHeight: '100vh', background: 'var(--app-shell-bg)' }}>
       <Header style={{
-        background: 'rgba(255, 255, 255, 0.72)',
+        background: 'var(--app-header-bg)',
         backdropFilter: 'blur(16px)',
         padding: '0 5%',
         position: 'sticky',
         top: 0,
         zIndex: 100,
-        borderBottom: '1px solid rgba(15, 23, 42, 0.05)',
+        borderBottom: '1px solid var(--app-shell-border)',
         height: 88,
       }}>
         <div className="landing-header-shell">
@@ -63,7 +64,7 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               onClick={() => navigate(getLocalizedPath('/', currentLanguage))}
             >
               <img
-                src="/brand/dotblue-logo.png"
+                src={isDark ? '/brand/dotblue-logo-dark.svg' : '/brand/dotblue-logo-light.svg'}
                 alt={t('app_name')}
                 style={{ width: 132, height: 42, objectFit: 'contain', flexShrink: 0 }}
               />
@@ -71,7 +72,9 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                 style={{
                   width: 1,
                   height: 22,
-                  background: 'linear-gradient(180deg, rgba(22,119,255,0.04) 0%, rgba(22,119,255,0.24) 50%, rgba(22,119,255,0.04) 100%)',
+                  background: isDark
+                    ? 'linear-gradient(180deg, rgba(96,165,250,0.06) 0%, rgba(96,165,250,0.36) 50%, rgba(96,165,250,0.06) 100%)'
+                    : 'linear-gradient(180deg, rgba(22,119,255,0.04) 0%, rgba(22,119,255,0.24) 50%, rgba(22,119,255,0.04) 100%)',
                   flexShrink: 0,
                 }}
               />
@@ -80,7 +83,7 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                   style={{
                     fontSize: 13,
                     fontWeight: 600,
-                    color: '#0f172a',
+                    color: 'var(--app-panel-text)',
                     lineHeight: 1.2,
                     whiteSpace: 'nowrap',
                   }}
@@ -100,11 +103,11 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               </div>
             </div>
             <Space size={4} className="landing-nav-group">
-              <Button className="landing-nav-button" type="text" onClick={() => scrollToSection('assistants')}>
-                {t('landing_nav_assistants')}
-              </Button>
               <Button className="landing-nav-button" type="text" onClick={() => scrollToSection('highlights')}>
                 {t('landing_nav_highlights')}
+              </Button>
+              <Button className="landing-nav-button" type="text" onClick={() => scrollToSection('assistants')}>
+                {t('landing_nav_assistants')}
               </Button>
               <Button className="landing-nav-button" type="text" onClick={() => scrollToSection('pricing')}>
                 {t('view_pricing')}
@@ -116,66 +119,49 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           </div>
 
           <Space size="small" className="landing-header-actions">
-            <Button
-              className="landing-utility-button landing-github-button"
-              type="text"
-              shape="circle"
-              icon={<GithubOutlined />}
-              href="https://github.com/12345dotblue/dotblue"
-              target="_blank"
-              rel="noreferrer"
-              aria-label={t('landing_nav_github')}
-              title={t('landing_nav_github')}
-            />
-            <Dropdown
-              menu={{
-                items: LANGUAGE_OPTIONS.map((item) => ({
-                  key: item.value,
-                  label: item.label,
-                })),
-                onClick: ({ key }) => changeLanguage(String(key)),
-              }}
-              trigger={['click']}
-            >
-              <Button className="landing-utility-button" type="text" icon={<GlobalOutlined />}>
-                {currentLanguageLabel}
-              </Button>
-            </Dropdown>
-            {isAuthenticated ? (
-              <>
-                <Button className="landing-secondary-button" shape="round" icon={<AppstoreOutlined />} onClick={() => navigate(getLocalizedPath('/dashboard', currentLanguage))}>
-                  {t('go_to_dashboard')}
+            <div className="landing-utility-cluster">
+              <Button
+                className="landing-utility-button landing-github-button"
+                type="text"
+                shape="circle"
+                icon={<GithubOutlined />}
+                href="https://github.com/12345dotblue/dotblue"
+                target="_blank"
+                rel="noreferrer"
+                aria-label={t('landing_nav_github')}
+                title={t('landing_nav_github')}
+              />
+              <ThemeModeDropdown buttonClassName="landing-utility-button landing-utility-button--compact" compact />
+              <Dropdown
+                menu={{
+                  items: LANGUAGE_OPTIONS.map((item) => ({
+                    key: item.value,
+                    label: item.label,
+                  })),
+                  onClick: ({ key }) => changeLanguage(String(key)),
+                }}
+                trigger={['click']}
+              >
+                <Button className="landing-utility-button landing-utility-button--compact" type="text" icon={<GlobalOutlined />}>
+                  {currentLanguageLabel}
                 </Button>
-                <Button
-                  className="landing-primary-button"
-                  type="primary"
-                  shape="round"
-                  icon={<LogoutOutlined />}
-                  onClick={() => {
-                    casdoorService.removeToken();
-                    navigate(getLocalizedPath('/login', currentLanguage));
-                  }}
-                >
-                  {t('logout')}
-                </Button>
-              </>
-            ) : (
-              <Button className="landing-primary-button" type="primary" shape="round" onClick={() => navigate(getLocalizedPath('/login', currentLanguage))}>
-                {t('login')}
-              </Button>
-            )}
+              </Dropdown>
+            </div>
+            <Button className="landing-primary-button" type="primary" shape="round" icon={<AppstoreOutlined />} onClick={() => navigate(getLocalizedPath('/dashboard', currentLanguage))}>
+              {t('go_to_dashboard')}
+            </Button>
           </Space>
         </div>
       </Header>
 
       <Content>{children}</Content>
 
-      <Footer style={{ background: '#f9fafb', padding: '64px 5% 32px' }}>
+      <Footer style={{ background: 'var(--app-panel-elevated-bg)', padding: '64px 5% 32px', borderTop: '1px solid var(--app-shell-border)' }}>
         <Row gutter={[32, 32]}>
           <Col xs={24} md={8}>
             <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
               <img
-                src="/brand/dotblue-logo.png"
+                src={isDark ? '/brand/dotblue-logo-dark.svg' : '/brand/dotblue-logo-light.svg'}
                 alt={t('app_name')}
                 style={{ width: 104, height: 32, objectFit: 'contain', marginRight: 10 }}
               />
@@ -213,11 +199,11 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                 </Space>
               </a>
             </Paragraph>
-            <Divider style={{ margin: '16px 0' }} />
+            <Divider style={{ margin: '16px 0', borderColor: 'var(--app-shell-border)' }} />
             <div style={{ display: 'flex', gap: 12, opacity: 0.5 }}>
-              <div style={{ width: 40, height: 24, background: '#e0e0e0', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10 }}>{t('footer_payment_visa')}</div>
-              <div style={{ width: 40, height: 24, background: '#e0e0e0', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10 }}>{t('footer_payment_mastercard')}</div>
-              <div style={{ width: 40, height: 24, background: '#e0e0e0', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10 }}>{t('footer_payment_amex')}</div>
+              <div style={{ width: 40, height: 24, background: 'var(--app-panel-muted-bg)', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'var(--app-panel-text-muted)' }}>{t('footer_payment_visa')}</div>
+              <div style={{ width: 40, height: 24, background: 'var(--app-panel-muted-bg)', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'var(--app-panel-text-muted)' }}>{t('footer_payment_mastercard')}</div>
+              <div style={{ width: 40, height: 24, background: 'var(--app-panel-muted-bg)', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'var(--app-panel-text-muted)' }}>{t('footer_payment_amex')}</div>
             </div>
           </Col>
         </Row>
@@ -230,9 +216,9 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             height: 64px;
             padding: 0 18px 0 20px;
             border-radius: 20px;
-            border: 1px solid rgba(15, 23, 42, 0.06);
-            background: rgba(255, 255, 255, 0.86);
-            box-shadow: 0 12px 32px rgba(15, 23, 42, 0.06);
+            border: 1px solid var(--app-shell-border);
+            background: ${isDark ? 'rgba(16, 26, 43, 0.86)' : 'rgba(255, 255, 255, 0.86)'};
+            box-shadow: ${isDark ? '0 18px 36px rgba(2, 8, 23, 0.28)' : '0 12px 32px rgba(15, 23, 42, 0.06)'};
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -251,7 +237,7 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           .landing-brand-block {
             display: flex;
             align-items: center;
-            gap: 14px;
+            gap: 8px;
             cursor: pointer;
             min-width: 0;
             flex: 0 0 auto;
@@ -281,7 +267,7 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             height: 36px;
             padding: 0 14px;
             border-radius: 999px;
-            color: #334155;
+            color: var(--app-panel-text-muted);
             font-weight: 500;
           }
 
@@ -290,46 +276,45 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           }
 
           .landing-nav-group .landing-nav-button:hover {
-            color: #1677ff !important;
-            background: #eff6ff !important;
+            color: var(--app-panel-text) !important;
+            background: var(--app-panel-muted-bg) !important;
+          }
+
+          .landing-utility-cluster {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px;
+            border: 1px solid var(--app-shell-border);
+            border-radius: 999px;
+            background: ${isDark ? 'rgba(8, 17, 31, 0.72)' : 'rgba(248, 250, 252, 0.92)'};
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
           }
 
           .landing-utility-button {
-            height: 38px;
-            padding: 0 14px;
+            height: 34px;
+            padding: 0 12px;
             border-radius: 999px;
-            border: 1px solid rgba(148, 163, 184, 0.22);
-            background: #fff;
-            color: #334155;
+            border: 0 !important;
+            background: transparent !important;
+            color: var(--app-panel-text-muted);
             font-weight: 500;
+            box-shadow: none !important;
           }
 
           .landing-utility-button:hover {
-            color: #1677ff !important;
-            border-color: rgba(22, 119, 255, 0.22) !important;
-            background: #f8fbff !important;
+            color: var(--app-panel-text) !important;
+            background: var(--app-panel-muted-bg) !important;
           }
 
           .landing-github-button {
-            width: 38px;
-            min-width: 38px;
+            width: 34px;
+            min-width: 34px;
             padding: 0;
           }
 
-          .landing-secondary-button {
-            height: 40px;
-            padding: 0 18px;
-            border-radius: 999px;
-            border-color: rgba(148, 163, 184, 0.28);
-            color: #0f172a;
-            font-weight: 600;
-            box-shadow: none;
-          }
-
-          .landing-secondary-button:hover {
-            color: #1677ff !important;
-            border-color: rgba(22, 119, 255, 0.24) !important;
-            background: #f8fbff !important;
+          .landing-utility-button--compact {
+            min-width: 34px;
           }
 
           .landing-primary-button {
@@ -341,6 +326,9 @@ const LandingLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           }
 
           .landing-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
             flex: 0 0 auto;
             white-space: nowrap;
           }

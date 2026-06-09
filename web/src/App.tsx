@@ -1,7 +1,7 @@
 import React from 'react'
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation, useParams } from 'react-router-dom'
 import { HelmetProvider, Helmet } from 'react-helmet-async'
-import { ConfigProvider, theme } from 'antd'
+import { ConfigProvider } from 'antd'
 import enUS from 'antd/locale/en_US'
 import zhCN from 'antd/locale/zh_CN'
 import jaJP from 'antd/locale/ja_JP'
@@ -32,6 +32,7 @@ import ProductDocsPage from './domains/marketing/ProductDocsPage'
 import Terms from './domains/legal/Terms'
 import Privacy from './domains/legal/Privacy'
 import Refund from './domains/legal/Refund'
+import { ThemeModeProvider, buildAntdThemeConfig, useThemeMode } from './theme/themeMode'
 
 import { BACKEND_URL } from './config'
 
@@ -146,8 +147,9 @@ function LocalizedFallback() {
   return <Navigate to={getLocalizedPath('/', language)} replace />
 }
 
-function App() {
+function AppContent() {
   const { t, i18n } = useTranslation()
+  const { resolvedTheme } = useThemeMode()
   const currentLanguage = resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language) as keyof typeof ANTD_LOCALES
 
   React.useEffect(() => {
@@ -168,28 +170,7 @@ function App() {
             'aria-label': t('common_close'),
           },
         }}
-        theme={{
-          algorithm: theme.defaultAlgorithm,
-          token: {
-            colorPrimary: '#1677ff',
-            borderRadius: 12,
-            fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            colorBgLayout: '#f4f7f9',
-          },
-          components: {
-            Layout: {
-              headerBg: 'rgba(255, 255, 255, 0.7)',
-              siderBg: '#001529',
-            },
-            Card: {
-              boxShadowTertiary: '0 4px 20px rgba(0,0,0,0.03)',
-            },
-            Button: {
-              controlHeight: 40,
-              paddingContentHorizontal: 20,
-            },
-          },
-        }}
+        theme={buildAntdThemeConfig(resolvedTheme)}
       >
         <BrowserRouter>
           <Helmet>
@@ -368,6 +349,14 @@ function App() {
         </BrowserRouter>
       </ConfigProvider>
     </HelmetProvider>
+  )
+}
+
+function App() {
+  return (
+    <ThemeModeProvider>
+      <AppContent />
+    </ThemeModeProvider>
   )
 }
 

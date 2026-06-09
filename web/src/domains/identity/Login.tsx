@@ -1,4 +1,4 @@
-﻿import React, { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { casdoorService } from './CasdoorService';
 
@@ -19,7 +19,7 @@ const Login: React.FC = () => {
         justifyContent: 'center',
         padding: 24,
         backgroundColor: '#f4f7fb',
-        backgroundImage: "linear-gradient(rgba(255,255,255,0.82), rgba(255,255,255,0.92)), url('/brand/dotblue-login-bg.png')",
+        backgroundImage: "linear-gradient(rgba(255,255,255,0.82), rgba(255,255,255,0.92)), url('/brand/dotblue-login-bg.svg')",
         backgroundSize: 'cover',
         backgroundPosition: 'center',
       }}
@@ -37,7 +37,7 @@ const Login: React.FC = () => {
         }}
       >
         <img
-          src="/brand/dotblue-logo.png"
+          src="/brand/dotblue-logo-light.svg"
           alt={t('app_name')}
           style={{ width: 160, height: 56, objectFit: 'contain', marginBottom: 20 }}
         />

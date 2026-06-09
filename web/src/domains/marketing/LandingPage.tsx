@@ -6,7 +6,6 @@ import {
   ThunderboltOutlined,
   ApiOutlined,
   AuditOutlined,
-  CodeOutlined,
   ArrowRightOutlined,
   CheckOutlined,
   DeploymentUnitOutlined,
@@ -22,6 +21,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useAuthState } from '../identity/useAuthState';
 import { SUPPORTED_LANGUAGES, buildLocalizedUrl, getLocalizedPath, resolveSupportedLanguage } from '../../i18n/config';
+import { useThemeMode } from '../../theme/themeMode';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -31,8 +31,10 @@ const LandingPage: React.FC = () => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { token } = theme.useToken();
+  const { resolvedTheme } = useThemeMode();
   const [yearly, setYearly] = useState(false);
   const isAuthenticated = useAuthState();
+  const isDark = resolvedTheme === 'dark';
   const currentLanguage = resolveSupportedLanguage(i18n?.resolvedLanguage || i18n?.language);
   const primaryTarget = getLocalizedPath(isAuthenticated ? '/dashboard' : '/login', currentLanguage);
   const homeTitle = t('home_seo_title');
@@ -46,40 +48,96 @@ const LandingPage: React.FC = () => {
     t('hero_proof_visibility'),
   ]), [t]);
 
-  const highlights = useMemo(() => ([
+  const heroPanelItems = useMemo(() => ([
     {
-      label: t('highlight_runtime_label'),
-      title: t('highlight_runtime_title'),
-      desc: t('highlight_runtime_desc'),
-      metric: t('highlight_runtime_metric'),
+      label: t('hero_panel_item_build_label'),
+      title: t('hero_panel_item_build_title'),
+      desc: t('hero_panel_item_build_desc'),
       icon: <DeploymentUnitOutlined />,
       color: '#1677ff',
     },
     {
-      label: t('highlight_observability_label'),
-      title: t('highlight_observability_title'),
-      desc: t('highlight_observability_desc'),
-      metric: t('highlight_observability_metric'),
-      icon: <RadarChartOutlined />,
+      label: t('hero_panel_item_govern_label'),
+      title: t('hero_panel_item_govern_title'),
+      desc: t('hero_panel_item_govern_desc'),
+      icon: <ClusterOutlined />,
       color: '#13c2c2',
     },
     {
-      label: t('highlight_governance_label'),
-      title: t('highlight_governance_title'),
-      desc: t('highlight_governance_desc'),
-      metric: t('highlight_governance_metric'),
-      icon: <ClusterOutlined />,
+      label: t('hero_panel_item_runtime_label'),
+      title: t('hero_panel_item_runtime_title'),
+      desc: t('hero_panel_item_runtime_desc'),
+      icon: <RadarChartOutlined />,
       color: '#722ed1',
     },
   ]), [t]);
 
-  const features = useMemo(() => ([
-    { title: t('feat_security_title'), desc: t('feat_security_desc'), icon: <SafetyCertificateOutlined />, color: '#52c41a' },
-    { title: t('feat_multi_title'), desc: t('feat_multi_desc'), icon: <AppstoreOutlined />, color: '#1677ff' },
-    { title: t('feat_stream_title'), desc: t('feat_stream_desc'), icon: <ThunderboltOutlined />, color: '#faad14' },
-    { title: t('feat_config_title'), desc: t('feat_config_desc'), icon: <ApiOutlined />, color: '#722ed1' },
-    { title: t('feat_enterprise_title'), desc: t('feat_enterprise_desc'), icon: <AuditOutlined />, color: '#eb2f96' },
-    { title: t('feat_api_title'), desc: t('feat_api_desc'), icon: <CodeOutlined />, color: '#13c2c2' },
+  const valueProps = useMemo(() => ([
+    {
+      label: t('value_prop_build_label'),
+      title: t('value_prop_build_title'),
+      desc: t('value_prop_build_desc'),
+      metric: t('value_prop_build_metric'),
+      icon: <AppstoreOutlined />,
+      color: '#1677ff',
+    },
+    {
+      label: t('value_prop_private_label'),
+      title: t('value_prop_private_title'),
+      desc: t('value_prop_private_desc'),
+      metric: t('value_prop_private_metric'),
+      icon: <SafetyCertificateOutlined />,
+      color: '#52c41a',
+    },
+    {
+      label: t('value_prop_governance_label'),
+      title: t('value_prop_governance_title'),
+      desc: t('value_prop_governance_desc'),
+      metric: t('value_prop_governance_metric'),
+      icon: <ClusterOutlined />,
+      color: '#722ed1',
+    },
+    {
+      label: t('value_prop_cost_label'),
+      title: t('value_prop_cost_title'),
+      desc: t('value_prop_cost_desc'),
+      metric: t('value_prop_cost_metric'),
+      icon: <ThunderboltOutlined />,
+      color: '#fa8c16',
+    },
+  ]), [t]);
+
+  const capabilities = useMemo(() => ([
+    { title: t('capability_builder_title'), desc: t('capability_builder_desc'), icon: <DeploymentUnitOutlined />, color: '#1677ff' },
+    { title: t('capability_workspace_title'), desc: t('capability_workspace_desc'), icon: <AppstoreOutlined />, color: '#13c2c2' },
+    { title: t('capability_agent_governance_title'), desc: t('capability_agent_governance_desc'), icon: <ClusterOutlined />, color: '#722ed1' },
+    { title: t('capability_skill_governance_title'), desc: t('capability_skill_governance_desc'), icon: <ApiOutlined />, color: '#eb2f96' },
+    { title: t('capability_runtime_title'), desc: t('capability_runtime_desc'), icon: <RadarChartOutlined />, color: '#2f54eb' },
+    { title: t('capability_cost_title'), desc: t('capability_cost_desc'), icon: <AuditOutlined />, color: '#faad14' },
+  ]), [t]);
+
+  const deploymentModes = useMemo(() => ([
+    {
+      title: t('deployment_saas_title'),
+      desc: t('deployment_saas_desc'),
+      points: [t('deployment_saas_point_one'), t('deployment_saas_point_two')],
+      icon: <ThunderboltOutlined />,
+      color: '#1677ff',
+    },
+    {
+      title: t('deployment_self_host_title'),
+      desc: t('deployment_self_host_desc'),
+      points: [t('deployment_self_host_point_one'), t('deployment_self_host_point_two')],
+      icon: <DeploymentUnitOutlined />,
+      color: '#13c2c2',
+    },
+    {
+      title: t('deployment_private_title'),
+      desc: t('deployment_private_desc'),
+      points: [t('deployment_private_point_one'), t('deployment_private_point_two')],
+      icon: <SafetyCertificateOutlined />,
+      color: '#722ed1',
+    },
   ]), [t]);
 
   const assistants = useMemo(() => ([
@@ -143,6 +201,36 @@ const LandingPage: React.FC = () => {
     },
   ]), [navigate, primaryTarget, t, yearly]);
 
+  const surface = useMemo(() => ({
+    heroBg: isDark
+      ? 'radial-gradient(circle at top right, rgba(37, 99, 235, 0.24), transparent 34%), linear-gradient(180deg, #0b1220 0%, #101a2b 72%)'
+      : 'radial-gradient(circle at top right, rgba(22,119,255,0.18), transparent 34%), linear-gradient(180deg, #f7fbff 0%, #ffffff 72%)',
+    heroCardBg: isDark
+      ? 'linear-gradient(180deg, #132033 0%, #101a2b 100%)'
+      : 'linear-gradient(180deg, #ffffff 0%, #f7fbff 100%)',
+    sectionBg: isDark ? '#0f1728' : '#ffffff',
+    altSectionBg: isDark ? '#0c1423' : '#fafbfc',
+    cardBg: isDark
+      ? 'linear-gradient(180deg, #132033 0%, #101a2b 100%)'
+      : 'linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)',
+    border: 'var(--app-shell-border)',
+    mutedText: 'var(--app-panel-text-muted)',
+    proofBg: isDark ? 'rgba(16, 26, 43, 0.92)' : '#fff',
+    proofBorder: isDark ? 'rgba(96, 165, 250, 0.16)' : '#d9e8ff',
+    proofColor: isDark ? '#dbeafe' : '#2f3a4a',
+    successBadgeBg: isDark ? 'rgba(22, 163, 74, 0.14)' : '#f6ffed',
+    successBadgeColor: isDark ? '#86efac' : '#389e0d',
+    successBadgeBorder: isDark ? 'rgba(34, 197, 94, 0.24)' : '#b7eb8f',
+    softPanelBg: isDark
+      ? 'linear-gradient(135deg, rgba(22,119,255,0.18), rgba(19,194,194,0.16))'
+      : 'linear-gradient(135deg, rgba(22,119,255,0.08), rgba(54,207,201,0.12))',
+    softPanelBorder: isDark ? 'rgba(96, 165, 250, 0.16)' : 'rgba(22,119,255,0.12)',
+    panelShadow: isDark ? '0 28px 80px rgba(2, 8, 23, 0.28)' : '0 28px 80px rgba(15, 52, 96, 0.14)',
+    statShadow: isDark ? '0 12px 30px rgba(2, 8, 23, 0.2)' : '0 8px 30px rgba(15, 52, 96, 0.06)',
+    cardShadow: isDark ? '0 18px 44px rgba(2, 8, 23, 0.22)' : '0 16px 40px rgba(15,52,96,0.08)',
+    pricingShadow: isDark ? '0 10px 35px rgba(2, 8, 23, 0.22)' : '0 10px 35px rgba(15,52,96,0.06)',
+  }), [isDark]);
+
   return (
     <div style={{ width: '100%', overflow: 'hidden' }}>
       <Helmet>
@@ -166,7 +254,7 @@ const LandingPage: React.FC = () => {
       </Helmet>
       <section style={{
         padding: '112px 5% 88px',
-        background: 'radial-gradient(circle at top right, rgba(22,119,255,0.18), transparent 34%), linear-gradient(180deg, #f7fbff 0%, #ffffff 72%)',
+        background: surface.heroBg,
       }}>
         <div style={{ maxWidth: 1180, margin: '0 auto' }}>
           <Row gutter={[48, 48]} align="middle">
@@ -176,14 +264,14 @@ const LandingPage: React.FC = () => {
                   <Tag color="blue" style={{ borderRadius: 999, padding: '6px 14px', marginInlineEnd: 0 }}>
                     {t('hero_tagline')}
                   </Tag>
-                  <Tag style={{ borderRadius: 999, padding: '6px 14px', marginInlineEnd: 0, background: '#f6ffed', color: '#389e0d', borderColor: '#b7eb8f' }}>
+                  <Tag style={{ borderRadius: 999, padding: '6px 14px', marginInlineEnd: 0, background: surface.successBadgeBg, color: surface.successBadgeColor, borderColor: surface.successBadgeBorder }}>
                     {t('hero_badge_product')}
                   </Tag>
                 </Space>
                 <Title style={{ fontSize: 'clamp(38px, 5.4vw, 62px)', margin: 0, lineHeight: 1.08, whiteSpace: 'pre-line', letterSpacing: '-0.03em' }}>
                   {t('hero_title')}
                 </Title>
-                <Paragraph style={{ fontSize: 'clamp(17px, 2vw, 20px)', color: '#5b6673', margin: 0, maxWidth: 720 }}>
+                <Paragraph style={{ fontSize: 'clamp(17px, 2vw, 20px)', color: surface.mutedText, margin: 0, maxWidth: 720 }}>
                   {t('hero_subtitle')}
                 </Paragraph>
                 <Space size="middle" wrap>
@@ -201,7 +289,7 @@ const LandingPage: React.FC = () => {
                     size="large"
                     shape="round"
                     onClick={() => {
-                      document.getElementById('assistants')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      document.getElementById('highlights')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     }}
                     style={{ height: 52, padding: '0 36px', fontSize: 16 }}
                   >
@@ -224,7 +312,7 @@ const LandingPage: React.FC = () => {
                 </Space>
                 <Space wrap size={[10, 10]}>
                   {heroProofs.map((item) => (
-                    <Tag key={item} style={{ borderRadius: 999, padding: '8px 14px', background: '#fff', borderColor: '#d9e8ff', color: '#2f3a4a', marginInlineEnd: 0 }}>
+                    <Tag key={item} style={{ borderRadius: 999, padding: '8px 14px', background: surface.proofBg, borderColor: surface.proofBorder, color: surface.proofColor, marginInlineEnd: 0 }}>
                       {item}
                     </Tag>
                   ))}
@@ -236,8 +324,9 @@ const LandingPage: React.FC = () => {
                 variant="borderless"
                 style={{
                   borderRadius: 28,
-                  background: 'linear-gradient(180deg, #ffffff 0%, #f7fbff 100%)',
-                  boxShadow: '0 28px 80px rgba(15, 52, 96, 0.14)',
+                  background: surface.heroCardBg,
+                  border: `1px solid ${surface.border}`,
+                  boxShadow: surface.panelShadow,
                 }}
                 styles={{ body: { padding: 28 } }}
               >
@@ -246,15 +335,15 @@ const LandingPage: React.FC = () => {
                     <Text strong style={{ fontSize: 16 }}>{t('assistants_panel_title')}</Text>
                     <Tag color="processing" style={{ marginInlineEnd: 0 }}>{t('assistants_panel_badge')}</Tag>
                   </div>
-                  <div style={{ borderRadius: 20, padding: 20, background: 'linear-gradient(135deg, rgba(22,119,255,0.08), rgba(54,207,201,0.12))', border: '1px solid rgba(22,119,255,0.12)' }}>
+                  <div style={{ borderRadius: 20, padding: 20, background: surface.softPanelBg, border: `1px solid ${surface.softPanelBorder}` }}>
                     <Space orientation="vertical" size={10} style={{ width: '100%' }}>
                       <Text type="secondary">{t('assistants_panel_label')}</Text>
                       <Title level={4} style={{ margin: 0 }}>{t('assistants_panel_featured_title')}</Title>
-                      <Paragraph style={{ margin: 0, color: '#5b6673' }}>{t('assistants_panel_featured_desc')}</Paragraph>
+                      <Paragraph style={{ margin: 0, color: surface.mutedText }}>{t('assistants_panel_featured_desc')}</Paragraph>
                     </Space>
                   </div>
                   <div style={{ display: 'grid', gap: 12 }}>
-                    {assistants.slice(0, 3).map((item) => (
+                    {heroPanelItems.map((item) => (
                       <div
                         key={item.title}
                         style={{
@@ -264,8 +353,8 @@ const LandingPage: React.FC = () => {
                           gap: 16,
                           padding: '14px 16px',
                           borderRadius: 18,
-                          background: '#fff',
-                          border: '1px solid #eef2f6',
+                          background: 'var(--app-panel-bg)',
+                          border: `1px solid ${surface.border}`,
                         }}
                       >
                         <Space size={12} align="start">
@@ -274,10 +363,10 @@ const LandingPage: React.FC = () => {
                           </div>
                           <div>
                             <div style={{ fontSize: 14, fontWeight: 600, color: token.colorText }}>{item.title}</div>
-                            <Text type="secondary" style={{ fontSize: 12 }}>{item.tag}</Text>
+                            <Text type="secondary" style={{ fontSize: 12 }}>{item.desc}</Text>
                           </div>
                         </Space>
-                        <Tag style={{ marginInlineEnd: 0, borderRadius: 999 }}>{t('assistants_panel_status')}</Tag>
+                        <Tag style={{ marginInlineEnd: 0, borderRadius: 999 }}>{item.label}</Tag>
                       </div>
                     ))}
                   </div>
@@ -291,9 +380,10 @@ const LandingPage: React.FC = () => {
               { label: t('hero_stat_security'), value: t('hero_stat_value_security') },
               { label: t('hero_stat_sandbox'), value: t('hero_stat_value_sandbox') },
               { label: t('hero_stat_uptime'), value: t('hero_stat_value_uptime') },
+              { label: t('hero_stat_cost'), value: t('hero_stat_value_cost') },
             ].map((s) => (
-              <Col key={s.label} xs={24} sm={8}>
-                <div style={{ borderRadius: 24, padding: '20px 24px', background: '#fff', border: '1px solid #edf2f8', boxShadow: '0 8px 30px rgba(15, 52, 96, 0.06)', textAlign: 'center' }}>
+              <Col key={s.label} xs={24} sm={12} lg={6}>
+                <div style={{ borderRadius: 24, padding: '20px 24px', background: 'var(--app-panel-bg)', border: `1px solid ${surface.border}`, boxShadow: surface.statShadow, textAlign: 'center' }}>
                   <div style={{ fontSize: 30, fontWeight: 700, color: token.colorPrimary, lineHeight: 1.1 }}>{s.value}</div>
                   <Text type="secondary" style={{ fontSize: 13 }}>{s.label}</Text>
                 </div>
@@ -303,48 +393,7 @@ const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      <section id="assistants" style={{ padding: '88px 5%', background: '#fff' }}>
-        <div style={{ maxWidth: 1180, margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', maxWidth: 760, margin: '0 auto 56px' }}>
-            <Title level={2} style={{ marginBottom: 12 }}>{t('assistants_title')}</Title>
-            <Paragraph type="secondary" style={{ fontSize: 16, marginBottom: 0 }}>
-              {t('assistants_subtitle')}
-            </Paragraph>
-          </div>
-          <Row gutter={[24, 24]}>
-            {assistants.map((assistant) => (
-              <Col xs={24} md={12} xl={6} key={assistant.title}>
-                <Card
-                  hoverable
-                  variant="borderless"
-                  style={{
-                    height: '100%',
-                    borderRadius: 22,
-                    background: 'linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)',
-                    boxShadow: '0 16px 40px rgba(15,52,96,0.08)',
-                  }}
-                  styles={{ body: { padding: 24 } }}
-                >
-                  <Space orientation="vertical" size={16} style={{ width: '100%' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-                      <div style={{ width: 48, height: 48, borderRadius: 14, background: `${assistant.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {React.cloneElement(assistant.icon as StyledIconElement, { style: { fontSize: 22, color: assistant.color } })}
-                      </div>
-                      <Tag color="blue" style={{ marginInlineEnd: 0, borderRadius: 999 }}>{assistant.tag}</Tag>
-                    </div>
-                    <div>
-                      <Title level={4} style={{ marginBottom: 8 }}>{assistant.title}</Title>
-                      <Paragraph type="secondary" style={{ marginBottom: 0 }}>{assistant.desc}</Paragraph>
-                    </div>
-                  </Space>
-                </Card>
-              </Col>
-            ))}
-          </Row>
-        </div>
-      </section>
-
-      <section id="highlights" style={{ padding: '96px 5%', background: '#ffffff' }}>
+      <section id="highlights" style={{ padding: '96px 5%', background: surface.sectionBg }}>
         <div style={{ textAlign: 'center', maxWidth: 720, margin: '0 auto 56px' }}>
           <Title level={2} style={{ marginBottom: 12 }}>{t('highlights_title')}</Title>
           <Paragraph type="secondary" style={{ fontSize: 16, marginBottom: 0 }}>
@@ -352,16 +401,17 @@ const LandingPage: React.FC = () => {
           </Paragraph>
         </div>
         <Row gutter={[24, 24]} justify="center" style={{ maxWidth: 1180, margin: '0 auto' }}>
-          {highlights.map((item) => (
-            <Col xs={24} md={12} xl={8} key={item.title}>
+          {valueProps.map((item) => (
+            <Col xs={24} md={12} xl={6} key={item.title}>
               <Card
                 variant="borderless"
                 hoverable
                 style={{
                   height: '100%',
                   borderRadius: 24,
-                  background: 'linear-gradient(180deg, #ffffff 0%, #f9fbff 100%)',
-                  boxShadow: '0 16px 50px rgba(15, 52, 96, 0.08)',
+                  background: surface.cardBg,
+                  border: `1px solid ${surface.border}`,
+                  boxShadow: surface.cardShadow,
                 }}
                 styles={{ body: { padding: 28 } }}
               >
@@ -386,15 +436,15 @@ const LandingPage: React.FC = () => {
         </Row>
       </section>
 
-      <section style={{ padding: '100px 5%', background: '#fafbfc' }}>
+      <section style={{ padding: '100px 5%', background: surface.altSectionBg }}>
         <div style={{ textAlign: 'center', maxWidth: 680, margin: '0 auto 56px' }}>
           <Title level={2} style={{ marginBottom: 12 }}>{t('features_title')}</Title>
           <Paragraph type="secondary" style={{ fontSize: 16, marginBottom: 0 }}>{t('features_subtitle')}</Paragraph>
         </div>
         <Row gutter={[24, 24]} justify="center" style={{ maxWidth: 1180, margin: '0 auto' }}>
-          {features.map((feature) => (
+          {capabilities.map((feature) => (
             <Col xs={24} sm={12} lg={8} key={feature.title}>
-              <Card hoverable variant="borderless" style={{ height: '100%', borderRadius: 20 }} styles={{ body: { padding: 28 } }}>
+              <Card hoverable variant="borderless" style={{ height: '100%', borderRadius: 20, background: 'var(--app-panel-bg)', border: `1px solid ${surface.border}`, boxShadow: surface.cardShadow }} styles={{ body: { padding: 28 } }}>
                 <div style={{
                   width: 48, height: 48, borderRadius: 12,
                   background: `${feature.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -410,7 +460,90 @@ const LandingPage: React.FC = () => {
         </Row>
       </section>
 
-      <section id="pricing" style={{ padding: '96px 5%', background: '#fff' }}>
+      <section style={{ padding: '96px 5%', background: surface.sectionBg }}>
+        <div style={{ textAlign: 'center', maxWidth: 720, margin: '0 auto 56px' }}>
+          <Title level={2} style={{ marginBottom: 12 }}>{t('deployment_title')}</Title>
+          <Paragraph type="secondary" style={{ fontSize: 16, marginBottom: 0 }}>
+            {t('deployment_subtitle')}
+          </Paragraph>
+        </div>
+        <Row gutter={[24, 24]} justify="center" style={{ maxWidth: 1180, margin: '0 auto' }}>
+          {deploymentModes.map((item) => (
+            <Col xs={24} md={12} xl={8} key={item.title}>
+              <Card
+                variant="borderless"
+                style={{
+                  height: '100%',
+                  borderRadius: 24,
+                  background: surface.cardBg,
+                  border: `1px solid ${surface.border}`,
+                  boxShadow: surface.cardShadow,
+                }}
+                styles={{ body: { padding: 28 } }}
+              >
+                <Space orientation="vertical" size={18} style={{ width: '100%' }}>
+                  <div style={{ width: 52, height: 52, borderRadius: 16, background: `${item.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {React.cloneElement(item.icon as StyledIconElement, { style: { fontSize: 24, color: item.color } })}
+                  </div>
+                  <div>
+                    <Title level={4} style={{ marginBottom: 10 }}>{item.title}</Title>
+                    <Paragraph type="secondary" style={{ marginBottom: 0 }}>{item.desc}</Paragraph>
+                  </div>
+                  <Space wrap size={[10, 10]}>
+                    {item.points.map((point) => (
+                      <Tag key={point} style={{ marginInlineEnd: 0, borderRadius: 999 }}>{point}</Tag>
+                    ))}
+                  </Space>
+                </Space>
+              </Card>
+            </Col>
+          ))}
+        </Row>
+      </section>
+
+      <section id="assistants" style={{ padding: '88px 5%', background: surface.altSectionBg }}>
+        <div style={{ maxWidth: 1180, margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', maxWidth: 760, margin: '0 auto 56px' }}>
+            <Title level={2} style={{ marginBottom: 12 }}>{t('assistants_title')}</Title>
+            <Paragraph type="secondary" style={{ fontSize: 16, marginBottom: 0 }}>
+              {t('assistants_subtitle')}
+            </Paragraph>
+          </div>
+          <Row gutter={[24, 24]}>
+            {assistants.map((assistant) => (
+              <Col xs={24} md={12} xl={6} key={assistant.title}>
+                <Card
+                  hoverable
+                  variant="borderless"
+                  style={{
+                    height: '100%',
+                    borderRadius: 22,
+                    background: surface.cardBg,
+                    border: `1px solid ${surface.border}`,
+                    boxShadow: surface.cardShadow,
+                  }}
+                  styles={{ body: { padding: 24 } }}
+                >
+                  <Space orientation="vertical" size={16} style={{ width: '100%' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                      <div style={{ width: 48, height: 48, borderRadius: 14, background: `${assistant.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {React.cloneElement(assistant.icon as StyledIconElement, { style: { fontSize: 22, color: assistant.color } })}
+                      </div>
+                      <Tag color="blue" style={{ marginInlineEnd: 0, borderRadius: 999 }}>{assistant.tag}</Tag>
+                    </div>
+                    <div>
+                      <Title level={4} style={{ marginBottom: 8 }}>{assistant.title}</Title>
+                      <Paragraph type="secondary" style={{ marginBottom: 0 }}>{assistant.desc}</Paragraph>
+                    </div>
+                  </Space>
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        </div>
+      </section>
+
+      <section id="pricing" style={{ padding: '96px 5%', background: surface.sectionBg }}>
         <div style={{ textAlign: 'center', maxWidth: 680, margin: '0 auto 48px' }}>
           <Title level={2} style={{ marginBottom: 12 }}>{t('pricing_title')}</Title>
           <Paragraph type="secondary" style={{ fontSize: 16, marginBottom: 0 }}>{t('pricing_subtitle')}</Paragraph>
@@ -430,8 +563,9 @@ const LandingPage: React.FC = () => {
                   height: '100%',
                   borderRadius: 24,
                   position: 'relative',
-                  boxShadow: plan.popular ? `0 14px 50px ${token.colorPrimary}22` : '0 10px 35px rgba(15,52,96,0.06)',
-                  borderColor: plan.popular ? token.colorPrimary : '#eef2f6',
+                  background: 'var(--app-panel-bg)',
+                  boxShadow: plan.popular ? `0 14px 50px ${token.colorPrimary}22` : surface.pricingShadow,
+                  borderColor: plan.popular ? token.colorPrimary : surface.border,
                 }}
                 styles={{ body: { padding: 28 } }}
               >
@@ -444,7 +578,7 @@ const LandingPage: React.FC = () => {
                   <Title level={4} style={{ marginBottom: 4 }}>{plan.name}</Title>
                   <div style={{ fontSize: 42, fontWeight: 700, color: token.colorPrimary, margin: '16px 0 8px' }}>
                     {plan.price}
-                    {plan.price !== t('pricing_enterprise_price') && <span style={{ fontSize: 16, fontWeight: 400, color: '#999' }}>/{yearly ? t('pricing_yearly') : t('pricing_monthly')}</span>}
+                    {plan.price !== t('pricing_enterprise_price') && <span style={{ fontSize: 16, fontWeight: 400, color: surface.mutedText }}>/{yearly ? t('pricing_yearly') : t('pricing_monthly')}</span>}
                   </div>
                   <Paragraph type="secondary" style={{ marginBottom: 0 }}>{plan.desc}</Paragraph>
                 </div>
@@ -474,9 +608,11 @@ const LandingPage: React.FC = () => {
       <section style={{ padding: '80px 5% 96px' }}>
         <div style={{ maxWidth: 1180, margin: '0 auto' }}>
           <div style={{
-            background: 'linear-gradient(135deg, #1677ff 0%, #003eb3 100%)',
+            background: isDark
+              ? 'linear-gradient(135deg, #1d4ed8 0%, #0f2f7a 100%)'
+              : 'linear-gradient(135deg, #1677ff 0%, #003eb3 100%)',
             borderRadius: 32, padding: '72px 40px', textAlign: 'center', color: '#fff',
-            boxShadow: '0 20px 40px rgba(22,119,255,0.2)',
+            boxShadow: isDark ? '0 20px 40px rgba(15, 23, 42, 0.36)' : '0 20px 40px rgba(22,119,255,0.2)',
           }}>
             <Title level={2} style={{ color: '#fff', marginBottom: 16 }}>{t('cta_title')}</Title>
             <Paragraph style={{ color: 'rgba(255,255,255,0.85)', fontSize: 18, margin: '0 auto 28px', maxWidth: 680 }}>

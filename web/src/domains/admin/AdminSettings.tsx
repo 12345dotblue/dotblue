@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Button,
   Card,
@@ -36,6 +36,7 @@ import EnterpriseSkillsTab from './EnterpriseSkillsTab';
 import EnterpriseLLMSettingsTab from './EnterpriseLLMSettingsTab';
 import EnterpriseUsageSettingsTab from './EnterpriseUsageSettingsTab';
 import IMSettingsTab from './IMSettingsTab';
+import { useThemeMode } from '../../theme/themeMode';
 
 const { Paragraph, Text, Title } = Typography;
 const ENTERPRISE_ADMIN_TABS = ['organization', 'members', 'invitations', 'llm', 'usage', 'im', 'skills'] as const;
@@ -138,6 +139,7 @@ function getAdminActionErrorMessage(fallbackMessage: string) {
 
 const AdminSettings: React.FC = () => {
   const { t, i18n } = useTranslation();
+  const { resolvedTheme } = useThemeMode();
   const [searchParams, setSearchParams] = useSearchParams();
   const [messageApi, contextHolder] = message.useMessage();
   const [fetching, setFetching] = useState(true);
@@ -170,6 +172,16 @@ const AdminSettings: React.FC = () => {
       ? (requestedTab as EnterpriseAdminTab)
       : 'organization';
   }, [searchParams]);
+  const isDark = resolvedTheme === 'dark';
+  const overviewSurfaceStyle = useMemo<React.CSSProperties>(() => ({
+    borderRadius: 24,
+    overflow: 'hidden',
+    background: isDark
+      ? 'linear-gradient(135deg, #132033 0%, #101a2b 42%, #16253a 100%)'
+      : 'linear-gradient(135deg, #f8fbff 0%, #eef6ff 42%, #f9fcff 100%)',
+    border: isDark ? '1px solid #223247' : '1px solid #d6e4ff',
+    boxShadow: isDark ? '0 18px 36px rgba(2, 8, 23, 0.22)' : undefined,
+  }), [isDark]);
 
   const orgTreeData = useMemo(() => buildOrgTree(orgUnits), [orgUnits]);
   const orgUnitOptions = useMemo(() => orgUnits.map((unit) => ({
@@ -615,12 +627,7 @@ const AdminSettings: React.FC = () => {
             <Card
               variant="borderless"
               loading={fetching}
-              style={{
-                borderRadius: 24,
-                overflow: 'hidden',
-                background: 'linear-gradient(135deg, #f8fbff 0%, #eef6ff 42%, #f9fcff 100%)',
-                border: '1px solid #d6e4ff',
-              }}
+              style={overviewSurfaceStyle}
               styles={{ body: { padding: 24 } }}
             >
               <Row gutter={[24, 24]} align="middle">
