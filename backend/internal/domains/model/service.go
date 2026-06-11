@@ -32,6 +32,7 @@ type CreateReq struct {
 	ApiBase      string `json:"apiBase"`
 	ApiKey       string `json:"apiKey"`
 	Model        string `json:"model" v:"required"`
+	FundingType  string `json:"fundingType"`
 	IsDefault    bool   `json:"isDefault"`
 	EnterpriseId string `json:"enterpriseId"`
 }
@@ -42,6 +43,7 @@ type UpdateReq struct {
 	ApiBase     string `json:"apiBase"`
 	ApiKey      string `json:"apiKey"`
 	Model       string `json:"model" v:"required"`
+	FundingType string `json:"fundingType"`
 	IsDefault   bool   `json:"isDefault"`
 }
 
@@ -79,25 +81,32 @@ func (s *Service) Create(scope, enterpriseId string, req CreateReq) (*LLMModel, 
 	req.ApiBase = strings.TrimSpace(req.ApiBase)
 	req.ApiKey = strings.TrimSpace(req.ApiKey)
 	req.Model = strings.TrimSpace(req.Model)
+	req.FundingType = strings.TrimSpace(req.FundingType)
 	if req.DisplayName == "" || req.Type == "" || req.Model == "" {
 		return nil, errors.New("invalid model payload")
 	}
 	if scope == ScopeEnterprise && strings.TrimSpace(enterpriseId) == "" {
 		return nil, errors.New("enterprise id is required")
 	}
+	fundingType, modelSourceType, err := normalizeRouting(scope, req.FundingType)
+	if err != nil {
+		return nil, err
+	}
 	now := s.now()
 	item := &LLMModel{
-		Id:           s.idGenerator(),
-		Scope:        scope,
-		EnterpriseId: enterpriseId,
-		DisplayName:  req.DisplayName,
-		Type:         req.Type,
-		ApiBase:      req.ApiBase,
-		ApiKey:       req.ApiKey,
-		Model:        req.Model,
-		IsDefault:    scope == ScopePlatform && req.IsDefault,
-		CreatedAt:    now,
-		UpdatedAt:    now,
+		Id:              s.idGenerator(),
+		Scope:           scope,
+		EnterpriseId:    enterpriseId,
+		DisplayName:     req.DisplayName,
+		Type:            req.Type,
+		ApiBase:         req.ApiBase,
+		ApiKey:          req.ApiKey,
+		Model:           req.Model,
+		FundingType:     fundingType,
+		ModelSourceType: modelSourceType,
+		IsDefault:       scope == ScopePlatform && req.IsDefault,
+		CreatedAt:       now,
+		UpdatedAt:       now,
 	}
 	if scope == ScopePlatform && item.IsDefault {
 		if err := s.repo.ClearDefault(ScopePlatform); err != nil {
@@ -137,21 +146,28 @@ func (s *Service) Update(id string, scope, enterpriseId string, req UpdateReq) (
 	req.ApiBase = strings.TrimSpace(req.ApiBase)
 	req.ApiKey = strings.TrimSpace(req.ApiKey)
 	req.Model = strings.TrimSpace(req.Model)
+	req.FundingType = strings.TrimSpace(req.FundingType)
 	if strings.Contains(req.ApiKey, maskedAPIKeyToken) {
 		req.ApiKey = existing.ApiKey
 	}
+	fundingType, modelSourceType, err := normalizeRouting(scope, req.FundingType)
+	if err != nil {
+		return nil, err
+	}
 
 	updated := &LLMModel{
-		Id:           existing.Id,
-		Scope:        existing.Scope,
-		EnterpriseId: existing.EnterpriseId,
-		DisplayName:  req.DisplayName,
-		Type:         req.Type,
-		ApiBase:      req.ApiBase,
-		ApiKey:       req.ApiKey,
-		Model:        req.Model,
-		IsDefault:    scope == ScopePlatform && req.IsDefault,
-		UpdatedAt:    s.now(),
+		Id:              existing.Id,
+		Scope:           existing.Scope,
+		EnterpriseId:    existing.EnterpriseId,
+		DisplayName:     req.DisplayName,
+		Type:            req.Type,
+		ApiBase:         req.ApiBase,
+		ApiKey:          req.ApiKey,
+		Model:           req.Model,
+		FundingType:     fundingType,
+		ModelSourceType: modelSourceType,
+		IsDefault:       scope == ScopePlatform && req.IsDefault,
+		UpdatedAt:       s.now(),
 	}
 	if scope == ScopePlatform && updated.IsDefault {
 		if err := s.repo.ClearDefault(ScopePlatform); err != nil {
@@ -259,16 +275,18 @@ func (s *Service) UpsertDefaultPlatformModel(cfg *PlatformModelInput, displayNam
 	}
 	if existing == nil {
 		item := &LLMModel{
-			Id:          "platform-default",
-			Scope:       ScopePlatform,
-			DisplayName: displayName,
-			Type:        strings.TrimSpace(cfg.Type),
-			ApiBase:     strings.TrimSpace(cfg.ApiBase),
-			ApiKey:      strings.TrimSpace(cfg.ApiKey),
-			Model:       strings.TrimSpace(cfg.Model),
-			IsDefault:   true,
-			CreatedAt:   now,
-			UpdatedAt:   now,
+			Id:              "platform-default",
+			Scope:           ScopePlatform,
+			DisplayName:     displayName,
+			Type:            strings.TrimSpace(cfg.Type),
+			ApiBase:         strings.TrimSpace(cfg.ApiBase),
+			ApiKey:          strings.TrimSpace(cfg.ApiKey),
+			Model:           strings.TrimSpace(cfg.Model),
+			FundingType:     FundingTypePlatform,
+			ModelSourceType: ModelSourceTypePlatform,
+			IsDefault:       true,
+			CreatedAt:       now,
+			UpdatedAt:       now,
 		}
 		if err := s.repo.Insert(item); err != nil {
 			return nil, err
@@ -281,12 +299,37 @@ func (s *Service) UpsertDefaultPlatformModel(cfg *PlatformModelInput, displayNam
 	existing.ApiBase = strings.TrimSpace(cfg.ApiBase)
 	existing.ApiKey = strings.TrimSpace(cfg.ApiKey)
 	existing.Model = strings.TrimSpace(cfg.Model)
+	existing.FundingType = FundingTypePlatform
+	existing.ModelSourceType = ModelSourceTypePlatform
 	existing.IsDefault = true
 	existing.UpdatedAt = now
 	if err := s.repo.Update(existing); err != nil {
 		return nil, err
 	}
 	return s.repo.GetByID(existing.Id)
+}
+
+func normalizeRouting(scope, fundingType string) (string, string, error) {
+	switch scope {
+	case ScopeEnterprise:
+		if fundingType == "" {
+			fundingType = FundingTypeEnterprise
+		}
+		if fundingType != FundingTypeEnterprise {
+			return "", "", errors.New("enterprise models must use enterprise_funded")
+		}
+		return fundingType, ModelSourceTypeEnterpriseCustom, nil
+	case ScopePlatform:
+		if fundingType == "" {
+			fundingType = FundingTypePlatform
+		}
+		if fundingType != FundingTypePlatform {
+			return "", "", errors.New("platform models must use platform_funded")
+		}
+		return fundingType, ModelSourceTypePlatform, nil
+	default:
+		return "", "", errors.New("unsupported model scope")
+	}
 }
 
 func (s *Service) ensureLegacyPlatformDefault() (*LLMModel, error) {

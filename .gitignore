@@ -6,6 +6,7 @@
 .copilot/
 .agent-local-notes.md
 local-docs/
+backend/.gocache/
 
 # IDE
 .idea/

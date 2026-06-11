@@ -997,6 +997,14 @@ export const translation = {
     "im_settings_slack_bot_token_placeholder": "Exemple: xoxb-...",
     "im_settings_slack_app_token_placeholder": "Exemple: xapp-...",
     "im_settings_domain_label": "Domaine",
-    "im_settings_priority_required": "Saisissez une priorite"
+    "im_settings_priority_required": "Saisissez une priorite",
+    "credit_currency_label": "Settlement Currency",
+    "credit_input_price_per_m_label": "Input Price / 1M",
+    "credit_output_price_per_m_label": "Output Price / 1M",
+    "credit_input_price_per_m_tokens_label": "Input Price Per 1M Tokens",
+    "credit_output_price_per_m_tokens_label": "Output Price Per 1M Tokens",
+    "platform_settings_new_enterprise_platform_credits": "New Enterprise Initial Platform Credits",
+    "platform_settings_default_credit_currency": "Default Credit Settlement Currency",
+    "platform_settings_default_credit_currency_required": "Please select the default credit settlement currency.",
   }
 };

@@ -35,6 +35,11 @@ func (s *stubUsageRepo) Fail(invocationId, errorCode string, completedAt time.Ti
 	return nil
 }
 
+func (s *stubUsageRepo) UpdateCreditSnapshot(invocationId string, item *UsageEvent) error {
+	s.current = item
+	return nil
+}
+
 func (s *stubUsageRepo) GetByInvocationID(invocationId string) (*UsageEvent, error) {
 	return s.current, nil
 }

@@ -40,17 +40,19 @@ func (r *GFRepository) GetByID(id string) (*LLMModel, error) {
 
 func (r *GFRepository) Insert(item *LLMModel) error {
 	_, err := g.DB().Model("llm_models").Data(g.Map{
-		"id":            item.Id,
-		"scope":         item.Scope,
-		"enterprise_id": item.EnterpriseId,
-		"display_name":  item.DisplayName,
-		"provider_type": item.Type,
-		"api_base":      item.ApiBase,
-		"api_key":       item.ApiKey,
-		"model_name":    item.Model,
-		"is_default":    item.IsDefault,
-		"created_at":    item.CreatedAt,
-		"updated_at":    item.UpdatedAt,
+		"id":                item.Id,
+		"scope":             item.Scope,
+		"enterprise_id":     item.EnterpriseId,
+		"display_name":      item.DisplayName,
+		"provider_type":     item.Type,
+		"api_base":          item.ApiBase,
+		"api_key":           item.ApiKey,
+		"model_name":        item.Model,
+		"funding_type":      item.FundingType,
+		"model_source_type": item.ModelSourceType,
+		"is_default":        item.IsDefault,
+		"created_at":        item.CreatedAt,
+		"updated_at":        item.UpdatedAt,
 	}).Insert()
 	return err
 }
@@ -58,13 +60,15 @@ func (r *GFRepository) Insert(item *LLMModel) error {
 func (r *GFRepository) Update(item *LLMModel) error {
 	_, err := g.DB().Model("llm_models").
 		Data(g.Map{
-			"display_name":  item.DisplayName,
-			"provider_type": item.Type,
-			"api_base":      item.ApiBase,
-			"api_key":       item.ApiKey,
-			"model_name":    item.Model,
-			"is_default":    item.IsDefault,
-			"updated_at":    item.UpdatedAt,
+			"display_name":      item.DisplayName,
+			"provider_type":     item.Type,
+			"api_base":          item.ApiBase,
+			"api_key":           item.ApiKey,
+			"model_name":        item.Model,
+			"funding_type":      item.FundingType,
+			"model_source_type": item.ModelSourceType,
+			"is_default":        item.IsDefault,
+			"updated_at":        item.UpdatedAt,
 		}).
 		Where("id = ?", item.Id).
 		Update()

@@ -15,6 +15,7 @@ type enterpriseModelReq struct {
 	ApiBase     string `json:"apiBase"`
 	ApiKey      string `json:"apiKey"`
 	Model       string `json:"model" v:"required"`
+	FundingType string `json:"fundingType"`
 }
 
 type platformModelReq struct {
@@ -23,6 +24,7 @@ type platformModelReq struct {
 	ApiBase     string `json:"apiBase"`
 	ApiKey      string `json:"apiKey"`
 	Model       string `json:"model" v:"required"`
+	FundingType string `json:"fundingType"`
 	IsDefault   bool   `json:"isDefault"`
 }
 
@@ -55,6 +57,7 @@ func CreateEnterpriseModelHandler(r *ghttp.Request) {
 		ApiBase:     req.ApiBase,
 		ApiKey:      req.ApiKey,
 		Model:       req.Model,
+		FundingType: req.FundingType,
 	})
 	if err != nil {
 		r.Response.WriteStatus(http.StatusBadRequest, err.Error())
@@ -81,6 +84,7 @@ func UpdateEnterpriseModelHandler(r *ghttp.Request) {
 		ApiBase:     req.ApiBase,
 		ApiKey:      req.ApiKey,
 		Model:       req.Model,
+		FundingType: req.FundingType,
 	})
 	if err != nil {
 		r.Response.WriteStatus(http.StatusBadRequest, err.Error())
@@ -130,6 +134,7 @@ func CreatePlatformModelHandler(r *ghttp.Request) {
 		ApiBase:     req.ApiBase,
 		ApiKey:      req.ApiKey,
 		Model:       req.Model,
+		FundingType: req.FundingType,
 		IsDefault:   req.IsDefault,
 	})
 	if err != nil {
@@ -156,6 +161,7 @@ func UpdatePlatformModelHandler(r *ghttp.Request) {
 		ApiBase:     req.ApiBase,
 		ApiKey:      req.ApiKey,
 		Model:       req.Model,
+		FundingType: req.FundingType,
 		IsDefault:   req.IsDefault,
 	})
 	if err != nil {

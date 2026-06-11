@@ -1230,6 +1230,14 @@ export const translation = {
     "platform_resource_release_load_failed": "리소스 공개 규칙을 불러오지 못했습니다.",
     "platform_resource_release_current_title": "현재 공개 규칙",
     "platform_resource_release_current_empty": "아직 명시적인 공개 규칙이 없습니다. 기본 가시성 동작이 계속 적용됩니다.",
-    "platform_resource_release_meta_line": "작업자: {{operator}} · 업데이트: {{updatedAt}}"
+    "platform_resource_release_meta_line": "운영자: {{operator}} · 업데이트: {{updatedAt}}",
+    "credit_currency_label": "Settlement Currency",
+    "credit_input_price_per_m_label": "Input Price / 1M",
+    "credit_output_price_per_m_label": "Output Price / 1M",
+    "credit_input_price_per_m_tokens_label": "Input Price Per 1M Tokens",
+    "credit_output_price_per_m_tokens_label": "Output Price Per 1M Tokens",
+    "platform_settings_new_enterprise_platform_credits": "New Enterprise Initial Platform Credits",
+    "platform_settings_default_credit_currency": "Default Credit Settlement Currency",
+    "platform_settings_default_credit_currency_required": "Please select the default credit settlement currency.",
   }
 };

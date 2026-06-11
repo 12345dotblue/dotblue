@@ -1228,6 +1228,14 @@ export const translation = {
     "platform_resource_release_load_failed": "No se pudieron cargar los registros de apertura del recurso.",
     "platform_resource_release_current_title": "Reglas Actuales de Apertura",
     "platform_resource_release_current_empty": "Todavia no existe una regla explicita de apertura. Se sigue aplicando el comportamiento por defecto.",
-    "platform_resource_release_meta_line": "Operador: {{operator}} · Actualizado: {{updatedAt}}"
+    "platform_resource_release_meta_line": "Operador: {{operator}} · Actualizado: {{updatedAt}}",
+    "credit_currency_label": "Settlement Currency",
+    "credit_input_price_per_m_label": "Input Price / 1M",
+    "credit_output_price_per_m_label": "Output Price / 1M",
+    "credit_input_price_per_m_tokens_label": "Input Price Per 1M Tokens",
+    "credit_output_price_per_m_tokens_label": "Output Price Per 1M Tokens",
+    "platform_settings_new_enterprise_platform_credits": "New Enterprise Initial Platform Credits",
+    "platform_settings_default_credit_currency": "Default Credit Settlement Currency",
+    "platform_settings_default_credit_currency_required": "Please select the default credit settlement currency.",
   }
 };

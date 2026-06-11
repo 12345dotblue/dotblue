@@ -11,6 +11,7 @@ import (
 	"dotblue/internal/domains/agent"
 	"dotblue/internal/domains/chat"
 	"dotblue/internal/domains/conversation"
+	"dotblue/internal/domains/credit"
 	"dotblue/internal/domains/engine"
 	"dotblue/internal/domains/enterprise"
 	"dotblue/internal/domains/file"
@@ -113,6 +114,15 @@ var (
 				group.GET("/admin/platform/usage/overview", metering.PlatformUsageOverviewHandler)
 				group.GET("/admin/platform/usage/trends", metering.PlatformUsageTrendsHandler)
 				group.GET("/admin/platform/usage/events", metering.PlatformUsageEventsHandler)
+				group.GET("/admin/platform/credits/overview", credit.PlatformCreditOverviewHandler)
+				group.GET("/admin/platform/credits/wallets", credit.PlatformCreditWalletsHandler)
+				group.GET("/admin/platform/credits/ledger", credit.PlatformCreditLedgerHandler)
+				group.GET("/admin/platform/credits/grants", credit.PlatformCreditGrantsHandler)
+				group.POST("/admin/platform/credits/grants", credit.CreatePlatformCreditGrantHandler)
+				group.GET("/admin/platform/credit-price-books", credit.ListPlatformCreditPriceBooksHandler)
+				group.POST("/admin/platform/credit-price-books", credit.CreatePlatformCreditPriceBookHandler)
+				group.PUT("/admin/platform/credit-price-books/{id}", credit.UpdatePlatformCreditPriceBookHandler)
+				group.DELETE("/admin/platform/credit-price-books/{id}", credit.DeletePlatformCreditPriceBookHandler)
 				group.GET("/admin/platform/model-prices", metering.ListPlatformPricesHandler)
 				group.POST("/admin/platform/model-prices", metering.CreatePlatformPriceHandler)
 				group.PUT("/admin/platform/model-prices/{id}", metering.UpdatePlatformPriceHandler)
@@ -162,6 +172,19 @@ var (
 				group.GET("/admin/usage/overview", metering.EnterpriseUsageOverviewHandler)
 				group.GET("/admin/usage/trends", metering.EnterpriseUsageTrendsHandler)
 				group.GET("/admin/usage/events", metering.EnterpriseUsageEventsHandler)
+				group.GET("/admin/credits/overview", credit.EnterpriseCreditOverviewHandler)
+				group.GET("/admin/credits/wallets", credit.EnterpriseCreditWalletsHandler)
+				group.GET("/admin/credits/ledger", credit.EnterpriseCreditLedgerHandler)
+				group.GET("/admin/credits/grants", credit.EnterpriseCreditGrantsHandler)
+				group.POST("/admin/credits/grants", credit.CreateEnterpriseCreditGrantHandler)
+				group.GET("/admin/credit-price-books", credit.ListEnterpriseCreditPriceBooksHandler)
+				group.POST("/admin/credit-price-books", credit.CreateEnterpriseCreditPriceBookHandler)
+				group.PUT("/admin/credit-price-books/{id}", credit.UpdateEnterpriseCreditPriceBookHandler)
+				group.DELETE("/admin/credit-price-books/{id}", credit.DeleteEnterpriseCreditPriceBookHandler)
+				group.GET("/admin/credit-budget-policies", credit.ListEnterpriseCreditBudgetPoliciesHandler)
+				group.POST("/admin/credit-budget-policies", credit.CreateEnterpriseCreditBudgetPolicyHandler)
+				group.PUT("/admin/credit-budget-policies/{id}", credit.UpdateEnterpriseCreditBudgetPolicyHandler)
+				group.DELETE("/admin/credit-budget-policies/{id}", credit.DeleteEnterpriseCreditBudgetPolicyHandler)
 				group.GET("/admin/llm-model-prices", metering.ListEnterprisePricesHandler)
 				group.POST("/admin/llm-model-prices", metering.CreateEnterprisePriceHandler)
 				group.PUT("/admin/llm-model-prices/{id}", metering.UpdateEnterprisePriceHandler)

@@ -53,16 +53,20 @@ func (r *GFRepository) UpsertMembership(id, enterpriseId, userId, role, status s
 }
 
 func (r *GFRepository) InsertOrgUnit(id, enterpriseId, name, code string, sortOrder int, now time.Time) error {
-	_, err := g.DB().Model("org_units").Ctx(context.Background()).Data(g.Map{
-		"id":            id,
-		"enterprise_id": enterpriseId,
-		"name":          name,
-		"code":          code,
-		"status":        "active",
-		"sort_order":    sortOrder,
-		"created_at":    now,
-		"updated_at":    now,
-	}).Insert()
+	_, err := g.DB().Model("org_units").Ctx(context.Background()).
+		Data(g.Map{
+			"id":            id,
+			"enterprise_id": enterpriseId,
+			"name":          name,
+			"code":          code,
+			"status":        "active",
+			"sort_order":    sortOrder,
+			"created_at":    now,
+			"updated_at":    now,
+		}).
+		OnConflict("id").
+		OnDuplicate("name", "code", "status", "sort_order", "updated_at").
+		Save()
 	return err
 }
 

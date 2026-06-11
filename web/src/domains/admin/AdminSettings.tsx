@@ -33,13 +33,14 @@ import { useSearchParams } from 'react-router-dom';
 import { BACKEND_URL } from '../../config';
 import { casdoorService } from '../identity/CasdoorService';
 import EnterpriseSkillsTab from './EnterpriseSkillsTab';
+import EnterpriseCreditSettingsTab from './EnterpriseCreditSettingsTab';
 import EnterpriseLLMSettingsTab from './EnterpriseLLMSettingsTab';
 import EnterpriseUsageSettingsTab from './EnterpriseUsageSettingsTab';
 import IMSettingsTab from './IMSettingsTab';
 import { useThemeMode } from '../../theme/themeMode';
 
 const { Paragraph, Text, Title } = Typography;
-const ENTERPRISE_ADMIN_TABS = ['organization', 'members', 'invitations', 'llm', 'usage', 'im', 'skills'] as const;
+const ENTERPRISE_ADMIN_TABS = ['organization', 'members', 'invitations', 'llm', 'usage', 'credits', 'im', 'skills'] as const;
 type EnterpriseAdminTab = typeof ENTERPRISE_ADMIN_TABS[number];
 
 interface EnterpriseSummary {
@@ -224,6 +225,13 @@ const AdminSettings: React.FC = () => {
     if (activeTab === 'usage') {
       return {
         label: t('admin_settings_refresh_usage'),
+        icon: <PlusOutlined />,
+        onClick: () => window.location.reload(),
+      };
+    }
+    if (activeTab === 'credits') {
+      return {
+        label: t('admin_settings_refresh_credits'),
         icon: <PlusOutlined />,
         onClick: () => window.location.reload(),
       };
@@ -829,6 +837,11 @@ const AdminSettings: React.FC = () => {
                   key: 'usage',
                   label: t('admin_settings_usage_audit'),
                   children: <EnterpriseUsageSettingsTab />,
+                },
+                {
+                  key: 'credits',
+                  label: t('admin_settings_credits'),
+                  children: <EnterpriseCreditSettingsTab />,
                 },
                 {
                   key: 'im',

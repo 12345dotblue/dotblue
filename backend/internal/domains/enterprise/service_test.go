@@ -334,18 +334,19 @@ func TestServiceEnsureBootstrapMembership(t *testing.T) {
 				return 0, nil
 			},
 			upsertEnterpriseFunc: func(id, name, slug, userId string, now time.Time) error {
-				So(id, ShouldEqual, "org-1")
+				So(id, ShouldEqual, "user-1")
 				So(name, ShouldEqual, "Alice Workspace")
 				So(slug, ShouldEqual, "alice-workspace")
 				return nil
 			},
 			upsertMembershipFunc: func(id, enterpriseId, userId, role, status string, joinedAt, now time.Time) error {
-				So(enterpriseId, ShouldEqual, "org-1")
+				So(enterpriseId, ShouldEqual, "user-1")
 				So(role, ShouldEqual, RoleOwner)
 				return nil
 			},
 			insertOrgUnitFunc: func(id, enterpriseId, name, code string, sortOrder int, now time.Time) error {
-				So(enterpriseId, ShouldEqual, "org-1")
+				So(id, ShouldEqual, bootstrapRootOrgUnitID("user-1"))
+				So(enterpriseId, ShouldEqual, "user-1")
 				So(name, ShouldEqual, "默认部门")
 				return nil
 			},
@@ -353,7 +354,8 @@ func TestServiceEnsureBootstrapMembership(t *testing.T) {
 				return nil
 			},
 			upsertPrimaryAssignmentFunc: func(id, enterpriseId, orgUnitId, userId string, createdAt time.Time) error {
-				So(enterpriseId, ShouldEqual, "org-1")
+				So(enterpriseId, ShouldEqual, "user-1")
+				So(orgUnitId, ShouldEqual, bootstrapRootOrgUnitID("user-1"))
 				return nil
 			},
 			getEnterpriseByIdFunc: func(id string) (*Enterprise, error) {
@@ -371,7 +373,50 @@ func TestServiceEnsureBootstrapMembership(t *testing.T) {
 		err := service.EnsureBootstrapMembership("user-1", "org-1", "Alice")
 
 		So(err, ShouldBeNil)
-		So(savedLastEnterprise, ShouldEqual, "org-1")
+		So(savedLastEnterprise, ShouldEqual, "user-1")
+	})
+
+	Convey("EnsureBootstrapMembership 不复用共享认证组织作为企业 ID", t, func() {
+		repo := &stubRepository{
+			countMembershipsByUserFunc: func(userId string) (int, error) {
+				return 0, nil
+			},
+			upsertEnterpriseFunc: func(id, name, slug, userId string, now time.Time) error {
+				So(id, ShouldEqual, "user-1")
+				So(name, ShouldEqual, "Alice Workspace")
+				return nil
+			},
+			upsertMembershipFunc: func(id, enterpriseId, userId, role, status string, joinedAt, now time.Time) error {
+				So(enterpriseId, ShouldEqual, "user-1")
+				return nil
+			},
+			insertOrgUnitFunc: func(id, enterpriseId, name, code string, sortOrder int, now time.Time) error {
+				So(id, ShouldEqual, bootstrapRootOrgUnitID("user-1"))
+				So(enterpriseId, ShouldEqual, "user-1")
+				return nil
+			},
+			deletePrimaryAssignmentsFunc: func(enterpriseId, userId string) error {
+				return nil
+			},
+			upsertPrimaryAssignmentFunc: func(id, enterpriseId, orgUnitId, userId string, createdAt time.Time) error {
+				So(enterpriseId, ShouldEqual, "user-1")
+				So(orgUnitId, ShouldEqual, bootstrapRootOrgUnitID("user-1"))
+				return nil
+			},
+			getEnterpriseByIdFunc: func(id string) (*Enterprise, error) {
+				return &Enterprise{Id: id, Name: "Alice Workspace"}, nil
+			},
+			upsertLastEnterpriseFunc: func(userId, enterpriseId string, updatedAt time.Time) error {
+				So(enterpriseId, ShouldEqual, "user-1")
+				return nil
+			},
+		}
+		service := NewService(repo)
+		service.now = func() time.Time { return time.Date(2026, 5, 20, 9, 0, 0, 0, time.UTC) }
+
+		err := service.EnsureBootstrapMembership("user-1", "dotblue", "Alice")
+
+		So(err, ShouldBeNil)
 	})
 
 	Convey("EnsureBootstrapMembership 已有成员时不重复创建", t, func() {
@@ -625,7 +670,7 @@ func TestServiceAcceptInvitation(t *testing.T) {
 	Convey("AcceptInvitation 在邮箱不匹配时返回领域错误", t, func() {
 		repo := &stubRepository{
 			getInvitationByCodeFunc: func(code string) (*Invitation, error) {
-				expiresAt := time.Date(2026, 5, 25, 0, 0, 0, 0, time.UTC)
+				expiresAt := time.Now().Add(24 * time.Hour)
 				return &Invitation{
 					Id:           "inv-1",
 					EnterpriseId: "ent-1",

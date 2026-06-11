@@ -34,6 +34,14 @@ type UsageEvent struct {
 	ModelScope            string     `json:"modelScope" orm:"model_scope"`
 	ProviderType          string     `json:"providerType" orm:"provider_type"`
 	ModelNameSnapshot     string     `json:"modelNameSnapshot" orm:"model_name_snapshot"`
+	FundingType           string     `json:"fundingType" orm:"funding_type"`
+	CreditType            string     `json:"creditType" orm:"credit_type"`
+	CreditPriceBookId     string     `json:"creditPriceBookId" orm:"credit_price_book_id"`
+	CreditUnitUsdSnapshot float64    `json:"creditUnitUsdSnapshot" orm:"credit_unit_usd_snapshot"`
+	InputCreditsPer1M     int64      `json:"inputCreditsPer1M" orm:"input_credits_per_1m_snapshot"`
+	OutputCreditsPer1M    int64      `json:"outputCreditsPer1M" orm:"output_credits_per_1m_snapshot"`
+	ReservedCredits       int64      `json:"reservedCredits" orm:"reserved_credits"`
+	SettledCredits        int64      `json:"settledCredits" orm:"settled_credits"`
 	Status                string     `json:"status" orm:"status"`
 	UsageSource           string     `json:"usageSource" orm:"usage_source"`
 	PromptTokens          int64      `json:"promptTokens" orm:"prompt_tokens"`
@@ -163,6 +171,18 @@ type CheckLimitInput struct {
 	EnterpriseId string
 	UserId       string
 	AgentId      string
+}
+
+type UpdateCreditSnapshotInput struct {
+	InvocationId           string
+	FundingType            string
+	CreditType             string
+	CreditPriceBookId      string
+	CreditUnitUsdSnapshot  float64
+	InputCreditsPer1M      int64
+	OutputCreditsPer1M     int64
+	ReservedCredits        int64
+	SettledCredits         int64
 }
 
 type PriceFilter struct {

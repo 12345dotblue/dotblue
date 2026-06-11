@@ -40,6 +40,14 @@ func (r *GFUsageEventRepository) InsertStarted(item *UsageEvent) error {
 		"model_scope":              item.ModelScope,
 		"provider_type":            item.ProviderType,
 		"model_name_snapshot":      item.ModelNameSnapshot,
+		"funding_type":             item.FundingType,
+		"credit_type":              item.CreditType,
+		"credit_price_book_id":     item.CreditPriceBookId,
+		"credit_unit_usd_snapshot": item.CreditUnitUsdSnapshot,
+		"input_credits_per_1m_snapshot":  item.InputCreditsPer1M,
+		"output_credits_per_1m_snapshot": item.OutputCreditsPer1M,
+		"reserved_credits":         item.ReservedCredits,
+		"settled_credits":          item.SettledCredits,
 		"status":                   item.Status,
 		"usage_source":             item.UsageSource,
 		"currency":                 item.Currency,
@@ -97,6 +105,20 @@ func (r *GFUsageEventRepository) Fail(invocationId, errorCode string, completedA
 		"status":       StatusFailed,
 		"error_code":   errorCode,
 		"completed_at": completedAt,
+	}).Where("invocation_id = ?", invocationId).Update()
+	return err
+}
+
+func (r *GFUsageEventRepository) UpdateCreditSnapshot(invocationId string, item *UsageEvent) error {
+	_, err := g.DB().Model("llm_usage_events").Data(g.Map{
+		"funding_type":                  item.FundingType,
+		"credit_type":                   item.CreditType,
+		"credit_price_book_id":          item.CreditPriceBookId,
+		"credit_unit_usd_snapshot":      item.CreditUnitUsdSnapshot,
+		"input_credits_per_1m_snapshot": item.InputCreditsPer1M,
+		"output_credits_per_1m_snapshot": item.OutputCreditsPer1M,
+		"reserved_credits":              item.ReservedCredits,
+		"settled_credits":               item.SettledCredits,
 	}).Where("invocation_id = ?", invocationId).Update()
 	return err
 }

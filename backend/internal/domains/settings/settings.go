@@ -8,14 +8,16 @@ import (
 
 // PlatformConfig holds core platform settings (stored as JSONB).
 type PlatformConfig struct {
-	DataBasePath   string `json:"dataBasePath"`
-	DataMountPath  string `json:"dataMountPath,omitempty"`
-	ContainerPort  int    `json:"containerPort"`
-	RuntimeMode    string `json:"runtimeMode,omitempty"`
-	EndpointMode   string `json:"endpointMode,omitempty"`
-	DockerEndpoint string `json:"dockerEndpoint,omitempty"`
-	DockerNetwork  string `json:"dockerNetwork,omitempty"`
-	RuntimeEngines []RuntimeEngineConfig `json:"runtimeEngines,omitempty"`
+	DataBasePath                     string                `json:"dataBasePath"`
+	DataMountPath                    string                `json:"dataMountPath,omitempty"`
+	ContainerPort                    int                   `json:"containerPort"`
+	RuntimeMode                      string                `json:"runtimeMode,omitempty"`
+	EndpointMode                     string                `json:"endpointMode,omitempty"`
+	DockerEndpoint                   string                `json:"dockerEndpoint,omitempty"`
+	DockerNetwork                    string                `json:"dockerNetwork,omitempty"`
+	NewEnterprisePlatformCredits     int64                 `json:"newEnterprisePlatformCredits"`
+	DefaultCreditSettlementCurrency  string                `json:"defaultCreditSettlementCurrency,omitempty"`
+	RuntimeEngines                   []RuntimeEngineConfig `json:"runtimeEngines,omitempty"`
 }
 
 // RuntimeEngineConfig is the platform-level runtime registry entry exposed to
@@ -111,6 +113,10 @@ func NormalizePlatformConfig(cfg *PlatformConfig) *PlatformConfig {
 		return nil
 	}
 	clone := *cfg
+	if clone.NewEnterprisePlatformCredits < 0 {
+		clone.NewEnterprisePlatformCredits = 0
+	}
+	clone.DefaultCreditSettlementCurrency = normalizeSettlementCurrency(clone.DefaultCreditSettlementCurrency)
 	clone.RuntimeEngines = normalizeRuntimeEngines(cfg.RuntimeEngines)
 	return &clone
 }
@@ -183,5 +189,16 @@ func normalizeRuntimeEngineType(engineType string) string {
 		return strings.TrimSpace(strings.ToLower(engineType))
 	default:
 		return ""
+	}
+}
+
+func normalizeSettlementCurrency(currency string) string {
+	switch strings.ToUpper(strings.TrimSpace(currency)) {
+	case "CNY":
+		return "CNY"
+	case "", "USD":
+		return "USD"
+	default:
+		return "USD"
 	}
 }

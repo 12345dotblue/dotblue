@@ -18,22 +18,28 @@ var (
 )
 
 type Service struct {
-	repo          Repository
-	idGenerator   func() string
-	codeGenerator func() (string, error)
-	now           func() time.Time
+	repo                 Repository
+	bootstrapProvisioner BootstrapProvisioner
+	idGenerator          func() string
+	codeGenerator        func() (string, error)
+	now                  func() time.Time
 }
 
 func NewService(repo Repository) *Service {
 	return &Service{
-		repo:          repo,
-		idGenerator:   func() string { return uuid.NewString() },
-		codeGenerator: generateInviteCode,
-		now:           time.Now,
+		repo:                 repo,
+		bootstrapProvisioner: noopBootstrapProvisioner{},
+		idGenerator:          func() string { return uuid.NewString() },
+		codeGenerator:        generateInviteCode,
+		now:                  time.Now,
 	}
 }
 
-var defaultService = NewService(NewGFRepository())
+var defaultService = func() *Service {
+	service := NewService(NewGFRepository())
+	service.bootstrapProvisioner = newPlatformBootstrapProvisioner()
+	return service
+}()
 
 func (s *Service) EnsureBootstrapMembership(userId, sourceOrgId, displayName string) error {
 	if s == nil || s.repo == nil {
@@ -47,7 +53,10 @@ func (s *Service) EnsureBootstrapMembership(userId, sourceOrgId, displayName str
 		return nil
 	}
 
-	enterpriseId := strings.TrimSpace(sourceOrgId)
+	// Casdoor owner/organization identifies the auth tenant, not a user's personal
+	// workspace. Reusing it here would merge every newly registered user into the
+	// same enterprise when the auth org is shared across the deployment.
+	enterpriseId := bootstrapEnterpriseID(userId)
 	if enterpriseId == "" {
 		enterpriseId = s.idGenerator()
 	}
@@ -89,6 +98,11 @@ func (s *Service) CreateEnterpriseWithOwner(id, name, userId, role string) (*Ent
 	if _, err := s.AssignPrimaryOrgUnit(id, userId, rootId); err != nil {
 		return nil, err
 	}
+	if s.bootstrapProvisioner != nil {
+		if err := s.bootstrapProvisioner.BootstrapNewEnterprise(id); err != nil {
+			return nil, err
+		}
+	}
 	return s.GetEnterpriseById(id)
 }
 
@@ -96,7 +110,10 @@ func (s *Service) EnsureRootOrgUnit(enterpriseId string) (string, error) {
 	if s == nil || s.repo == nil {
 		return "", errors.New("enterprise repository is not configured")
 	}
-	id := s.idGenerator()
+	id := bootstrapRootOrgUnitID(enterpriseId)
+	if id == "" {
+		id = s.idGenerator()
+	}
 	if err := s.repo.InsertOrgUnit(id, enterpriseId, "默认部门", "root", 0, s.now()); err != nil {
 		return "", err
 	}
@@ -115,6 +132,22 @@ func (s *Service) SetLastEnterprise(userId, enterpriseId string) error {
 		return errors.New("enterprise repository is not configured")
 	}
 	return s.repo.UpsertLastEnterprise(userId, enterpriseId, s.now())
+}
+
+func bootstrapEnterpriseID(userId string) string {
+	userId = strings.TrimSpace(userId)
+	if userId == "" {
+		return ""
+	}
+	return userId
+}
+
+func bootstrapRootOrgUnitID(enterpriseId string) string {
+	enterpriseId = strings.TrimSpace(enterpriseId)
+	if enterpriseId == "" {
+		return ""
+	}
+	return uuid.NewSHA1(uuid.NameSpaceURL, []byte("dotblue:enterprise-root:"+enterpriseId)).String()
 }
 
 func (s *Service) GetLastEnterprise(userId string) (string, error) {

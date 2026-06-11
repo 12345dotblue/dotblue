@@ -111,6 +111,8 @@ func postgresSchemaStatements() []statement {
 					api_base       TEXT DEFAULT '',
 					api_key        TEXT DEFAULT '',
 					model_name     VARCHAR(256) NOT NULL,
+					funding_type   VARCHAR(32) DEFAULT '',
+					model_source_type VARCHAR(32) DEFAULT '',
 					is_default     BOOLEAN DEFAULT FALSE,
 					created_at     TIMESTAMPTZ DEFAULT NOW(),
 					updated_at     TIMESTAMPTZ DEFAULT NOW()
@@ -122,10 +124,18 @@ func postgresSchemaStatements() []statement {
 			sql:  `CREATE INDEX IF NOT EXISTS idx_llm_models_scope_enterprise ON llm_models(scope, enterprise_id, created_at DESC)`,
 		},
 		{
+			name: "alter llm models add funding type",
+			sql:  `ALTER TABLE llm_models ADD COLUMN IF NOT EXISTS funding_type VARCHAR(32) DEFAULT ''`,
+		},
+		{
+			name: "alter llm models add model source type",
+			sql:  `ALTER TABLE llm_models ADD COLUMN IF NOT EXISTS model_source_type VARCHAR(32) DEFAULT ''`,
+		},
+		{
 			name: "migrate enterprise llm models to unified table",
 			sql: `
 				INSERT INTO llm_models (
-					id, scope, enterprise_id, display_name, provider_type, api_base, api_key, model_name, is_default, created_at, updated_at
+					id, scope, enterprise_id, display_name, provider_type, api_base, api_key, model_name, funding_type, model_source_type, is_default, created_at, updated_at
 				)
 				SELECT
 					id,
@@ -136,6 +146,8 @@ func postgresSchemaStatements() []statement {
 					api_base,
 					api_key,
 					model_name,
+					'enterprise_funded',
+					'enterprise_custom_model',
 					FALSE,
 					created_at,
 					updated_at
@@ -147,7 +159,7 @@ func postgresSchemaStatements() []statement {
 			name: "migrate sys provider to platform default model",
 			sql: `
 				INSERT INTO llm_models (
-					id, scope, enterprise_id, display_name, provider_type, api_base, api_key, model_name, is_default, created_at, updated_at
+					id, scope, enterprise_id, display_name, provider_type, api_base, api_key, model_name, funding_type, model_source_type, is_default, created_at, updated_at
 				)
 				SELECT
 					'platform-default',
@@ -158,12 +170,30 @@ func postgresSchemaStatements() []statement {
 					COALESCE(provider->>'apiBase', ''),
 					COALESCE(provider->>'apiKey', ''),
 					COALESCE(provider->>'model', ''),
+					'platform_funded',
+					'platform_model',
 					TRUE,
 					NOW(),
 					NOW()
 				FROM sys_settings
 				WHERE COALESCE(provider->>'type', '') <> ''
 				  AND NOT EXISTS (SELECT 1 FROM llm_models m WHERE m.scope = 'platform')
+			`,
+		},
+		{
+			name: "backfill llm models routing fields",
+			sql: `
+				UPDATE llm_models
+				SET
+					funding_type = CASE
+						WHEN scope = 'enterprise' THEN 'enterprise_funded'
+						ELSE 'platform_funded'
+					END,
+					model_source_type = CASE
+						WHEN scope = 'enterprise' THEN 'enterprise_custom_model'
+						ELSE 'platform_model'
+					END
+				WHERE COALESCE(funding_type, '') = '' OR COALESCE(model_source_type, '') = ''
 			`,
 		},
 		{
@@ -471,6 +501,14 @@ func postgresSchemaStatements() []statement {
 					model_scope               VARCHAR(32) DEFAULT '',
 					provider_type             VARCHAR(64) DEFAULT '',
 					model_name_snapshot       VARCHAR(256) DEFAULT '',
+					funding_type              VARCHAR(32) DEFAULT '',
+					credit_type               VARCHAR(32) DEFAULT '',
+					credit_price_book_id      VARCHAR(128) DEFAULT '',
+					credit_unit_usd_snapshot  NUMERIC(20, 8) DEFAULT 0,
+					input_credits_per_1m_snapshot BIGINT DEFAULT 0,
+					output_credits_per_1m_snapshot BIGINT DEFAULT 0,
+					reserved_credits          BIGINT DEFAULT 0,
+					settled_credits           BIGINT DEFAULT 0,
 					status                    VARCHAR(32) NOT NULL DEFAULT 'started',
 					usage_source              VARCHAR(32) DEFAULT 'estimated',
 					prompt_tokens             BIGINT DEFAULT 0,
@@ -497,6 +535,38 @@ func postgresSchemaStatements() []statement {
 		{
 			name: "create llm usage events enterprise index",
 			sql:  `CREATE INDEX IF NOT EXISTS idx_llm_usage_events_enterprise_created ON llm_usage_events(enterprise_id, created_at DESC)`,
+		},
+		{
+			name: "alter llm usage events add funding type",
+			sql:  `ALTER TABLE llm_usage_events ADD COLUMN IF NOT EXISTS funding_type VARCHAR(32) DEFAULT ''`,
+		},
+		{
+			name: "alter llm usage events add credit type",
+			sql:  `ALTER TABLE llm_usage_events ADD COLUMN IF NOT EXISTS credit_type VARCHAR(32) DEFAULT ''`,
+		},
+		{
+			name: "alter llm usage events add credit price book id",
+			sql:  `ALTER TABLE llm_usage_events ADD COLUMN IF NOT EXISTS credit_price_book_id VARCHAR(128) DEFAULT ''`,
+		},
+		{
+			name: "alter llm usage events add credit unit snapshot",
+			sql:  `ALTER TABLE llm_usage_events ADD COLUMN IF NOT EXISTS credit_unit_usd_snapshot NUMERIC(20, 8) DEFAULT 0`,
+		},
+		{
+			name: "alter llm usage events add input credits snapshot",
+			sql:  `ALTER TABLE llm_usage_events ADD COLUMN IF NOT EXISTS input_credits_per_1m_snapshot BIGINT DEFAULT 0`,
+		},
+		{
+			name: "alter llm usage events add output credits snapshot",
+			sql:  `ALTER TABLE llm_usage_events ADD COLUMN IF NOT EXISTS output_credits_per_1m_snapshot BIGINT DEFAULT 0`,
+		},
+		{
+			name: "alter llm usage events add reserved credits",
+			sql:  `ALTER TABLE llm_usage_events ADD COLUMN IF NOT EXISTS reserved_credits BIGINT DEFAULT 0`,
+		},
+		{
+			name: "alter llm usage events add settled credits",
+			sql:  `ALTER TABLE llm_usage_events ADD COLUMN IF NOT EXISTS settled_credits BIGINT DEFAULT 0`,
 		},
 		{
 			name: "create llm usage events agent index",
@@ -696,6 +766,207 @@ func postgresSchemaStatements() []statement {
 		{
 			name: "create enterprise_invitations enterprise_status index",
 			sql:  `CREATE INDEX IF NOT EXISTS idx_enterprise_invitations_enterprise ON enterprise_invitations(enterprise_id, status)`,
+		},
+		{
+			name: "create credit wallets table",
+			sql: `
+				CREATE TABLE IF NOT EXISTS credit_wallets (
+					id                 VARCHAR(128) PRIMARY KEY,
+					enterprise_id      VARCHAR(128) NOT NULL REFERENCES enterprises(id) ON DELETE CASCADE,
+					credit_type        VARCHAR(32) NOT NULL,
+					total_credits      BIGINT NOT NULL DEFAULT 0,
+					reserved_credits   BIGINT NOT NULL DEFAULT 0,
+					available_credits  BIGINT NOT NULL DEFAULT 0,
+					version            BIGINT NOT NULL DEFAULT 1,
+					created_at         TIMESTAMPTZ DEFAULT NOW(),
+					updated_at         TIMESTAMPTZ DEFAULT NOW()
+				)
+			`,
+		},
+		{
+			name: "create credit wallets unique index",
+			sql:  `CREATE UNIQUE INDEX IF NOT EXISTS uk_credit_wallets_enterprise_type ON credit_wallets(enterprise_id, credit_type)`,
+		},
+		{
+			name: "create credit grants table",
+			sql: `
+				CREATE TABLE IF NOT EXISTS credit_grants (
+					id                 VARCHAR(128) PRIMARY KEY,
+					enterprise_id      VARCHAR(128) NOT NULL REFERENCES enterprises(id) ON DELETE CASCADE,
+					credit_type        VARCHAR(32) NOT NULL,
+					source_type        VARCHAR(32) NOT NULL,
+					source_ref_id      VARCHAR(128) DEFAULT '',
+					granted_credits    BIGINT NOT NULL DEFAULT 0,
+					remaining_credits  BIGINT NOT NULL DEFAULT 0,
+					effective_at       TIMESTAMPTZ NOT NULL,
+					expires_at         TIMESTAMPTZ NULL,
+					metadata_json      JSONB DEFAULT '{}'::jsonb,
+					created_at         TIMESTAMPTZ DEFAULT NOW()
+				)
+			`,
+		},
+		{
+			name: "create credit grants enterprise index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_credit_grants_enterprise_type_created ON credit_grants(enterprise_id, credit_type, created_at DESC)`,
+		},
+		{
+			name: "delete duplicate credit grant ledger entries",
+			sql: `
+				WITH ranked AS (
+					SELECT
+						id,
+						ROW_NUMBER() OVER (
+							PARTITION BY enterprise_id, credit_type, source_type, source_ref_id
+							ORDER BY created_at ASC, id ASC
+						) AS rn
+					FROM credit_grants
+					WHERE COALESCE(source_ref_id, '') <> ''
+				),
+				duplicates AS (
+					SELECT id FROM ranked WHERE rn > 1
+				)
+				DELETE FROM credit_ledger_entries
+				WHERE grant_id IN (SELECT id FROM duplicates)
+			`,
+		},
+		{
+			name: "delete duplicate credit grants",
+			sql: `
+				WITH ranked AS (
+					SELECT
+						id,
+						ROW_NUMBER() OVER (
+							PARTITION BY enterprise_id, credit_type, source_type, source_ref_id
+							ORDER BY created_at ASC, id ASC
+						) AS rn
+					FROM credit_grants
+					WHERE COALESCE(source_ref_id, '') <> ''
+				)
+				DELETE FROM credit_grants
+				WHERE id IN (SELECT id FROM ranked WHERE rn > 1)
+			`,
+		},
+		{
+			name: "create credit grants source ref unique index",
+			sql:  `CREATE UNIQUE INDEX IF NOT EXISTS uk_credit_grants_source_ref ON credit_grants(enterprise_id, credit_type, source_type, source_ref_id) WHERE COALESCE(source_ref_id, '') <> ''`,
+		},
+		{
+			name: "create credit ledger entries table",
+			sql: `
+				CREATE TABLE IF NOT EXISTS credit_ledger_entries (
+					id                 VARCHAR(128) PRIMARY KEY,
+					enterprise_id      VARCHAR(128) NOT NULL REFERENCES enterprises(id) ON DELETE CASCADE,
+					credit_type        VARCHAR(32) NOT NULL,
+					wallet_id          VARCHAR(128) NOT NULL REFERENCES credit_wallets(id) ON DELETE CASCADE,
+					grant_id           VARCHAR(128) DEFAULT '',
+					entry_type         VARCHAR(32) NOT NULL,
+					direction          VARCHAR(16) NOT NULL,
+					credits            BIGINT NOT NULL DEFAULT 0,
+					balance_after      BIGINT NOT NULL DEFAULT 0,
+					reserved_after     BIGINT NOT NULL DEFAULT 0,
+					invocation_id      VARCHAR(128) DEFAULT '',
+					member_user_id     VARCHAR(128) DEFAULT '',
+					agent_id           UUID NULL REFERENCES agents(id) ON DELETE SET NULL,
+					budget_scope_type  VARCHAR(32) DEFAULT '',
+					budget_scope_id    VARCHAR(128) DEFAULT '',
+					reason_code        VARCHAR(64) DEFAULT '',
+					snapshot_json      JSONB DEFAULT '{}'::jsonb,
+					created_at         TIMESTAMPTZ DEFAULT NOW()
+				)
+			`,
+		},
+		{
+			name: "create credit ledger entries enterprise index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_credit_ledger_entries_enterprise_type_created ON credit_ledger_entries(enterprise_id, credit_type, created_at DESC)`,
+		},
+		{
+			name: "create credit ledger entries invocation index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_credit_ledger_entries_invocation ON credit_ledger_entries(invocation_id, created_at DESC)`,
+		},
+		{
+			name: "create credit reservations table",
+			sql: `
+				CREATE TABLE IF NOT EXISTS credit_reservations (
+					id                  VARCHAR(128) PRIMARY KEY,
+					enterprise_id       VARCHAR(128) NOT NULL REFERENCES enterprises(id) ON DELETE CASCADE,
+					credit_type         VARCHAR(32) NOT NULL,
+					invocation_id       VARCHAR(128) NOT NULL UNIQUE,
+					member_user_id      VARCHAR(128) DEFAULT '',
+					agent_id            UUID NULL REFERENCES agents(id) ON DELETE SET NULL,
+					model_id            VARCHAR(128) NOT NULL,
+					model_scope         VARCHAR(32) DEFAULT '',
+					funding_type        VARCHAR(32) NOT NULL,
+					price_book_id       VARCHAR(128) NOT NULL,
+					price_snapshot_json JSONB DEFAULT '{}'::jsonb,
+					reserved_credits    BIGINT NOT NULL DEFAULT 0,
+					status              VARCHAR(32) NOT NULL DEFAULT 'active',
+					expires_at          TIMESTAMPTZ NULL,
+					created_at          TIMESTAMPTZ DEFAULT NOW(),
+					updated_at          TIMESTAMPTZ DEFAULT NOW()
+				)
+			`,
+		},
+		{
+			name: "create credit reservations enterprise index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_credit_reservations_enterprise_type_status_created ON credit_reservations(enterprise_id, credit_type, status, created_at DESC)`,
+		},
+		{
+			name: "create credit budget policies table",
+			sql: `
+				CREATE TABLE IF NOT EXISTS credit_budget_policies (
+					id                    VARCHAR(128) PRIMARY KEY,
+					enterprise_id         VARCHAR(128) NOT NULL REFERENCES enterprises(id) ON DELETE CASCADE,
+					credit_type           VARCHAR(32) NOT NULL,
+					scope_type            VARCHAR(32) NOT NULL,
+					scope_id              VARCHAR(128) NOT NULL,
+					enabled               BOOLEAN DEFAULT TRUE,
+					daily_credit_limit    BIGINT DEFAULT 0,
+					monthly_credit_limit  BIGINT DEFAULT 0,
+					daily_token_limit     BIGINT DEFAULT 0,
+					monthly_token_limit   BIGINT DEFAULT 0,
+					daily_usd_limit       NUMERIC(20, 8) DEFAULT 0,
+					monthly_usd_limit     NUMERIC(20, 8) DEFAULT 0,
+					hard_limit            BOOLEAN DEFAULT TRUE,
+					created_at            TIMESTAMPTZ DEFAULT NOW(),
+					updated_at            TIMESTAMPTZ DEFAULT NOW()
+				)
+			`,
+		},
+		{
+			name: "create credit budget policies unique index",
+			sql:  `CREATE UNIQUE INDEX IF NOT EXISTS uk_credit_budget_policies_scope ON credit_budget_policies(enterprise_id, credit_type, scope_type, scope_id)`,
+		},
+		{
+			name: "create credit price books table",
+			sql: `
+				CREATE TABLE IF NOT EXISTS credit_price_books (
+					id                          VARCHAR(128) PRIMARY KEY,
+					enterprise_id               VARCHAR(128) DEFAULT '',
+					credit_type                 VARCHAR(32) NOT NULL,
+					model_id                    VARCHAR(128) NOT NULL,
+					model_scope                 VARCHAR(32) NOT NULL,
+					model_source_type           VARCHAR(32) NOT NULL,
+					funding_type                VARCHAR(32) NOT NULL,
+					currency                    VARCHAR(16) DEFAULT 'USD',
+					credit_unit_usd             NUMERIC(20, 8) NOT NULL,
+					cost_input_usd_per_1m       NUMERIC(20, 8) NOT NULL,
+					cost_output_usd_per_1m      NUMERIC(20, 8) NOT NULL,
+					platform_multiplier         NUMERIC(20, 8) DEFAULT 1,
+					enterprise_multiplier       NUMERIC(20, 8) DEFAULT 1,
+					billable_input_usd_per_1m   NUMERIC(20, 8) NOT NULL,
+					billable_output_usd_per_1m  NUMERIC(20, 8) NOT NULL,
+					input_credits_per_1m        BIGINT NOT NULL,
+					output_credits_per_1m       BIGINT NOT NULL,
+					effective_at                TIMESTAMPTZ NOT NULL,
+					status                      VARCHAR(32) NOT NULL DEFAULT 'active',
+					created_at                  TIMESTAMPTZ DEFAULT NOW(),
+					updated_at                  TIMESTAMPTZ DEFAULT NOW()
+				)
+			`,
+		},
+		{
+			name: "create credit price books enterprise index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_credit_price_books_enterprise_type_model_effective ON credit_price_books(enterprise_id, credit_type, model_id, effective_at DESC)`,
 		},
 		{
 			name: "create user_enterprise_sessions table",

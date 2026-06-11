@@ -13,6 +13,7 @@ import (
 
 	"dotblue/internal/domains/agent"
 	"dotblue/internal/domains/conversation"
+	"dotblue/internal/domains/credit"
 	"dotblue/internal/domains/engine"
 	filedomain "dotblue/internal/domains/file"
 	"dotblue/internal/domains/metering"
@@ -21,10 +22,13 @@ import (
 )
 
 var (
-	ErrAgentNotFound        = errors.New("agent not found")
-	ErrConversationNotFound = errors.New("conversation not found")
+	ErrAgentNotFound         = errors.New("agent not found")
+	ErrConversationNotFound  = errors.New("conversation not found")
 	loadDefaultPlatformModel = model.GetDefaultPlatformModel
+	loadModelByID            = model.GetByID
 )
+
+const defaultReserveCompletionTokens int64 = 2048
 
 type agentDomain interface {
 	BelongsToUser(id, userID, enterpriseID string) (bool, error)
@@ -58,6 +62,13 @@ type meteringDomain interface {
 	StartInvocation(input metering.StartInvocationInput) (*metering.UsageEvent, error)
 	CompleteInvocation(input metering.CompleteInvocationInput) (*metering.UsageEvent, error)
 	FailInvocation(input metering.FailInvocationInput) error
+	UpdateCreditSnapshot(input metering.UpdateCreditSnapshotInput) error
+}
+
+type creditDomain interface {
+	Reserve(input credit.ReserveInput) (*credit.CreditReservation, *credit.CreditSnapshot, error)
+	Settle(input credit.SettleInput) (*credit.CreditReservation, *credit.CreditSnapshot, error)
+	Release(invocationId, reasonCode string) (*credit.CreditReservation, *credit.CreditSnapshot, error)
 }
 
 type Service struct {
@@ -67,6 +78,7 @@ type Service struct {
 	runtime       runtimeDomain
 	getEngine     engineFactory
 	metering      meteringDomain
+	credits       creditDomain
 }
 
 type defaultAgentDomain struct{}
@@ -115,6 +127,7 @@ func (defaultConversationDomain) ListMessages(convID, before string, limit int) 
 
 type defaultRuntimeDomain struct{}
 type defaultMeteringDomain struct{}
+type defaultCreditDomain struct{}
 type defaultFileDomain struct{}
 
 func (defaultRuntimeDomain) EnsureRunning(ctx context.Context, orgID, userID, agentID string) (*engine.AgentEndpoint, error) {
@@ -137,6 +150,22 @@ func (defaultMeteringDomain) FailInvocation(input metering.FailInvocationInput) 
 	return metering.FailInvocation(input)
 }
 
+func (defaultMeteringDomain) UpdateCreditSnapshot(input metering.UpdateCreditSnapshotInput) error {
+	return metering.UpdateCreditSnapshot(input)
+}
+
+func (defaultCreditDomain) Reserve(input credit.ReserveInput) (*credit.CreditReservation, *credit.CreditSnapshot, error) {
+	return credit.Reserve(input)
+}
+
+func (defaultCreditDomain) Settle(input credit.SettleInput) (*credit.CreditReservation, *credit.CreditSnapshot, error) {
+	return credit.Settle(input)
+}
+
+func (defaultCreditDomain) Release(invocationId, reasonCode string) (*credit.CreditReservation, *credit.CreditSnapshot, error) {
+	return credit.Release(invocationId, reasonCode)
+}
+
 func (defaultFileDomain) ResolveForConversation(ctx context.Context, ids []string, userID, groupID, conversationID string) ([]*filedomain.File, error) {
 	return filedomain.ResolveForConversation(ctx, ids, userID, groupID, conversationID)
 }
@@ -153,6 +182,7 @@ func NewService() *Service {
 		runtime:       defaultRuntimeDomain{},
 		getEngine:     engine.GetEngine,
 		metering:      defaultMeteringDomain{},
+		credits:       defaultCreditDomain{},
 	}
 }
 
@@ -318,6 +348,10 @@ func (s *Service) ExecutePreparedTurn(ctx context.Context, prepared *PreparedTur
 	if err != nil {
 		return nil, err
 	}
+	if err := s.reserveCreditInvocation(prepared, usageEvent); err != nil {
+		s.failMeteringInvocation(usageEvent, err)
+		return nil, err
+	}
 
 	httpResp, err := resp.ProxyRequest(
 		upstreamCtx,
@@ -326,6 +360,7 @@ func (s *Service) ExecutePreparedTurn(ctx context.Context, prepared *PreparedTur
 		prepared.ConversationID,
 	)
 	if err != nil {
+		s.releaseCreditInvocation(usageEvent, err)
 		s.failMeteringInvocation(usageEvent, err)
 		g.Log().Errorf(ctx, "chat.turn.proxy.error conv=%s err=%v", prepared.ConversationID, err)
 		return nil, err
@@ -337,12 +372,14 @@ func (s *Service) ExecutePreparedTurn(ctx context.Context, prepared *PreparedTur
 	if httpResp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(httpResp.Body)
 		statusErr := errors.New(strings.TrimSpace(string(body)))
+		s.releaseCreditInvocation(usageEvent, statusErr)
 		s.failMeteringInvocation(usageEvent, statusErr)
 		return nil, statusErr
 	}
 
 	content, thinking, toolCalls, reportedUsage, err := collectEngineStream(httpResp.Body)
 	if err != nil {
+		s.releaseCreditInvocation(usageEvent, err)
 		s.failMeteringInvocation(usageEvent, err)
 		g.Log().Errorf(ctx, "chat.turn.stream.error conv=%s err=%v", prepared.ConversationID, err)
 		return nil, err
@@ -352,10 +389,12 @@ func (s *Service) ExecutePreparedTurn(ctx context.Context, prepared *PreparedTur
 
 	messageID, err := s.PersistAssistantTurnWithMessageID(prepared.ConversationID, content, thinking, toolCalls)
 	if err != nil {
+		s.releaseCreditInvocation(usageEvent, err)
 		s.failMeteringInvocation(usageEvent, err)
 		return nil, err
 	}
 	s.completeMeteringInvocation(usageEvent, prepared, messageID, content, thinking, reportedUsage)
+	s.settleCreditInvocation(usageEvent)
 
 	return &ExecutedTurn{
 		ConversationID:     prepared.ConversationID,
@@ -455,6 +494,74 @@ func (s *Service) startMeteringInvocation(prepared *PreparedTurn, sourceConnecti
 	})
 }
 
+func (s *Service) reserveCreditInvocation(prepared *PreparedTurn, event *metering.UsageEvent) error {
+	if s == nil || s.credits == nil || prepared == nil || prepared.Agent == nil || event == nil {
+		return nil
+	}
+	// Reserve credits before proxying upstream so budget and wallet checks fail fast.
+	modelScope, modelID, err := resolveMeteringModelSelection(prepared.Agent)
+	if err != nil {
+		return err
+	}
+	modelItem, err := loadModelByID(modelID)
+	if err != nil {
+		return err
+	}
+	estimatedPromptTokens := estimatePromptTokens(prepared.History)
+	_, snapshot, err := s.credits.Reserve(credit.ReserveInput{
+		InvocationId:              event.InvocationId,
+		EnterpriseId:              prepared.EnterpriseID,
+		MemberUserId:              prepared.UserID,
+		AgentId:                   prepared.Agent.Id,
+		ModelId:                   modelID,
+		ModelScope:                modelScope,
+		FundingType:               resolveModelFundingType(modelItem),
+		ModelSourceType:           resolveModelSourceType(modelItem),
+		EstimatedPromptTokens:     estimatedPromptTokens,
+		EstimatedCompletionTokens: defaultReserveCompletionTokens,
+	})
+	if err != nil {
+		g.Log().Warningf(context.Background(), "chat.credit.reserve.failed invocation=%s conv=%s enterprise=%s err=%v", event.InvocationId, prepared.ConversationID, prepared.EnterpriseID, err)
+		return err
+	}
+	s.updateMeteringCreditSnapshot(event, snapshot)
+	return nil
+}
+
+func (s *Service) settleCreditInvocation(event *metering.UsageEvent) {
+	if s == nil || s.credits == nil || event == nil {
+		return
+	}
+	_, snapshot, err := s.credits.Settle(credit.SettleInput{
+		InvocationId:     event.InvocationId,
+		PromptTokens:     event.PromptTokens,
+		CompletionTokens: event.CompletionTokens,
+	})
+	if err != nil {
+		g.Log().Warningf(context.Background(), "chat.credit.settle.failed invocation=%s err=%v", event.InvocationId, err)
+		return
+	}
+	s.updateMeteringCreditSnapshot(event, snapshot)
+}
+
+func (s *Service) releaseCreditInvocation(event *metering.UsageEvent, releaseErr error) {
+	if s == nil || s.credits == nil || event == nil {
+		return
+	}
+	reasonCode := ""
+	if releaseErr != nil {
+		reasonCode = releaseErr.Error()
+	}
+	_, snapshot, err := s.credits.Release(event.InvocationId, reasonCode)
+	if err != nil || snapshot == nil {
+		if err != nil {
+			g.Log().Warningf(context.Background(), "chat.credit.release.failed invocation=%s err=%v", event.InvocationId, err)
+		}
+		return
+	}
+	s.updateMeteringCreditSnapshot(event, snapshot)
+}
+
 func resolveMeteringModelSelection(agentRec *agent.Agent) (string, string, error) {
 	if agentRec == nil {
 		return "", "", errors.New("agent is required")
@@ -484,11 +591,14 @@ func (s *Service) completeMeteringInvocation(event *metering.UsageEvent, prepare
 		return
 	}
 	usage := finalUsageSummary(prepared.History, content, thinking, reportedUsage)
-	_, _ = s.metering.CompleteInvocation(metering.CompleteInvocationInput{
+	completed, _ := s.metering.CompleteInvocation(metering.CompleteInvocationInput{
 		InvocationId: event.InvocationId,
 		MessageId:    messageID,
 		Usage:        usage,
 	})
+	if completed != nil {
+		*event = *completed
+	}
 }
 
 func (s *Service) failMeteringInvocation(event *metering.UsageEvent, err error) {
@@ -536,20 +646,90 @@ func resolvePreparedSourceType(prepared *PreparedTurn) string {
 	return strings.TrimSpace(prepared.SourceType)
 }
 
-func finalUsageSummary(history []interface{}, content, thinking string, reportedUsage *metering.UsageSummary) metering.UsageSummary {
-	if reportedUsage != nil {
-		return metering.UsageSummary{
-			PromptTokens:     reportedUsage.PromptTokens,
-			CompletionTokens: reportedUsage.CompletionTokens,
-			ReasoningTokens:  reportedUsage.ReasoningTokens,
-			CacheReadTokens:  reportedUsage.CacheReadTokens,
-			CacheWriteTokens: reportedUsage.CacheWriteTokens,
-			TotalTokens:      reportedUsage.TotalTokens,
-			Source:           metering.UsageSourceReported,
-			RawUsageJSON:     reportedUsage.RawUsageJSON,
+func estimatePromptTokens(history []interface{}) int64 {
+	promptChars := 0
+	for i := range history {
+		if item, ok := history[i].(map[string]interface{}); ok {
+			promptChars += len(fmt.Sprint(item["content"]))
 		}
 	}
-	return estimateUsage(history, content, thinking)
+	estimated := int64(promptChars / 4)
+	if estimated <= 0 {
+		return 1
+	}
+	return estimated
+}
+
+func resolveModelFundingType(item *model.LLMModel) string {
+	if item == nil {
+		return ""
+	}
+	return strings.TrimSpace(item.FundingType)
+}
+
+func resolveModelSourceType(item *model.LLMModel) string {
+	if item == nil {
+		return ""
+	}
+	return strings.TrimSpace(item.ModelSourceType)
+}
+
+func (s *Service) updateMeteringCreditSnapshot(event *metering.UsageEvent, snapshot *credit.CreditSnapshot) {
+	if s == nil || s.metering == nil || event == nil || snapshot == nil {
+		return
+	}
+	_ = s.metering.UpdateCreditSnapshot(metering.UpdateCreditSnapshotInput{
+		InvocationId:          event.InvocationId,
+		FundingType:           snapshot.FundingType,
+		CreditType:            snapshot.CreditType,
+		CreditPriceBookId:     snapshot.PriceBookId,
+		CreditUnitUsdSnapshot: snapshot.CreditUnitUsd,
+		InputCreditsPer1M:     snapshot.InputCreditsPer1M,
+		OutputCreditsPer1M:    snapshot.OutputCreditsPer1M,
+		ReservedCredits:       snapshot.ReservedCredits,
+		SettledCredits:        snapshot.SettledCredits,
+	})
+	event.FundingType = snapshot.FundingType
+	event.CreditType = snapshot.CreditType
+	event.CreditPriceBookId = snapshot.PriceBookId
+	event.CreditUnitUsdSnapshot = snapshot.CreditUnitUsd
+	event.InputCreditsPer1M = snapshot.InputCreditsPer1M
+	event.OutputCreditsPer1M = snapshot.OutputCreditsPer1M
+	event.ReservedCredits = snapshot.ReservedCredits
+	event.SettledCredits = snapshot.SettledCredits
+}
+
+func finalUsageSummary(history []interface{}, content, thinking string, reportedUsage *metering.UsageSummary) metering.UsageSummary {
+	estimated := estimateUsage(history, content, thinking)
+	if reportedUsage == nil {
+		return estimated
+	}
+	reported := metering.UsageSummary{
+		PromptTokens:     reportedUsage.PromptTokens,
+		CompletionTokens: reportedUsage.CompletionTokens,
+		ReasoningTokens:  reportedUsage.ReasoningTokens,
+		CacheReadTokens:  reportedUsage.CacheReadTokens,
+		CacheWriteTokens: reportedUsage.CacheWriteTokens,
+		TotalTokens:      reportedUsage.TotalTokens,
+		Source:           metering.UsageSourceReported,
+		RawUsageJSON:     reportedUsage.RawUsageJSON,
+	}
+	estimatedTotal := estimated.PromptTokens + estimated.CompletionTokens + estimated.ReasoningTokens
+	if estimatedTotal <= 0 {
+		return reported
+	}
+	reportedTotal := reported.TotalTokens
+	if reportedTotal <= 0 {
+		reportedTotal = reported.PromptTokens + reported.CompletionTokens + reported.ReasoningTokens + reported.CacheReadTokens + reported.CacheWriteTokens
+	}
+	limit := estimatedTotal * 5
+	if limit < estimatedTotal+1024 {
+		limit = estimatedTotal + 1024
+	}
+	if reportedTotal > 0 && reportedTotal > limit {
+		return estimated
+	}
+	return reported
 }
 
 // estimateUsage keeps the first version provider-agnostic until upstream usage is exposed.

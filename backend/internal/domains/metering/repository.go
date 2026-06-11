@@ -6,6 +6,7 @@ type UsageEventRepository interface {
 	InsertStarted(item *UsageEvent) error
 	Complete(invocationId string, item *UsageEvent) error
 	Fail(invocationId, errorCode string, completedAt time.Time) error
+	UpdateCreditSnapshot(invocationId string, item *UsageEvent) error
 	GetByInvocationID(invocationId string) (*UsageEvent, error)
 	UpsertDailyAggregate(item *UsageDailyAggregate) error
 	ListEvents(filter UsageEventFilter) ([]UsageEvent, int, error)

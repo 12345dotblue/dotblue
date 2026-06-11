@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"dotblue/internal/domains/conversation"
+	"dotblue/internal/domains/credit"
 	"dotblue/internal/domains/engine"
 	"dotblue/internal/domains/identity"
 	"dotblue/internal/domains/metering"
@@ -142,9 +143,15 @@ func proxyToHermes(r *ghttp.Request, ws *ghttp.WebSocket, prepared *PreparedTurn
 		sendError(ws, err.Error())
 		return
 	}
+	if err := defaultService.reserveCreditInvocation(prepared, usageEvent); err != nil {
+		defaultService.failMeteringInvocation(usageEvent, err)
+		sendError(ws, err.Error())
+		return
+	}
 
 	httpResp, err := eng.ProxyRequest(upstreamCtx, prepared.Endpoint, engineMessagesForTurn(prepared), convId)
 	if err != nil {
+		defaultService.releaseCreditInvocation(usageEvent, err)
 		defaultService.failMeteringInvocation(usageEvent, err)
 		g.Log().Errorf(r.Context(), "Engine request failed: %v", err)
 		sendError(ws, "Engine unreachable")
@@ -154,7 +161,9 @@ func proxyToHermes(r *ghttp.Request, ws *ghttp.WebSocket, prepared *PreparedTurn
 
 	if httpResp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(httpResp.Body)
-		defaultService.failMeteringInvocation(usageEvent, errors.New(strings.TrimSpace(string(body))))
+		statusErr := errors.New(strings.TrimSpace(string(body)))
+		defaultService.releaseCreditInvocation(usageEvent, statusErr)
+		defaultService.failMeteringInvocation(usageEvent, statusErr)
 		g.Log().Errorf(r.Context(), "Engine error: %s", string(body))
 		sendError(ws, "Engine error: "+string(body))
 		return
@@ -181,6 +190,7 @@ func proxyToHermes(r *ghttp.Request, ws *ghttp.WebSocket, prepared *PreparedTurn
 			} else {
 				g.Log().Warningf(r.Context(), "SSE read error: %v", err)
 			}
+			defaultService.releaseCreditInvocation(usageEvent, err)
 			defaultService.failMeteringInvocation(usageEvent, err)
 			sendError(ws, "Stream interrupted")
 			return
@@ -238,11 +248,26 @@ func proxyToHermes(r *ghttp.Request, ws *ghttp.WebSocket, prepared *PreparedTurn
 
 	messageID, err := PersistAssistantTurnWithMessageID(convId, fullContent.String(), fullThinking.String(), toolCalls)
 	if err != nil {
+		defaultService.releaseCreditInvocation(usageEvent, err)
 		defaultService.failMeteringInvocation(usageEvent, err)
 		g.Log().Errorf(r.Context(), "Failed to save assistant message: %v", err)
 		return
 	}
 	defaultService.completeMeteringInvocation(usageEvent, prepared, messageID, fullContent.String(), fullThinking.String(), reportedUsage)
+	usage := finalUsageSummary(prepared.History, fullContent.String(), fullThinking.String(), reportedUsage)
+	if defaultService != nil && defaultService.credits != nil {
+		_, snapshot, err := defaultService.credits.Settle(credit.SettleInput{
+			InvocationId:     usageEvent.InvocationId,
+			PromptTokens:     usage.PromptTokens,
+			CompletionTokens: usage.CompletionTokens,
+		})
+		if err == nil {
+			defaultService.updateMeteringCreditSnapshot(usageEvent, snapshot)
+		} else {
+			defaultService.releaseCreditInvocation(usageEvent, err)
+			g.Log().Warningf(context.Background(), "chat.credit.settle.failed invocation=%s err=%v", usageEvent.InvocationId, err)
+		}
+	}
 }
 
 // handleToolProgress forwards Hermes tool progress events as thinking indicators.
@@ -440,9 +465,17 @@ func proxyToHermesSSE(r *ghttp.Request, prepared *PreparedTurn) {
 		sseWrite(r, "error", MsgRes{Content: err.Error(), Status: "error"})
 		return
 	}
+	if err := defaultService.reserveCreditInvocation(prepared, usageEvent); err != nil {
+		defaultService.failMeteringInvocation(usageEvent, err)
+		if r.Context().Err() == nil {
+			sseWrite(r, "error", MsgRes{Content: err.Error(), Status: "error"})
+		}
+		return
+	}
 
 	resp, err := eng.ProxyRequest(upstreamCtx, prepared.Endpoint, engineMessagesForTurn(prepared), convId)
 	if err != nil {
+		defaultService.releaseCreditInvocation(usageEvent, err)
 		defaultService.failMeteringInvocation(usageEvent, err)
 		g.Log().Errorf(r.Context(), "Engine request failed: %v", err)
 		if r.Context().Err() == nil {
@@ -454,7 +487,9 @@ func proxyToHermesSSE(r *ghttp.Request, prepared *PreparedTurn) {
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		defaultService.failMeteringInvocation(usageEvent, errors.New(strings.TrimSpace(string(body))))
+		statusErr := errors.New(strings.TrimSpace(string(body)))
+		defaultService.releaseCreditInvocation(usageEvent, statusErr)
+		defaultService.failMeteringInvocation(usageEvent, statusErr)
 		g.Log().Errorf(r.Context(), "Engine error: %s", string(body))
 		sseWrite(r, "error", MsgRes{Content: "Engine error: " + string(body), Status: "error"})
 		return
@@ -484,6 +519,7 @@ func proxyToHermesSSE(r *ghttp.Request, prepared *PreparedTurn) {
 			} else {
 				g.Log().Warningf(r.Context(), "SSE read error: %v", err)
 			}
+			defaultService.releaseCreditInvocation(usageEvent, err)
 			defaultService.failMeteringInvocation(usageEvent, err)
 			if r.Context().Err() == nil {
 				sseWrite(r, "error", MsgRes{Content: "Stream interrupted", Status: "error"})
@@ -544,11 +580,26 @@ func proxyToHermesSSE(r *ghttp.Request, prepared *PreparedTurn) {
 
 	messageID, err := PersistAssistantTurnWithMessageID(convId, fullContent.String(), fullThinking.String(), toolCalls)
 	if err != nil {
+		defaultService.releaseCreditInvocation(usageEvent, err)
 		defaultService.failMeteringInvocation(usageEvent, err)
 		g.Log().Errorf(r.Context(), "Failed to save assistant message: %v", err)
 		return
 	}
 	defaultService.completeMeteringInvocation(usageEvent, prepared, messageID, fullContent.String(), fullThinking.String(), reportedUsage)
+	usage := finalUsageSummary(prepared.History, fullContent.String(), fullThinking.String(), reportedUsage)
+	if defaultService != nil && defaultService.credits != nil {
+		_, snapshot, err := defaultService.credits.Settle(credit.SettleInput{
+			InvocationId:     usageEvent.InvocationId,
+			PromptTokens:     usage.PromptTokens,
+			CompletionTokens: usage.CompletionTokens,
+		})
+		if err == nil {
+			defaultService.updateMeteringCreditSnapshot(usageEvent, snapshot)
+		} else {
+			defaultService.releaseCreditInvocation(usageEvent, err)
+			g.Log().Warningf(context.Background(), "chat.credit.settle.failed invocation=%s err=%v", usageEvent.InvocationId, err)
+		}
+	}
 }
 
 func handleToolProgressSSE(r *ghttp.Request, data string) *conversation.ToolCallItem {

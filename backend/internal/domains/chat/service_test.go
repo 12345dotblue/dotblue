@@ -8,6 +8,7 @@ import (
 
 	"dotblue/internal/domains/agent"
 	"dotblue/internal/domains/conversation"
+	"dotblue/internal/domains/credit"
 	"dotblue/internal/domains/engine"
 	"dotblue/internal/domains/metering"
 	"dotblue/internal/domains/model"
@@ -115,6 +116,13 @@ type stubMeteringDomain struct {
 	startInvocationFunc func(input metering.StartInvocationInput) (*metering.UsageEvent, error)
 	completeFunc        func(input metering.CompleteInvocationInput) (*metering.UsageEvent, error)
 	failFunc            func(input metering.FailInvocationInput) error
+	updateCreditFunc    func(input metering.UpdateCreditSnapshotInput) error
+}
+
+type stubCreditDomain struct {
+	reserveFunc func(input credit.ReserveInput) (*credit.CreditReservation, *credit.CreditSnapshot, error)
+	settleFunc  func(input credit.SettleInput) (*credit.CreditReservation, *credit.CreditSnapshot, error)
+	releaseFunc func(invocationId, reasonCode string) (*credit.CreditReservation, *credit.CreditSnapshot, error)
 }
 
 func (s *stubMeteringDomain) CheckLimit(input metering.CheckLimitInput) error {
@@ -143,6 +151,34 @@ func (s *stubMeteringDomain) FailInvocation(input metering.FailInvocationInput) 
 		return s.failFunc(input)
 	}
 	return nil
+}
+
+func (s *stubMeteringDomain) UpdateCreditSnapshot(input metering.UpdateCreditSnapshotInput) error {
+	if s.updateCreditFunc != nil {
+		return s.updateCreditFunc(input)
+	}
+	return nil
+}
+
+func (s *stubCreditDomain) Reserve(input credit.ReserveInput) (*credit.CreditReservation, *credit.CreditSnapshot, error) {
+	if s.reserveFunc != nil {
+		return s.reserveFunc(input)
+	}
+	return nil, nil, nil
+}
+
+func (s *stubCreditDomain) Settle(input credit.SettleInput) (*credit.CreditReservation, *credit.CreditSnapshot, error) {
+	if s.settleFunc != nil {
+		return s.settleFunc(input)
+	}
+	return nil, nil, nil
+}
+
+func (s *stubCreditDomain) Release(invocationId, reasonCode string) (*credit.CreditReservation, *credit.CreditSnapshot, error) {
+	if s.releaseFunc != nil {
+		return s.releaseFunc(invocationId, reasonCode)
+	}
+	return nil, nil, nil
 }
 
 func TestCollectEngineStreamParsesSSE(t *testing.T) {

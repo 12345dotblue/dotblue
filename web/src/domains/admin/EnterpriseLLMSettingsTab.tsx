@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Table, Typography, message } from 'antd';
+import { Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, Typography, message } from 'antd';
 import { CloudServerOutlined, DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import { useTranslation } from 'react-i18next';
@@ -15,6 +15,8 @@ interface EnterpriseLLMModel {
   apiBase: string;
   apiKey: string;
   model: string;
+  fundingType: 'platform_funded' | 'enterprise_funded';
+  modelSourceType: 'platform_model' | 'enterprise_custom_model';
 }
 
 interface Props {
@@ -30,6 +32,10 @@ const EnterpriseLLMSettingsTab: React.FC<Props> = ({ createSignal = 0 }) => {
   const { t } = useTranslation();
   const getProviderLabel = (value: EnterpriseLLMModel['type']) =>
     value === 'anthropic' ? t('llm_provider_anthropic') : t('llm_provider_openai');
+  const getFundingLabel = (value?: EnterpriseLLMModel['fundingType']) =>
+    value === 'platform_funded' ? 'Platform Funded' : 'Enterprise Funded';
+  const getSourceLabel = (value?: EnterpriseLLMModel['modelSourceType']) =>
+    value === 'platform_model' ? 'Platform Model' : 'Enterprise Custom';
   const [messageApi, contextHolder] = message.useMessage();
   const [models, setModels] = useState<EnterpriseLLMModel[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,6 +80,8 @@ const EnterpriseLLMSettingsTab: React.FC<Props> = ({ createSignal = 0 }) => {
       apiBase: 'https://api.openai.com/v1',
       apiKey: '',
       model: '',
+      fundingType: 'enterprise_funded',
+      modelSourceType: 'enterprise_custom_model',
     });
   }, [modalOpen, editingModel, form]);
 
@@ -163,6 +171,20 @@ const EnterpriseLLMSettingsTab: React.FC<Props> = ({ createSignal = 0 }) => {
               render: (value: EnterpriseLLMModel['type']) => getProviderLabel(value),
             },
             {
+              title: 'Funding',
+              dataIndex: 'fundingType',
+              key: 'fundingType',
+              width: 170,
+              render: (value: EnterpriseLLMModel['fundingType']) => <Tag color="purple">{getFundingLabel(value)}</Tag>,
+            },
+            {
+              title: 'Source',
+              dataIndex: 'modelSourceType',
+              key: 'modelSourceType',
+              width: 170,
+              render: (value: EnterpriseLLMModel['modelSourceType']) => <Tag>{getSourceLabel(value)}</Tag>,
+            },
+            {
               title: t('enterprise_admin_llm_api_base'),
               dataIndex: 'apiBase',
               key: 'apiBase',
@@ -206,7 +228,7 @@ const EnterpriseLLMSettingsTab: React.FC<Props> = ({ createSignal = 0 }) => {
         <Form
           form={form}
           layout="vertical"
-          initialValues={{ type: 'openai', apiBase: 'https://api.openai.com/v1', displayName: '', apiKey: '', model: '' }}
+          initialValues={{ type: 'openai', apiBase: 'https://api.openai.com/v1', displayName: '', apiKey: '', model: '', fundingType: 'enterprise_funded', modelSourceType: 'enterprise_custom_model' }}
         >
           <Form.Item
             label={t('enterprise_admin_llm_name')}
@@ -257,6 +279,20 @@ const EnterpriseLLMSettingsTab: React.FC<Props> = ({ createSignal = 0 }) => {
                   : t('llm_model_placeholder_openai')
               }
             />
+          </Form.Item>
+          <Form.Item
+            label="Funding"
+            name="fundingType"
+            rules={[{ required: true, message: 'Funding is required' }]}
+          >
+            <Select
+              options={[
+                { label: 'Enterprise Funded', value: 'enterprise_funded' },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item label="Source" name="modelSourceType">
+            <Input disabled />
           </Form.Item>
         </Form>
       </Modal>

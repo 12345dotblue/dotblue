@@ -15,6 +15,8 @@ interface PlatformLLMModel {
   apiBase: string;
   apiKey: string;
   model: string;
+  fundingType: 'platform_funded' | 'enterprise_funded';
+  modelSourceType: 'platform_model' | 'enterprise_custom_model';
   isDefault: boolean;
 }
 
@@ -27,6 +29,10 @@ const PlatformLLMSettingsCard: React.FC = () => {
   const { t } = useTranslation();
   const getProviderLabel = (value: PlatformLLMModel['type']) =>
     value === 'anthropic' ? t('llm_provider_anthropic') : t('llm_provider_openai');
+  const getFundingLabel = (value?: PlatformLLMModel['fundingType']) =>
+    value === 'enterprise_funded' ? 'Enterprise Funded' : 'Platform Funded';
+  const getSourceLabel = (value?: PlatformLLMModel['modelSourceType']) =>
+    value === 'enterprise_custom_model' ? 'Enterprise Custom' : 'Platform Model';
   const [messageApi, contextHolder] = message.useMessage();
   const [models, setModels] = useState<PlatformLLMModel[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,6 +78,8 @@ const PlatformLLMSettingsCard: React.FC = () => {
       apiBase: 'https://api.openai.com/v1',
       apiKey: '',
       model: '',
+      fundingType: 'platform_funded',
+      modelSourceType: 'platform_model',
       isDefault: models.length === 0,
     });
   }, [modalOpen, editingModel, form, models.length]);
@@ -154,6 +162,20 @@ const PlatformLLMSettingsCard: React.FC = () => {
             key: 'type',
             width: 140,
             render: (value: PlatformLLMModel['type']) => getProviderLabel(value),
+          },
+          {
+            title: 'Funding',
+            dataIndex: 'fundingType',
+            key: 'fundingType',
+            width: 160,
+            render: (value: PlatformLLMModel['fundingType']) => <Tag color="blue">{getFundingLabel(value)}</Tag>,
+          },
+          {
+            title: 'Source',
+            dataIndex: 'modelSourceType',
+            key: 'modelSourceType',
+            width: 160,
+            render: (value: PlatformLLMModel['modelSourceType']) => <Tag>{getSourceLabel(value)}</Tag>,
           },
           { title: t('platform_admin_llm_api_base'), dataIndex: 'apiBase', key: 'apiBase', ellipsis: true },
           {
@@ -251,6 +273,20 @@ const PlatformLLMSettingsCard: React.FC = () => {
                   : t('llm_model_placeholder_openai')
               }
             />
+          </Form.Item>
+          <Form.Item
+            label="Funding"
+            name="fundingType"
+            rules={[{ required: true, message: 'Funding is required' }]}
+          >
+            <Select
+              options={[
+                { label: 'Platform Funded', value: 'platform_funded' },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item label="Source" name="modelSourceType">
+            <Input disabled />
           </Form.Item>
           <Form.Item name="isDefault" valuePropName="checked">
             <Checkbox>{t('platform_admin_llm_default_checkbox')}</Checkbox>

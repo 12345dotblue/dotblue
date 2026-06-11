@@ -135,6 +135,10 @@ func DeleteLimitPolicy(id, scopeType, scopeId string) error {
 	return defaultService.DeleteLimitPolicy(id, scopeType, scopeId)
 }
 
+func UpdateCreditSnapshot(input UpdateCreditSnapshotInput) error {
+	return defaultService.UpdateCreditSnapshot(input)
+}
+
 func (s *Service) StartInvocation(input StartInvocationInput) (*UsageEvent, error) {
 	if s == nil || s.usageRepo == nil || s.models == nil {
 		return nil, errors.New("metering service is not configured")
@@ -224,6 +228,32 @@ func (s *Service) FailInvocation(input FailInvocationInput) error {
 		return errors.New("metering service is not configured")
 	}
 	return s.usageRepo.Fail(strings.TrimSpace(input.InvocationId), strings.TrimSpace(input.ErrorCode), s.now())
+}
+
+func (s *Service) UpdateCreditSnapshot(input UpdateCreditSnapshotInput) error {
+	if s == nil || s.usageRepo == nil {
+		return errors.New("metering service is not configured")
+	}
+	invocationID := strings.TrimSpace(input.InvocationId)
+	if invocationID == "" {
+		return errors.New("invocation id is required")
+	}
+	existing, err := s.usageRepo.GetByInvocationID(invocationID)
+	if err != nil {
+		return err
+	}
+	if existing == nil {
+		return errors.New("usage invocation not found")
+	}
+	existing.FundingType = strings.TrimSpace(input.FundingType)
+	existing.CreditType = strings.TrimSpace(input.CreditType)
+	existing.CreditPriceBookId = strings.TrimSpace(input.CreditPriceBookId)
+	existing.CreditUnitUsdSnapshot = max0(input.CreditUnitUsdSnapshot)
+	existing.InputCreditsPer1M = maxInt0(input.InputCreditsPer1M)
+	existing.OutputCreditsPer1M = maxInt0(input.OutputCreditsPer1M)
+	existing.ReservedCredits = maxInt0(input.ReservedCredits)
+	existing.SettledCredits = maxInt0(input.SettledCredits)
+	return s.usageRepo.UpdateCreditSnapshot(invocationID, existing)
 }
 
 func (s *Service) CheckLimit(input CheckLimitInput) error {

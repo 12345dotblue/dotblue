@@ -6,6 +6,7 @@ import axios from 'axios';
 import { BACKEND_URL } from '../../config';
 import { casdoorService } from '../identity/CasdoorService';
 import PlatformLLMSettingsCard from './PlatformLLMSettingsCard';
+import PlatformCreditSettingsCard from './PlatformCreditSettingsCard';
 import PlatformUsageSettingsCard from './PlatformUsageSettingsCard';
 import { useThemeMode } from '../../theme/themeMode';
 
@@ -48,6 +49,8 @@ interface PlatformConfig {
   endpointMode: 'auto' | 'host_loopback' | 'docker_dns';
   dockerEndpoint: string;
   dockerNetwork: string;
+  newEnterprisePlatformCredits: number;
+  defaultCreditSettlementCurrency: 'USD' | 'CNY';
   runtimeEngines?: RuntimeEngineConfig[];
 }
 
@@ -92,6 +95,8 @@ const PlatformSettingsPage: React.FC = () => {
         endpointMode: data.platform?.endpointMode || 'auto',
         dockerEndpoint: data.platform?.dockerEndpoint || '',
         dockerNetwork: data.platform?.dockerNetwork || '',
+        newEnterprisePlatformCredits: data.platform?.newEnterprisePlatformCredits || 0,
+        defaultCreditSettlementCurrency: data.platform?.defaultCreditSettlementCurrency || 'USD',
         runtimeEngines: toRuntimeEngineMap(data.platform?.runtimeEngines),
       });
     }).catch(() => {
@@ -112,6 +117,8 @@ const PlatformSettingsPage: React.FC = () => {
         endpointMode: values.endpointMode,
         dockerEndpoint: values.dockerEndpoint,
         dockerNetwork: values.dockerNetwork,
+        newEnterprisePlatformCredits: values.newEnterprisePlatformCredits,
+        defaultCreditSettlementCurrency: values.defaultCreditSettlementCurrency,
         runtimeEngines: toRuntimeEngineList(values.runtimeEngines),
       };
       await axios.post(`${BACKEND_URL}/api/admin/settings`, { platform: payload }, {
@@ -169,6 +176,24 @@ const PlatformSettingsPage: React.FC = () => {
                 rules={[{ required: true, message: t('platform_settings_container_port_required') }]}
               >
                 <InputNumber controls={false} style={{ width: '100%' }} placeholder={t('platform_settings_container_port_placeholder')} />
+              </Form.Item>
+              <Form.Item
+                label={t('platform_settings_new_enterprise_platform_credits')}
+                name="newEnterprisePlatformCredits"
+              >
+                <InputNumber min={0} precision={0} controls={false} style={{ width: '100%' }} />
+              </Form.Item>
+              <Form.Item
+                label={t('platform_settings_default_credit_currency')}
+                name="defaultCreditSettlementCurrency"
+                rules={[{ required: true, message: t('platform_settings_default_credit_currency_required') }]}
+              >
+                <Select
+                  options={[
+                    { value: 'USD', label: 'USD' },
+                    { value: 'CNY', label: 'CNY' },
+                  ]}
+                />
               </Form.Item>
               <Form.Item
                 label={t('platform_settings_runtime_mode')}
@@ -254,6 +279,9 @@ const PlatformSettingsPage: React.FC = () => {
 
         <Col xs={24} xl={14}>
           <PlatformLLMSettingsCard />
+        </Col>
+        <Col xs={24}>
+          <PlatformCreditSettingsCard />
         </Col>
         <Col xs={24}>
           <PlatformUsageSettingsCard />
