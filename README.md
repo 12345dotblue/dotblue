@@ -1,124 +1,43 @@
 # DotBlue
 
-DotBlue is an enterprise-grade AI assistant governance platform for teams that want to manage AI assistants with less operational overhead.
+DotBlue is an enterprise AI assistant platform for teams that need agent management, runtime isolation, skill governance, enterprise administration, and private deployment in one stack.
 
-It combines enterprise AI assistant management, real-time chat, enterprise administration, platform-wide LLM configuration, IM integration, and deployment workflows in one stack, so teams can build, govern, and deliver AI assistants instead of stitching together disconnected tools.
-
-DotBlue supports self-hosted and cloud-hosted deployment patterns, automatically hosts isolated assistant runtimes, and centralizes LLM provider credentials and access token management at the platform level. It already works with OpenAI-compatible providers and is designed to incrementally support more mainstream AI assistants, models, and enterprise channels over time.
-
-Keywords: enterprise AI assistant platform, AI assistant governance platform, self-hosted AI agent platform, cloud-hosted AI assistant platform, private deployment AI platform, multi-agent platform, LLM ops platform, AI workspace, AI agent management, enterprise chatbot platform, IM-integrated assistant platform, LLM token management.
-
-## Tagline
-
-- Govern enterprise AI assistants with less operational overhead
-- Run assistants in self-hosted or cloud-hosted environments with automated isolated runtime hosting
-- Support mainstream AI assistant and model ecosystems incrementally
-- Centralize LLM provider credentials, access tokens, and platform-wide management in one place
+Instead of stitching together a chat UI, auth, model settings, runtime hosting, IM integrations, and deployment scripts, DotBlue gives you a full-stack foundation for building, governing, and delivering AI assistants to real users.
 
 ## Why DotBlue
 
-- Built for real teams: more than a chat UI, with organizations, members, invitations, and admin capabilities
-- Built for safer runtime isolation: each agent runs in its own container sandbox with isolated runtime data
-- Built for extensibility: supports external LLM providers and includes IM integration capabilities
-- Built for deployment: ships with frontend, backend, authentication, databases, and Docker Compose setup
-
-## What Makes It Useful
-
-- Self-hosted and private-deployment friendly for internal enterprise environments
-- Multi-agent ready, with clear boundaries for agent management and runtime orchestration
-- Enterprise-aware, with organizations, members, roles, invitations, and admin workflows
-- LLM-provider aware, with centralized platform configuration for model access
-- Extensible toward more popular assistants, models, and message channels as the project evolves
-
-## Core Capabilities
-
-### 1. Agent Management
-
-- Create, edit, and delete agents
-- Configure a name and system prompt for each agent
-- Manage multiple agents for different roles and workflows
-
-### 2. Real-Time Chat
-
-- Conversation list, message history, and auto-generated titles
-- Streaming responses and visible thinking states
-- Tool call and step records for better execution traceability
-
-### 3. Enterprise Administration
-
-- Create and switch enterprises
-- Manage members, org units, roles, and invitations
-- Use an enterprise admin console for team collaboration and access control
-
-### 4. Platform Configuration
-
-- Configure platform data paths and runtime ports
-- Configure OpenAI, Anthropic, and other LLM providers
-- Let platform admins manage global settings in one place
-
-### 5. IM Integration
-
-- Configure and enable enterprise IM connections
-- Bind IM channels to agents
-- Includes Feishu-related integration as an external message entry point
-
-### 6. Skill Management
-
-- Create platform skills from scratch, import external skills from connected hubs, and govern the full lifecycle in one place
-- Separate the skill experience into Skill Market, Create Skill, Skill Governance, and Agent Skill Management instead of hiding everything in a single admin table
-- Install enterprise-enabled skills directly to a target agent and verify the result in the chat page
-- Support runtime skill injection for both Hermes and Nanobot so installed skills are actually exposed inside the agent runtime
+- Manage agents, conversations, skills, models, and enterprise access in one product
+- Run each agent in an isolated containerized runtime for safer execution boundaries
+- Support SaaS-style, self-hosted, and private deployment paths from the same codebase
+- Connect assistants to external channels instead of limiting them to an internal web chat
 
 ## Who It Is For
 
-- Product and platform teams that want to deliver AI agents to real users
-- Internal enterprise use cases that need organizations, permissions, and member management
-- Developers and operators who want to run a self-hosted AI agent platform
-- Open-source builders looking for a clean full-stack foundation for further customization
-
-## Tech Stack
-
-- Backend: Go 1.25, GoFrame, PostgreSQL
-- Frontend: React 19, TypeScript, Vite, Ant Design
-- Authentication: Casdoor
-- Runtime: Docker
-- Testing: Go `*_test.go`, Vitest
-
-## Repository Structure
-
-```text
-.
-├─ backend/          # Go backend: APIs, domain services, schema init, auto-install
-├─ web/              # React frontend: login, setup wizard, dashboard, chat, admin UI
-├─ deploy/           # Deployment assets: Casdoor, DotBlue, and Compose quick start
-└─ README.md
-```
-
-More detail:
-
-- `backend/internal/domains`: core business domains such as `agent`, `chat`, `conversation`, `enterprise`, and `im`
-- `backend/manifest/config`: runtime and initialization config templates
-- `web/src/domains`: frontend pages and business modules
-- `deploy/compose`: one-command local or test environment startup
+- Product and platform teams shipping AI assistants to internal or external users
+- Enterprise teams that need organizations, members, roles, invitations, and admin workflows
+- Developers and operators who want a self-hosted AI agent platform with a real product surface
+- Open-source builders who want a full-stack starting point instead of a thin SDK demo
 
 ## Quick Start
 
-The recommended way to get started is Docker Compose. It gives you the most complete end-to-end setup with the lowest local complexity.
+The recommended way to try DotBlue is Docker Compose. It gives you the most complete end-to-end setup with the lowest local complexity.
 
-Important reminder:
+### Prerequisites
 
-- If you update the platform-level LLM provider in the admin UI after agent containers have already started, recycle or restart the existing `hermes_*` agent containers before re-testing. Running agent containers keep their existing runtime config until they are recreated.
-- For skill-related end-to-end checks, prefer the local Compose environment and real browser verification first. Typical local validation flow is: import or create a skill -> install it to an agent -> open the chat page and confirm the assistant really uses the installed skill.
+- Docker Engine with Docker Compose available
+- Enough local resources to run `postgres`, `redis`, `casdoor`, `dotblue`, and `web`
+- A valid LLM API key for the provider you want to test
+- Free local ports for the default endpoints listed below
 
-### Option 1: Docker Compose
+### Start With Compose
 
-1. Go to the deployment directory
+1. Go to the deployment directory.
 
 ```bash
 cd deploy/compose
 ```
 
-2. Copy the environment template
+2. Copy the environment template.
 
 ```bash
 cp .env.example .env
@@ -130,14 +49,14 @@ Windows PowerShell:
 Copy-Item .env.example .env
 ```
 
-3. Update the key values in `.env`
+3. Update the key values in `.env`.
 
 - Database passwords
 - Platform admin account information
 - `DOTBLUE_LLM_API_KEY`
 - Public URLs and ports
 
-4. Generate local config files
+4. Generate the local config files.
 
 Linux/macOS:
 
@@ -151,25 +70,102 @@ Windows PowerShell:
 .\prepare-config.ps1
 ```
 
-5. Start the full stack
+5. Start the full stack.
 
 ```bash
 docker compose up -d --build
 ```
 
-Default local endpoints:
+### Default Local Endpoints
 
 - Web: `http://localhost:19000`
 - Backend: `http://localhost:18080`
 - Casdoor: `http://localhost:18000`
 
-The Compose setup starts:
+### What Compose Starts
 
 - `postgres`
 - `redis`
 - `casdoor`
 - `dotblue` in all-in-one mode, with the worker loop embedded
 - `web`
+
+### Validate The Setup
+
+After the containers are healthy:
+
+1. Open `http://localhost:19000`
+2. Confirm that the landing page or login flow is reachable
+3. Complete initialization through auto-install or the `/setup` page if needed
+4. Log in and verify you can create an agent and open the chat page
+
+For a more detailed walkthrough, see `deploy/compose/README.md`.
+
+## What You Get
+
+### Agent Management
+
+- Create, edit, and delete agents
+- Configure a name and system prompt for each agent
+- Manage multiple agents for different roles and workflows
+
+### Real-Time Chat
+
+- Conversation list, message history, and auto-generated titles
+- Streaming responses and visible thinking states
+- Tool call and step records for better execution traceability
+
+### Enterprise Administration
+
+- Create and switch enterprises
+- Manage members, org units, roles, and invitations
+- Use an enterprise admin console for team collaboration and access control
+
+### Platform Configuration
+
+- Configure platform data paths and runtime ports
+- Manage platform-wide model access and provider credentials
+- Let platform admins manage global settings in one place
+
+### IM Integration
+
+- Configure and enable enterprise IM connections
+- Bind IM channels to agents
+- Route assistant interactions through channels such as Feishu, Slack, Telegram, Discord, QQ, Matrix, and Web
+
+### Skill Management
+
+- Create platform skills from scratch
+- Import external skills from connected hubs
+- Govern the skill lifecycle from catalog to agent installation
+- Inject installed skills into both Hermes and Nanobot runtimes
+
+## Current Support
+
+- Backend: Go 1.25, GoFrame, PostgreSQL
+- Frontend: React 19, TypeScript, Vite, Ant Design
+- Authentication: Casdoor
+- Runtime isolation: Docker-based agent runtimes
+- Models: centralized platform configuration with OpenAI-compatible and provider-specific runtime handling
+- Testing: Go `*_test.go`, Vitest
+
+## Repository Structure
+
+```text
+.
+├─ backend/          # Go backend: APIs, domain services, schema init, auto-install
+├─ web/              # React frontend: landing page, login, setup, dashboard, chat, admin UI
+├─ deploy/           # Deployment assets: Casdoor, DotBlue, and Compose quick start
+├─ docs/             # Domain and product design notes
+└─ README.md
+```
+
+Useful directories:
+
+- `backend/internal/domains`: core business domains such as `agent`, `chat`, `conversation`, `enterprise`, `im`, `metering`, and `skill`
+- `backend/manifest/config`: runtime and initialization config templates
+- `web/src/domains`: frontend pages and business modules
+- `deploy/compose`: one-command local or test environment startup
 
 ## Local Development
 
@@ -234,7 +230,7 @@ At startup, the backend automatically performs:
 
 ### Backend
 
-- Template: `backend/manifest/config/config.example.yaml`
+- Runtime template: `backend/manifest/config/config.example.yaml`
 - Initialization template: `backend/manifest/config/init_data.example.json`
 - Recommended local files:
   - `backend/manifest/config/config.yaml`
@@ -255,6 +251,8 @@ Key environment variables:
 - `VITE_CASDOOR_ORG_NAME`
 - `VITE_CASDOOR_APP_NAME`
 - `VITE_BACKEND_URL`
+
+The container image also supports runtime overrides through `/runtime-config.js`, so private deployments can reuse the same `dotblue-web` image without rebuilding for each environment.
 
 ## API and UI Overview
 
@@ -285,48 +283,38 @@ Also available by default:
 - OpenAPI: `/api.json`
 - Swagger: `/swagger`
 
-## Highlights
+## Known Caveats
 
-- Clear separation between frontend, backend, domain services, and deployment assets
-- A usable product foundation, not just an SDK or API demo
-- Covers local development, automatic installation, and Compose deployment in one repository
+- If you update the platform-level model or provider settings after agent containers have already started, recycle or restart the existing `hermes_*` agent containers before re-testing. Running agent containers keep their existing runtime config until they are recreated.
+- For skill-related end-to-end checks, prefer the local Compose environment and real browser verification. A typical validation flow is: import or create a skill -> install it to an agent -> open the chat page -> confirm the assistant actually uses the installed skill.
+
+## Documentation Map
+
+- Root overview: `README.md`
+- Compose deployment guide: `deploy/compose/README.md`
+- Backend setup notes: `backend/README.MD`
+- Frontend environment notes: `web/README.md`
+- Domain design docs:
+  - `docs/skill-system-design.md`
+  - `docs/skill-backend-design.md`
+  - `docs/skill-frontend-design.md`
+  - `docs/skill-database-design.md`
+  - `docs/credit-domain-design.md`
 
 ## CI and Container Images
 
-Every push and pull request runs the CI workflow at
-`.github/workflows/ci.yml`, which lints, type-checks, builds, and tests both
-the backend and the web app, and builds both Docker images as a smoke test.
+Every push and pull request runs `.github/workflows/ci.yml`, which lints, type-checks, builds, and tests both the backend and the web app, and builds both Docker images as a smoke test.
 
-Cutting a tag of the form `vX.Y.Z` (for example `v0.1.0`) triggers
-`.github/workflows/release.yml`, which:
+Cutting a tag of the form `vX.Y.Z` (for example `v0.1.0`) triggers `.github/workflows/release.yml`, which:
 
-- builds and pushes multi-arch-style tags of the backend and web images to
-  GitHub Container Registry, and
-- drafts a GitHub release with auto-generated notes.
+- builds and pushes release tags of the backend and web images to GitHub Container Registry
+- drafts a GitHub release with auto-generated notes
 
-Once a tag is pushed, users can pull pre-built images directly instead of
-building from source. Replace `<owner>` with the GitHub owner of the repo:
+Once a tag is pushed, users can pull pre-built images directly instead of building from source. Replace `<owner>` with the GitHub owner of this repository:
 
 ```bash
 docker pull ghcr.io/<owner>/dotblue:v0.1.0
 docker pull ghcr.io/<owner>/dotblue-web:v0.1.0
 ```
 
-The backend image is published as `dotblue`, and the frontend image is
-published as `dotblue-web`.
-
-The frontend now reads its Casdoor and backend endpoints from
-`/runtime-config.js` at container startup, so private deployments can reuse the
-same `dotblue-web` image and override the runtime environment variables without
-rebuilding the image.
-
-## Open Source Checklist
-
-If you plan to publish DotBlue as an open-source project, it is worth adding:
-
-- `LICENSE`
-- `CONTRIBUTING.md`
-- `CODE_OF_CONDUCT.md`
-- `SECURITY.md`
-
-These files make the repository more complete and more welcoming for contributors.
+The backend image is published as `dotblue`, and the frontend image is published as `dotblue-web`.
