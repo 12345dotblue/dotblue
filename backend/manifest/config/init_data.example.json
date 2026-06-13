@@ -57,6 +57,8 @@
     "dataBasePath": "/var/lib/dotblue/agents",
     "dataMountPath": "/var/lib/dotblue/agents",
     "containerPort": 8642,
+    "newEnterprisePlatformCredits": 1000,
+    "defaultCreditSettlementCurrency": "USD",
     "runtimeMode": "host",
     "endpointMode": "host_loopback",
     "dockerEndpoint": "",

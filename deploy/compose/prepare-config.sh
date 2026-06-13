@@ -222,6 +222,8 @@ DOTBLUE_ENGINE_RUNTIME_MODE="${DOTBLUE_ENGINE_RUNTIME_MODE:-container}"
 DOTBLUE_ENGINE_ENDPOINT_MODE="${DOTBLUE_ENGINE_ENDPOINT_MODE:-docker_dns}"
 DOTBLUE_ENGINE_DOCKER_ENDPOINT="${DOTBLUE_ENGINE_DOCKER_ENDPOINT:-unix:///var/run/docker.sock}"
 DOTBLUE_ENGINE_DOCKER_NETWORK="${DOTBLUE_ENGINE_DOCKER_NETWORK:-${COMPOSE_PROJECT_NAME}_default}"
+DOTBLUE_NEW_ENTERPRISE_PLATFORM_CREDITS="${DOTBLUE_NEW_ENTERPRISE_PLATFORM_CREDITS:-1000}"
+DOTBLUE_DEFAULT_CREDIT_SETTLEMENT_CURRENCY="${DOTBLUE_DEFAULT_CREDIT_SETTLEMENT_CURRENCY:-USD}"
 DOTBLUE_ENGINE_DOCKER_SOCKET_GID="$(resolve_docker_socket_gid "${DOTBLUE_ENGINE_DOCKER_SOCKET_GID:-}" "${DOTBLUE_ENGINE_DOCKER_ENDPOINT}")"
 DOTBLUE_FILES_HOST_PATH_ABS="$(resolve_host_path "${DOTBLUE_FILES_HOST_PATH}")"
 DOTBLUE_ENGINE_HOST_DATA_PATH_ABS="$(resolve_host_path "${DOTBLUE_ENGINE_HOST_DATA_PATH}")"
@@ -322,7 +324,7 @@ cat > "${CASDOOR_DIR}/init_data.json" <<EOF
       "homepageUrl": "$(json_escape_string "${DOTBLUE_PUBLIC_URL}")",
       "organization": "$(json_escape_string "${CASDOOR_ORG_NAME}")",
       "cert": "$(json_escape_string "${DOTBLUE_CASDOOR_CERT_NAME}")",
-      "defaultGroup": "admin",
+      "defaultGroup": "",
       "enablePassword": true,
       "enableSignUp": true,
       "disableSignin": false,
@@ -560,6 +562,8 @@ cat > "${DOTBLUE_DIR}/init_data.json" <<EOF
     "dataBasePath": "$(json_escape_string "${DOTBLUE_ENGINE_HOST_DATA_PATH_ABS}")",
     "dataMountPath": "$(json_escape_string "${DOTBLUE_ENGINE_MOUNT_DATA_PATH}")",
     "containerPort": 8642,
+    "newEnterprisePlatformCredits": ${DOTBLUE_NEW_ENTERPRISE_PLATFORM_CREDITS},
+    "defaultCreditSettlementCurrency": "$(json_escape_string "${DOTBLUE_DEFAULT_CREDIT_SETTLEMENT_CURRENCY}")",
     "runtimeMode": "$(json_escape_string "${DOTBLUE_ENGINE_RUNTIME_MODE}")",
     "endpointMode": "$(json_escape_string "${DOTBLUE_ENGINE_ENDPOINT_MODE}")",
     "dockerEndpoint": "$(json_escape_string "${DOTBLUE_ENGINE_DOCKER_ENDPOINT}")",

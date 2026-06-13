@@ -24,6 +24,10 @@ import PlatformSkillBuilderPage from './domains/admin/PlatformSkillBuilderPage'
 import InviteAcceptPage from './domains/admin/InviteAcceptPage'
 import SetupWizard from './domains/setup/SetupWizard'
 import AgentSkillManagementPage from './domains/agent/AgentSkillManagementPage'
+import { CEndAgentConfigPage } from './domains/c-end-chat/pages/CEndAgentConfigPage'
+import { CEndChatPage } from './domains/c-end-chat/pages/CEndChatPage'
+import { CEndEmbedPage } from './domains/c-end-chat/pages/CEndEmbedPage'
+import { CEndSharePage } from './domains/c-end-chat/pages/CEndSharePage'
 
 import LandingLayout from './components/Layouts/LandingLayout'
 import AppLayout from './components/Layouts/AppLayout'
@@ -197,6 +201,11 @@ function AppContent() {
             <Route path="/admin/platform/skill-market" element={<RedirectToLocalized path="/admin/platform/skill-market" />} />
             <Route path="/admin/platform/skills/new" element={<RedirectToLocalized path="/admin/platform/skills/new" />} />
             <Route path="/dashboard/agents/:agentId/skills" element={<RedirectToLocalized />} />
+            <Route path="/share/:shareCode" element={<RedirectToLocalized />} />
+            <Route path="/embed/agents/:agentId" element={<RedirectToLocalized />} />
+            <Route path="/agents/:agentId/chat" element={<RedirectToLocalized />} />
+            <Route path="/admin/enterprise/c-end-chat" element={<RedirectToLocalized path="/admin/enterprise/c-end-chat" />} />
+            <Route path="/admin/enterprise/c-end-chat/agents/:agentId" element={<RedirectToLocalized />} />
 
             <Route path="/:lng" element={<LocalizedRouteGuard />}>
               <Route index element={<LandingLayout><LandingPage /></LandingLayout>} />
@@ -208,6 +217,9 @@ function AppContent() {
               <Route path="setup" element={<SetupWizard />} />
               <Route path="login" element={<Login />} />
               <Route path="invite/:code" element={<InviteAcceptPage />} />
+              <Route path="share/:shareCode" element={<SetupGuard><CEndSharePage /></SetupGuard>} />
+              <Route path="embed/agents/:agentId" element={<SetupGuard><CEndEmbedPage /></SetupGuard>} />
+              <Route path="agents/:agentId/chat" element={<SetupGuard><CEndChatPage /></SetupGuard>} />
               <Route path="admin/settings" element={<Navigate to="../enterprise" replace relative="path" />} />
               <Route
                 path="dashboard"
@@ -252,6 +264,28 @@ function AppContent() {
                     <PrivateRoute>
                       <AppLayout>
                         <AdminSettings />
+                      </AppLayout>
+                    </PrivateRoute>
+                  </SetupGuard>
+                }
+              />
+              <Route
+                path="admin/enterprise/c-end-chat"
+                element={
+                  <SetupGuard>
+                    <PrivateRoute>
+                      <Navigate to="../enterprise?tab=c-end-chat" replace relative="path" />
+                    </PrivateRoute>
+                  </SetupGuard>
+                }
+              />
+              <Route
+                path="admin/enterprise/c-end-chat/agents/:agentId"
+                element={
+                  <SetupGuard>
+                    <PrivateRoute>
+                      <AppLayout>
+                        <CEndAgentConfigPage />
                       </AppLayout>
                     </PrivateRoute>
                   </SetupGuard>

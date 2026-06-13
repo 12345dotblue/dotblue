@@ -80,6 +80,8 @@ export const translation = {
     "chat_earlier": "それ以前",
     "chat_input_placeholder": "ここにメッセージを入力...",
     "enterprise_admin_nav": "企業管理",
+    "enterprise_admin_open_c_end_chat": "C 向けチャットを管理",
+    "enterprise_admin_open_c_end_chat_desc": "公開共有、埋め込みアクセス、公開チャット入口を設定します。",
     "invite_accept_success": "エンタープライズへの参加に成功しました。",
     "invite_accept_failed": "招待を承認できませんでした。",
     "invite_not_found_title": "招待が見つかりません",

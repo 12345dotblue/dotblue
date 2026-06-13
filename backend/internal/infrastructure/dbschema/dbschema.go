@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/frame/g"
@@ -16,6 +17,13 @@ type provider interface {
 type statement struct {
 	name string
 	sql  string
+}
+
+type migration struct {
+	version       string
+	name          string
+	transactional bool
+	statements    []statement
 }
 
 func Ensure(ctx context.Context) error {
@@ -64,6 +72,29 @@ func execStatements(ctx context.Context, db gdb.DB, statements []statement) erro
 		if _, err := db.Exec(ctx, stmt.sql); err != nil {
 			return fmt.Errorf("%s: %w", stmt.name, err)
 		}
+	}
+	return nil
+}
+
+func execStatementsTx(ctx context.Context, tx gdb.TX, statements []statement) error {
+	_ = ctx
+	for _, stmt := range statements {
+		if _, err := tx.Exec(stmt.sql); err != nil {
+			return fmt.Errorf("%s: %w", stmt.name, err)
+		}
+	}
+	return nil
+}
+
+func recordMigration(ctx context.Context, model *gdb.Model, item migration) error {
+	_ = ctx
+	_, err := model.Data(g.Map{
+		"version":    item.version,
+		"name":       item.name,
+		"applied_at": time.Now(),
+	}).Insert()
+	if err != nil {
+		return fmt.Errorf("record migration %s: %w", item.version, err)
 	}
 	return nil
 }

@@ -2,40 +2,13 @@ package dbschema
 
 import (
 	"context"
-	"fmt"
-
 	"github.com/gogf/gf/v2/database/gdb"
-	"github.com/gogf/gf/v2/frame/g"
 )
 
 type postgresProvider struct{}
 
 func (postgresProvider) Ensure(ctx context.Context, db gdb.DB) error {
-	if err := execStatements(ctx, db, postgresSchemaStatements()); err != nil {
-		return err
-	}
-	if err := ensureSysSettingsSeed(ctx, db); err != nil {
-		return err
-	}
-	return nil
-}
-
-func ensureSysSettingsSeed(ctx context.Context, db gdb.DB) error {
-	count, err := db.Model("sys_settings").Ctx(ctx).Count()
-	if err != nil {
-		return fmt.Errorf("count sys_settings rows: %w", err)
-	}
-	if count > 0 {
-		return nil
-	}
-	if _, err := db.Model("sys_settings").Ctx(ctx).Data(g.Map{
-		"initialized": false,
-		"platform":    "{}",
-		"provider":    "{}",
-	}).Insert(); err != nil {
-		return fmt.Errorf("seed sys_settings default row: %w", err)
-	}
-	return nil
+	return applyPostgresMigrations(ctx, db)
 }
 
 func postgresSchemaStatements() []statement {
@@ -1300,6 +1273,97 @@ func postgresSchemaStatements() []statement {
 		{
 			name: "create channel_delivery_logs created_at index",
 			sql:  `CREATE INDEX IF NOT EXISTS idx_channel_delivery_logs_created_at ON channel_delivery_logs(created_at DESC)`,
+		},
+		{
+			name: "create chat_entry_agent_configs table",
+			sql: `
+				CREATE TABLE IF NOT EXISTS chat_entry_agent_configs (
+					id                     UUID PRIMARY KEY DEFAULT uuidv7(),
+					enterprise_id          VARCHAR(128) NOT NULL REFERENCES enterprises(id) ON DELETE CASCADE,
+					agent_id               UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+					enabled                BOOLEAN NOT NULL DEFAULT FALSE,
+					default_access_mode    VARCHAR(24) NOT NULL DEFAULT 'standalone',
+					allow_anonymous        BOOLEAN NOT NULL DEFAULT FALSE,
+					allow_file_upload      BOOLEAN NOT NULL DEFAULT FALSE,
+					theme_mode             VARCHAR(24) NOT NULL DEFAULT 'auto',
+					compact_header         BOOLEAN NOT NULL DEFAULT FALSE,
+					session_ttl_seconds    INTEGER NOT NULL DEFAULT 900,
+					refresh_before_seconds INTEGER NOT NULL DEFAULT 120,
+					created_by             VARCHAR(128) NOT NULL DEFAULT '',
+					created_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+					updated_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+					UNIQUE (enterprise_id, agent_id)
+				)
+			`,
+		},
+		{
+			name: "create chat_entry_share_links table",
+			sql: `
+				CREATE TABLE IF NOT EXISTS chat_entry_share_links (
+					id                  UUID PRIMARY KEY DEFAULT uuidv7(),
+					enterprise_id       VARCHAR(128) NOT NULL REFERENCES enterprises(id) ON DELETE CASCADE,
+					agent_id            UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+					conversation_id     UUID NULL REFERENCES conversations(id) ON DELETE SET NULL,
+					share_code          VARCHAR(128) NOT NULL UNIQUE,
+					password_hash       VARCHAR(255) NOT NULL DEFAULT '',
+					status              VARCHAR(24) NOT NULL DEFAULT 'active',
+					allow_continue_chat BOOLEAN NOT NULL DEFAULT FALSE,
+					allow_anonymous     BOOLEAN NOT NULL DEFAULT FALSE,
+					max_access_count    INTEGER NOT NULL DEFAULT 0,
+					access_count        INTEGER NOT NULL DEFAULT 0,
+					expires_at          TIMESTAMPTZ NULL,
+					revoked_at          TIMESTAMPTZ NULL,
+					created_by          VARCHAR(128) NOT NULL DEFAULT '',
+					created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+					updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+				)
+			`,
+		},
+		{
+			name: "create chat_entry_share_links agent index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_chat_entry_share_links_agent_created_at ON chat_entry_share_links(enterprise_id, agent_id, created_at DESC)`,
+		},
+		{
+			name: "create chat_entry_embed_configs table",
+			sql: `
+				CREATE TABLE IF NOT EXISTS chat_entry_embed_configs (
+					id                   UUID PRIMARY KEY DEFAULT uuidv7(),
+					enterprise_id        VARCHAR(128) NOT NULL REFERENCES enterprises(id) ON DELETE CASCADE,
+					agent_id             UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+					allowed_origins_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+					theme_mode           VARCHAR(24) NOT NULL DEFAULT 'auto',
+					compact_header       BOOLEAN NOT NULL DEFAULT TRUE,
+					allow_file_upload    BOOLEAN NOT NULL DEFAULT FALSE,
+					created_by           VARCHAR(128) NOT NULL DEFAULT '',
+					created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+					updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+					UNIQUE (enterprise_id, agent_id)
+				)
+			`,
+		},
+		{
+			name: "create chat_entry_access_logs table",
+			sql: `
+				CREATE TABLE IF NOT EXISTS chat_entry_access_logs (
+					id              UUID PRIMARY KEY DEFAULT uuidv7(),
+					channel_type    VARCHAR(24) NOT NULL,
+					target_id       VARCHAR(128) NOT NULL DEFAULT '',
+					enterprise_id   VARCHAR(128) NOT NULL DEFAULT '',
+					agent_id        VARCHAR(128) NOT NULL DEFAULT '',
+					origin          TEXT NOT NULL DEFAULT '',
+					referer         TEXT NOT NULL DEFAULT '',
+					ip_hash         VARCHAR(128) NOT NULL DEFAULT '',
+					user_agent      TEXT NOT NULL DEFAULT '',
+					trace_id        VARCHAR(128) NOT NULL DEFAULT '',
+					result          VARCHAR(32) NOT NULL DEFAULT '',
+					risk_flags_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+					created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+				)
+			`,
+		},
+		{
+			name: "create chat_entry_access_logs target index",
+			sql:  `CREATE INDEX IF NOT EXISTS idx_chat_entry_access_logs_target_created_at ON chat_entry_access_logs(channel_type, target_id, created_at DESC)`,
 		},
 	}
 }

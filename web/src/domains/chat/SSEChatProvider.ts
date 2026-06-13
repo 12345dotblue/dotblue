@@ -271,57 +271,76 @@ function createSSETransformStream(events: SSEProviderEvents): TransformStream<st
   });
 }
 
-// Cache providers per agent
+// Cache providers per request signature so member mode and public mode do not
+// accidentally share the same streaming client for the same agent id.
 const providerCache = new Map<string, SSEChatProvider>();
 
-// Custom fetch that injects the latest JWT on every request
-function authFetch(url: Parameters<typeof fetch>[0], options?: RequestInit): Promise<Response> {
+function defaultAuthHeaderProvider(): Record<string, string> {
   const jwt = localStorage.getItem('casdoor_token');
   const enterpriseId = localStorage.getItem(CURRENT_ENTERPRISE_STORAGE_KEY)?.trim();
-  const headers = new Headers(options?.headers);
-  if (jwt) headers.set('Authorization', `Bearer ${jwt}`);
-  if (enterpriseId) headers.set('X-Enterprise-ID', enterpriseId);
-  headers.set('Content-Type', 'application/json');
-  const method = (options?.method || 'GET').toUpperCase();
-  const bodyLen = typeof options?.body === 'string' ? options.body.length : undefined;
-  sseLog('fetch', { method, url, bodyLen });
-  return fetch(url, { ...options, headers })
-    .then((res) => {
-      sseLog('fetch_res', { status: res.status, ok: res.ok, contentType: res.headers.get('content-type') });
-      return res;
-    })
-    .catch((err) => {
-      sseLog('fetch_err', { name: err?.name, message: err?.message });
-      const msg = String(err?.message || err || '');
-      if (options?.signal?.aborted || err?.name === 'AbortError' || msg.includes('ERR_ABORTED') || msg.toLowerCase().includes('aborted')) {
-        sseLog('fetch_abort_ignored');
-        return new Response('data: [DONE]\n\n', {
-          status: 200,
-          headers: { 'Content-Type': 'text/event-stream' },
-        });
-      }
-      throw err;
+  const headers: Record<string, string> = {};
+  if (jwt) headers.Authorization = `Bearer ${jwt}`;
+  if (enterpriseId) headers['X-Enterprise-ID'] = enterpriseId;
+  return headers;
+}
+
+function createAuthFetch(getHeaders?: () => Record<string, string>): typeof fetch {
+  return (url: Parameters<typeof fetch>[0], options?: RequestInit): Promise<Response> => {
+    const headers = new Headers(options?.headers);
+    const latestHeaders = (getHeaders || defaultAuthHeaderProvider)();
+    Object.entries(latestHeaders).forEach(([key, value]) => {
+      if (value) headers.set(key, value);
     });
+    headers.set('Content-Type', 'application/json');
+    const method = (options?.method || 'GET').toUpperCase();
+    const bodyLen = typeof options?.body === 'string' ? options.body.length : undefined;
+    sseLog('fetch', { method, url, bodyLen });
+    return fetch(url, { ...options, headers })
+      .then((res) => {
+        sseLog('fetch_res', { status: res.status, ok: res.ok, contentType: res.headers.get('content-type') });
+        return res;
+      })
+      .catch((err) => {
+        sseLog('fetch_err', { name: err?.name, message: err?.message });
+        const msg = String(err?.message || err || '');
+        if (options?.signal?.aborted || err?.name === 'AbortError' || msg.includes('ERR_ABORTED') || msg.toLowerCase().includes('aborted')) {
+          sseLog('fetch_abort_ignored');
+          return new Response('data: [DONE]\n\n', {
+            status: 200,
+            headers: { 'Content-Type': 'text/event-stream' },
+          });
+        }
+        throw err;
+      });
+  };
+}
+
+interface ProviderOptions {
+  cacheKey?: string;
+  requestUrl?: string;
+  getHeaders?: () => Record<string, string>;
 }
 
 export function getOrCreateProvider(
   agentId: string,
   events: SSEProviderEvents,
+  options: ProviderOptions = {},
 ): SSEChatProvider {
-  let provider = providerCache.get(agentId);
+  const cacheKey = options.cacheKey || agentId;
+  let provider = providerCache.get(cacheKey);
   if (!provider) {
-    const request = XRequest(`${BACKEND_URL}/api/chat/completions`, {
+    const request = XRequest(options.requestUrl || `${BACKEND_URL}/api/chat/completions`, {
       manual: true,
-      fetch: authFetch,
+      fetch: createAuthFetch(options.getHeaders),
       // Reuse the provider, but create a fresh TransformStream for each request.
       transformStream: () => createSSETransformStream(events),
     });
     provider = new SSEChatProvider({ request });
-    providerCache.set(agentId, provider);
+    providerCache.set(cacheKey, provider);
   }
   return provider;
 }
 
-export function resetProvider(agentId: string): void {
-  providerCache.delete(agentId);
+export function resetProvider(cacheKey: string): void {
+  providerCache.delete(cacheKey);
 }

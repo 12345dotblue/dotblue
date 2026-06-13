@@ -201,6 +201,11 @@ func (s *Service) ResolveMemberContext(userId, sourceOrgId, displayName, request
 	if err != nil || current == nil {
 		return current, err
 	}
+	if s.bootstrapProvisioner != nil {
+		if err := s.bootstrapProvisioner.EnsureBootstrapCredits(current.EnterpriseId); err != nil {
+			return nil, err
+		}
+	}
 	if err := s.SetLastEnterprise(userId, current.EnterpriseId); err != nil {
 		return nil, err
 	}

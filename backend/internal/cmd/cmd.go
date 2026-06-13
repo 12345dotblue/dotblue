@@ -10,6 +10,7 @@ import (
 
 	"dotblue/internal/domains/agent"
 	"dotblue/internal/domains/chat"
+	"dotblue/internal/domains/chatentry"
 	"dotblue/internal/domains/conversation"
 	"dotblue/internal/domains/credit"
 	"dotblue/internal/domains/engine"
@@ -76,6 +77,17 @@ var (
 				group.POST("/setup/install", setup.InstallHandler)
 				group.POST("/im/inbound/{platform}/{id}", im.PlatformInboundHandler)
 				group.POST("/im/inbound/feishu/{id}", im.FeishuInboundHandler)
+				group.GET("/public/c-end-chat/share-links/{shareCode}", chatentry.ResolveShareLinkHandler)
+				group.POST("/public/c-end-chat/share-links/{shareCode}/verify", chatentry.VerifyShareLinkHandler)
+				group.POST("/public/c-end-chat/agents/{agentId}/session", chatentry.CreateStandaloneSessionHandler)
+				group.POST("/public/c-end-chat/embed/session", chatentry.ExchangeEmbedSessionHandler)
+				group.POST("/public/c-end-chat/session/refresh", chatentry.RefreshSessionHandler)
+				group.POST("/public/c-end-chat/conversations", chatentry.CreateConversationHandler)
+				group.GET("/public/c-end-chat/conversations/{id}/messages", chatentry.ListConversationMessagesHandler)
+				group.POST("/public/c-end-chat/files", chatentry.PublicFileUploadHandler)
+				group.GET("/public/c-end-chat/files/{id}/preview", chatentry.PublicFilePreviewHandler)
+				group.GET("/public/c-end-chat/files/{id}/download", chatentry.PublicFileDownloadHandler)
+				group.POST("/public/c-end-chat/chat/completions", chatentry.PublicChatCompletionsHandler)
 			})
 
 			s.Group("/api", func(group *ghttp.RouterGroup) {
@@ -153,6 +165,14 @@ var (
 				group.Middleware(identity.Middleware)
 				group.Middleware(enterprise.MemberContextMiddleware)
 				group.Middleware(enterprise.AdminMiddleware)
+				group.GET("/admin/c-end-chat/agents/{agentId}", chatentry.GetAgentConfigHandler)
+				group.PUT("/admin/c-end-chat/agents/{agentId}", chatentry.UpsertAgentConfigHandler)
+				group.GET("/admin/c-end-chat/agents/{agentId}/share-links", chatentry.ListShareLinksHandler)
+				group.POST("/admin/c-end-chat/share-links", chatentry.CreateShareLinkHandler)
+				group.POST("/admin/c-end-chat/share-links/{id}/revoke", chatentry.RevokeShareLinkHandler)
+				group.GET("/admin/c-end-chat/agents/{agentId}/embed-config", chatentry.GetEmbedConfigHandler)
+				group.PUT("/admin/c-end-chat/agents/{agentId}/embed-config", chatentry.UpsertEmbedConfigHandler)
+				group.POST("/admin/c-end-chat/agents/{agentId}/embed-token", chatentry.CreateEmbedTokenHandler)
 				group.GET("/admin/summary", enterprise.GetSummaryHandler)
 				group.GET("/admin/org-units", enterprise.ListOrgUnitsHandler)
 				group.POST("/admin/org-units", enterprise.CreateOrgUnitHandler)

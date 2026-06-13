@@ -80,6 +80,8 @@ export const translation = {
     "chat_earlier": "Plus ancien",
     "chat_input_placeholder": "Tapez votre message ici...",
     "enterprise_admin_nav": "Administration entreprise",
+    "enterprise_admin_open_c_end_chat": "Gerer le chat C-end",
+    "enterprise_admin_open_c_end_chat_desc": "Configurez le partage public, l acces embarque et les points d entree du chat public.",
     "invite_accept_success": "Participation a l entreprise reussie.",
     "invite_accept_failed": "Impossible d accepter l invitation.",
     "invite_not_found_title": "Invitation introuvable",

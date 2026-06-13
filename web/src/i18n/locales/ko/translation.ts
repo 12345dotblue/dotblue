@@ -835,6 +835,8 @@ export const translation = {
     "enterprise_admin_pending_invites": "대기 중인 초대",
     "enterprise_admin_summary_title": "엔터프라이즈 개요",
     "enterprise_admin_summary_desc": "현재 엔터프라이즈, 역할 범위, 구성원, 부서, 대기 중인 초대를 한곳에서 확인합니다.",
+    "enterprise_admin_open_c_end_chat": "C단 채팅 관리",
+    "enterprise_admin_open_c_end_chat_desc": "공개 공유, 임베드 접근, 공개 채팅 진입점을 설정합니다.",
     "enterprise_admin_tab_organization": "조직",
     "enterprise_admin_tab_members": "구성원",
     "enterprise_admin_tab_invitations": "초대",

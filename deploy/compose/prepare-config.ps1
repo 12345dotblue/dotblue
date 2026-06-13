@@ -243,6 +243,12 @@ if (-not $envMap["DOTBLUE_ENGINE_DOCKER_ENDPOINT"]) {
 if (-not $envMap["DOTBLUE_ENGINE_DOCKER_NETWORK"]) {
   $envMap["DOTBLUE_ENGINE_DOCKER_NETWORK"] = "$($envMap["COMPOSE_PROJECT_NAME"])_default"
 }
+if (-not $envMap["DOTBLUE_NEW_ENTERPRISE_PLATFORM_CREDITS"]) {
+  $envMap["DOTBLUE_NEW_ENTERPRISE_PLATFORM_CREDITS"] = "1000"
+}
+if (-not $envMap["DOTBLUE_DEFAULT_CREDIT_SETTLEMENT_CURRENCY"]) {
+  $envMap["DOTBLUE_DEFAULT_CREDIT_SETTLEMENT_CURRENCY"] = "USD"
+}
 $envMap["DOTBLUE_ENGINE_DOCKER_SOCKET_GID"] = Resolve-DockerSocketGid $envMap
 $dotblueFilesHostPathAbs = Resolve-HostPath $envMap["DOTBLUE_FILES_HOST_PATH"]
 $dotblueEngineHostDataPathAbs = Resolve-HostPath $envMap["DOTBLUE_ENGINE_HOST_DATA_PATH"]
@@ -353,7 +359,7 @@ $casdoorInitData = @{
       homepageUrl = $envMap["DOTBLUE_PUBLIC_URL"]
       organization = $envMap["CASDOOR_ORG_NAME"]
       cert = $envMap["DOTBLUE_CASDOOR_CERT_NAME"]
-      defaultGroup = "admin"
+      defaultGroup = ""
       enablePassword = $true
       enableSignUp = $true
       disableSignin = $false
@@ -546,6 +552,8 @@ $dotblueInitData = @{
     dataBasePath = $dotblueEngineHostDataPathAbs
     dataMountPath = $envMap["DOTBLUE_ENGINE_MOUNT_DATA_PATH"]
     containerPort = 8642
+    newEnterprisePlatformCredits = [int64]$envMap["DOTBLUE_NEW_ENTERPRISE_PLATFORM_CREDITS"]
+    defaultCreditSettlementCurrency = $envMap["DOTBLUE_DEFAULT_CREDIT_SETTLEMENT_CURRENCY"]
     runtimeMode = $envMap["DOTBLUE_ENGINE_RUNTIME_MODE"]
     endpointMode = $envMap["DOTBLUE_ENGINE_ENDPOINT_MODE"]
     dockerEndpoint = $envMap["DOTBLUE_ENGINE_DOCKER_ENDPOINT"]

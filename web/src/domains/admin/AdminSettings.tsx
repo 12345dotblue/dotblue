@@ -22,25 +22,25 @@ import {
 import {
   CopyOutlined,
   PlusOutlined,
-  SettingOutlined,
   TeamOutlined,
   ApartmentOutlined,
   LinkOutlined,
+  DollarOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { BACKEND_URL } from '../../config';
 import { casdoorService } from '../identity/CasdoorService';
+import { CEndAdminPage } from '../c-end-chat/pages/CEndAdminPage';
 import EnterpriseSkillsTab from './EnterpriseSkillsTab';
 import EnterpriseCreditSettingsTab from './EnterpriseCreditSettingsTab';
 import EnterpriseLLMSettingsTab from './EnterpriseLLMSettingsTab';
 import EnterpriseUsageSettingsTab from './EnterpriseUsageSettingsTab';
 import IMSettingsTab from './IMSettingsTab';
-import { useThemeMode } from '../../theme/themeMode';
 
-const { Paragraph, Text, Title } = Typography;
-const ENTERPRISE_ADMIN_TABS = ['organization', 'members', 'invitations', 'llm', 'usage', 'credits', 'im', 'skills'] as const;
+const { Paragraph, Text } = Typography;
+const ENTERPRISE_ADMIN_TABS = ['organization', 'members', 'invitations', 'c-end-chat', 'llm', 'usage', 'credits', 'im', 'skills'] as const;
 type EnterpriseAdminTab = typeof ENTERPRISE_ADMIN_TABS[number];
 
 interface EnterpriseSummary {
@@ -96,6 +96,21 @@ interface InvitationItem {
   createdAt: string;
 }
 
+interface CreditWalletOverview {
+  creditType: string;
+  totalCredits: number;
+  reservedCredits: number;
+  availableCredits: number;
+  grantedCredits: number;
+  settledCredits: number;
+  expiredCredits: number;
+}
+
+interface CreditOverview {
+  enterpriseId: string;
+  wallets: CreditWalletOverview[];
+}
+
 function getAuthHeaders() {
   const token = casdoorService.getToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -140,7 +155,6 @@ function getAdminActionErrorMessage(fallbackMessage: string) {
 
 const AdminSettings: React.FC = () => {
   const { t, i18n } = useTranslation();
-  const { resolvedTheme } = useThemeMode();
   const [searchParams, setSearchParams] = useSearchParams();
   const [messageApi, contextHolder] = message.useMessage();
   const [fetching, setFetching] = useState(true);
@@ -148,8 +162,8 @@ const AdminSettings: React.FC = () => {
   const [orgUnits, setOrgUnits] = useState<OrgUnit[]>([]);
   const [members, setMembers] = useState<MemberItem[]>([]);
   const [invitations, setInvitations] = useState<InvitationItem[]>([]);
+  const [creditOverview, setCreditOverview] = useState<CreditOverview | null>(null);
   const [enterpriseAdminDenied, setEnterpriseAdminDenied] = useState(false);
-  const [createEnterpriseOpen, setCreateEnterpriseOpen] = useState(false);
   const [orgModalOpen, setOrgModalOpen] = useState(false);
   const [editingOrgUnit, setEditingOrgUnit] = useState<OrgUnit | null>(null);
   const [memberModalOpen, setMemberModalOpen] = useState(false);
@@ -159,10 +173,6 @@ const AdminSettings: React.FC = () => {
   const [savingOrgUnit, setSavingOrgUnit] = useState(false);
   const [addingMember, setAddingMember] = useState(false);
   const [creatingInvitation, setCreatingInvitation] = useState(false);
-  const [llmCreateSignal, setLLMCreateSignal] = useState(0);
-  const [imCreateSignal, setIMCreateSignal] = useState(0);
-  const [skillCreateSignal, setSkillCreateSignal] = useState(0);
-  const [createEnterpriseForm] = Form.useForm<{ name: string }>();
   const [orgForm] = Form.useForm<OrgUnit>();
   const [memberForm] = Form.useForm<{ userId?: string; email?: string; role: string; orgUnitId?: string }>();
   const [invitationForm] = Form.useForm<{ email?: string; role: string; defaultOrgUnitId?: string; expiresInDays?: number; maxUses?: number }>();
@@ -173,16 +183,6 @@ const AdminSettings: React.FC = () => {
       ? (requestedTab as EnterpriseAdminTab)
       : 'organization';
   }, [searchParams]);
-  const isDark = resolvedTheme === 'dark';
-  const overviewSurfaceStyle = useMemo<React.CSSProperties>(() => ({
-    borderRadius: 24,
-    overflow: 'hidden',
-    background: isDark
-      ? 'linear-gradient(135deg, #132033 0%, #101a2b 42%, #16253a 100%)'
-      : 'linear-gradient(135deg, #f8fbff 0%, #eef6ff 42%, #f9fcff 100%)',
-    border: isDark ? '1px solid #223247' : '1px solid #d6e4ff',
-    boxShadow: isDark ? '0 18px 36px rgba(2, 8, 23, 0.22)' : undefined,
-  }), [isDark]);
 
   const orgTreeData = useMemo(() => buildOrgTree(orgUnits), [orgUnits]);
   const orgUnitOptions = useMemo(() => orgUnits.map((unit) => ({
@@ -190,78 +190,21 @@ const AdminSettings: React.FC = () => {
     value: unit.id,
   })), [orgUnits]);
   const orgUnitMap = useMemo(() => new Map(orgUnits.map((unit) => [unit.id, unit])), [orgUnits]);
-  const activeTabAction = useMemo(() => {
-    if (activeTab === 'organization') {
-      return {
-        label: t('enterprise_admin_new_department'),
-        icon: <PlusOutlined />,
-        onClick: () => {
-          setEditingOrgUnit(null);
-          setOrgModalOpen(true);
-        },
-      };
-    }
-    if (activeTab === 'members') {
-      return {
-        label: t('enterprise_admin_add_existing_member'),
-        icon: <PlusOutlined />,
-        onClick: () => setMemberModalOpen(true),
-      };
-    }
-    if (activeTab === 'llm') {
-      return {
-        label: t('enterprise_admin_llm_create'),
-        icon: <PlusOutlined />,
-        onClick: () => setLLMCreateSignal((current) => current + 1),
-      };
-    }
-    if (activeTab === 'im') {
-      return {
-        label: t('admin_settings_new_im_connection'),
-        icon: <PlusOutlined />,
-        onClick: () => setIMCreateSignal((current) => current + 1),
-      };
-    }
-    if (activeTab === 'usage') {
-      return {
-        label: t('admin_settings_refresh_usage'),
-        icon: <PlusOutlined />,
-        onClick: () => window.location.reload(),
-      };
-    }
-    if (activeTab === 'credits') {
-      return {
-        label: t('admin_settings_refresh_credits'),
-        icon: <PlusOutlined />,
-        onClick: () => window.location.reload(),
-      };
-    }
-    if (activeTab === 'skills') {
-      return {
-        label: t('enterprise_admin_skills_action_create'),
-        icon: <PlusOutlined />,
-        onClick: () => setSkillCreateSignal((current) => current + 1),
-      };
-    }
-    return {
-      label: t('enterprise_admin_create_invite'),
-      icon: <PlusOutlined />,
-      onClick: () => setInvitationModalOpen(true),
-    };
-  }, [activeTab, t]);
 
   const loadEnterpriseData = async () => {
     try {
-      const [summaryRes, orgUnitsRes, membersRes, invitationsRes] = await Promise.all([
+      const [summaryRes, orgUnitsRes, membersRes, invitationsRes, creditsRes] = await Promise.all([
         axios.get(`${BACKEND_URL}/api/admin/summary`, { headers: getAuthHeaders() }),
         axios.get(`${BACKEND_URL}/api/admin/org-units`, { headers: getAuthHeaders() }),
         axios.get(`${BACKEND_URL}/api/admin/members`, { headers: getAuthHeaders() }),
         axios.get(`${BACKEND_URL}/api/admin/invitations`, { headers: getAuthHeaders() }),
+        axios.get(`${BACKEND_URL}/api/admin/credits/overview`, { headers: getAuthHeaders() }),
       ]);
       setSummary(summaryRes.data || null);
       setOrgUnits(Array.isArray(orgUnitsRes.data) ? orgUnitsRes.data : []);
       setMembers(Array.isArray(membersRes.data) ? membersRes.data : []);
       setInvitations(Array.isArray(invitationsRes.data) ? invitationsRes.data : []);
+      setCreditOverview(creditsRes.data || null);
       setEnterpriseAdminDenied(false);
     } catch (error: any) {
       if (error?.response?.status === 403) {
@@ -270,6 +213,7 @@ const AdminSettings: React.FC = () => {
         setOrgUnits([]);
         setMembers([]);
         setInvitations([]);
+        setCreditOverview(null);
         return;
       }
       throw error;
@@ -290,13 +234,6 @@ const AdminSettings: React.FC = () => {
   useEffect(() => {
     loadAll();
   }, [t]);
-
-  useEffect(() => {
-    if (!createEnterpriseOpen) {
-      return;
-    }
-    createEnterpriseForm.resetFields();
-  }, [createEnterpriseOpen, createEnterpriseForm]);
 
   useEffect(() => {
     if (!orgModalOpen) {
@@ -335,21 +272,6 @@ const AdminSettings: React.FC = () => {
     const nextSearchParams = new URLSearchParams(searchParams);
     nextSearchParams.set('tab', tab);
     setSearchParams(nextSearchParams, { replace: true });
-  };
-
-  const handleCreateEnterprise = async () => {
-    const values = await createEnterpriseForm.validateFields();
-    try {
-      await axios.post(`${BACKEND_URL}/api/enterprises`, values, {
-        headers: getAuthHeaders(),
-      });
-      messageApi.success(t('enterprise_admin_enterprise_created'));
-      setCreateEnterpriseOpen(false);
-      createEnterpriseForm.resetFields();
-      window.location.reload();
-    } catch {
-      messageApi.error(t('enterprise_admin_enterprise_create_failed'));
-    }
   };
 
   const openCreateOrgUnit = () => {
@@ -632,76 +554,45 @@ const AdminSettings: React.FC = () => {
           </Card>
         ) : (
           <>
-            <Card
-              variant="borderless"
-              loading={fetching}
-              style={overviewSurfaceStyle}
-              styles={{ body: { padding: 24 } }}
-            >
-              <Row gutter={[24, 24]} align="middle">
-                <Col xs={24} xl={16}>
-                  <Space orientation="vertical" size={12} style={{ width: '100%' }}>
-                    <Tag color="blue" style={{ width: 'fit-content', borderRadius: 999, paddingInline: 12 }}>
-                      {t('enterprise_admin_current_enterprise')}
-                    </Tag>
-                    <div>
-                      <Title level={3} style={{ marginBottom: 8 }}>
-                        <SettingOutlined style={{ marginRight: 10 }} />
-                        {summary?.enterpriseName || t('enterprise_admin_title')}
-                      </Title>
-                      <Paragraph type="secondary" style={{ marginBottom: 0, maxWidth: 720 }}>
-                        {t('enterprise_admin_summary_desc')}
-                      </Paragraph>
-                    </div>
-                    <Space wrap size={[12, 12]}>
-                      <Tag color="geekblue" style={{ borderRadius: 999, paddingInline: 12 }}>
-                        {t('enterprise_admin_current_enterprise')}: {summary?.enterpriseName || '-'}
-                      </Tag>
-                      <Tag color="gold" style={{ borderRadius: 999, paddingInline: 12 }}>
-                        {t('enterprise_admin_my_role', {
-                          role: summary?.myRole ? t(`enterprise_role_${summary.myRole}`) : '-',
-                        })}
-                      </Tag>
-                    </Space>
-                  </Space>
-                </Col>
-                <Col xs={24} xl={8}>
-                  <Space orientation="vertical" size={12} style={{ width: '100%' }}>
-                    <Button type="primary" size="large" icon={<PlusOutlined />} onClick={() => setCreateEnterpriseOpen(true)} block>
-                      {t('enterprise_admin_create_enterprise')}
-                    </Button>
-                    <Button size="large" icon={activeTabAction.icon} onClick={activeTabAction.onClick} block type="default">
-                      {activeTabAction.label}
-                    </Button>
-                  </Space>
-                </Col>
-              </Row>
-            </Card>
-
             <Row gutter={[16, 16]}>
-              <Col xs={24} sm={12} lg={6}>
-                <Card variant="borderless" loading={fetching} style={{ borderRadius: 20, height: '100%' }}>
-                  <Statistic title={t('enterprise_admin_current_enterprise')} value={summary?.enterpriseName || '-'} prefix={<TeamOutlined />} />
-                </Card>
-              </Col>
-              <Col xs={12} sm={12} lg={6}>
+              <Col xs={12} sm={12} lg={4}>
                 <Card variant="borderless" loading={fetching} style={{ borderRadius: 20, height: '100%' }}>
                   <Statistic title={t('enterprise_admin_members')} value={summary?.memberCount || 0} />
                 </Card>
               </Col>
-              <Col xs={12} sm={12} lg={6}>
+              <Col xs={12} sm={12} lg={4}>
                 <Card variant="borderless" loading={fetching} style={{ borderRadius: 20, height: '100%' }}>
                   <Statistic title={t('enterprise_admin_departments')} value={summary?.orgUnitCount || 0} prefix={<ApartmentOutlined />} />
                 </Card>
               </Col>
-              <Col xs={12} sm={12} lg={6}>
+              <Col xs={12} sm={12} lg={4}>
                 <Card variant="borderless" loading={fetching} style={{ borderRadius: 20, height: '100%' }}>
                   <Statistic title={t('enterprise_admin_admins')} value={summary?.adminCount || 0} />
                 </Card>
               </Col>
-              <Col xs={12} sm={12} lg={6}>
+              <Col xs={12} sm={12} lg={4}>
                 <Card variant="borderless" loading={fetching} style={{ borderRadius: 20, height: '100%' }}>
                   <Statistic title={t('enterprise_admin_pending_invites')} value={summary?.pendingInviteCount || 0} />
+                </Card>
+              </Col>
+              <Col xs={12} sm={12} lg={4}>
+                <Card variant="borderless" loading={fetching} style={{ borderRadius: 20, height: '100%' }}>
+                  <Statistic
+                    title={t('enterprise_admin_credits_available')}
+                    value={creditOverview?.wallets?.find((w) => w.creditType === 'platform')?.availableCredits || 0}
+                    prefix={<DollarOutlined style={{ color: '#1677ff' }} />}
+                    valueStyle={{ color: '#1677ff' }}
+                  />
+                </Card>
+              </Col>
+              <Col xs={12} sm={12} lg={4}>
+                <Card variant="borderless" loading={fetching} style={{ borderRadius: 20, height: '100%' }}>
+                  <Statistic
+                    title={t('enterprise_admin_credits_reserved')}
+                    value={creditOverview?.wallets?.find((w) => w.creditType === 'platform')?.reservedCredits || 0}
+                    prefix={<DollarOutlined style={{ color: '#fa8c16' }} />}
+                    valueStyle={{ color: '#fa8c16' }}
+                  />
                 </Card>
               </Col>
             </Row>
@@ -829,9 +720,14 @@ const AdminSettings: React.FC = () => {
                   ),
                 },
                 {
+                  key: 'c-end-chat',
+                  label: t('enterprise_admin_tab_c_end_chat'),
+                  children: <CEndAdminPage embedded />,
+                },
+                {
                   key: 'llm',
                   label: t('enterprise_admin_tab_llm'),
-                  children: <EnterpriseLLMSettingsTab createSignal={llmCreateSignal} />,
+                  children: <EnterpriseLLMSettingsTab />,
                 },
                 {
                   key: 'usage',
@@ -846,33 +742,18 @@ const AdminSettings: React.FC = () => {
                 {
                   key: 'im',
                   label: t('admin_settings_im_access'),
-                  children: <IMSettingsTab createSignal={imCreateSignal} />,
+                  children: <IMSettingsTab />,
                 },
                 {
                   key: 'skills',
                   label: t('enterprise_admin_tab_skills'),
-                  children: <EnterpriseSkillsTab createSignal={skillCreateSignal} />,
+                  children: <EnterpriseSkillsTab />,
                 },
               ]}
             />
           </>
         )}
       </Space>
-
-      <Modal
-        title={t('enterprise_admin_create_enterprise')}
-        open={createEnterpriseOpen}
-        onOk={handleCreateEnterprise}
-        onCancel={() => setCreateEnterpriseOpen(false)}
-        okText={t('enterprise_admin_create')}
-        destroyOnHidden
-      >
-        <Form form={createEnterpriseForm} layout="vertical">
-          <Form.Item label={t('enterprise_admin_enterprise_name')} name="name" rules={[{ required: true, message: t('enterprise_admin_enterprise_name_required') }]}>
-            <Input placeholder={t('enterprise_admin_enterprise_name_placeholder')} />
-          </Form.Item>
-        </Form>
-      </Modal>
 
       <Modal
         title={editingOrgUnit ? t('enterprise_admin_edit_department') : t('enterprise_admin_create_department')}

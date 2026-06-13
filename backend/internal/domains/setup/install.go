@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/casdoor/casdoor-go-sdk/casdoorsdk"
@@ -181,6 +182,7 @@ func (e *installExecutor) ensureApplication(ctx context.Context, client setupCli
 			return newInstallInputErrorf("application.redirectUris is required when creating Casdoor application %q", plan.ApplicationName)
 		}
 
+		// New self-registered users must not inherit the platform admin group.
 		app := &casdoorsdk.Application{
 			Owner:                   "admin",
 			Name:                    plan.ApplicationName,
@@ -192,7 +194,7 @@ func (e *installExecutor) ensureApplication(ctx context.Context, client setupCli
 			HomepageUrl:             appCfg.HomepageURL,
 			Logo:                    appCfg.Logo,
 			Favicon:                 appCfg.Favicon,
-			DefaultGroup:            firstNonEmpty(appCfg.DefaultGroup, AdminGroupName),
+			DefaultGroup:            strings.TrimSpace(appCfg.DefaultGroup),
 			RedirectUris:            appCfg.RedirectUris,
 			SigninUrl:               appCfg.SigninURL,
 			SignupUrl:               appCfg.SignupURL,
@@ -228,7 +230,9 @@ func (e *installExecutor) ensureApplication(ctx context.Context, client setupCli
 	existing.HomepageUrl = firstNonEmpty(appCfg.HomepageURL, existing.HomepageUrl)
 	existing.Logo = firstNonEmpty(appCfg.Logo, existing.Logo)
 	existing.Favicon = firstNonEmpty(appCfg.Favicon, existing.Favicon)
-	existing.DefaultGroup = firstNonEmpty(appCfg.DefaultGroup, existing.DefaultGroup, AdminGroupName)
+	// Keep the application default group explicit so upgrades can clear the old
+	// misconfiguration that promoted every sign-up into the admin group.
+	existing.DefaultGroup = strings.TrimSpace(appCfg.DefaultGroup)
 	if len(appCfg.RedirectUris) > 0 {
 		existing.RedirectUris = appCfg.RedirectUris
 	}

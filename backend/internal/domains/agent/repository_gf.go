@@ -1,6 +1,9 @@
 package agent
 
 import (
+	"database/sql"
+	"errors"
+	"strings"
 	"time"
 
 	"github.com/gogf/gf/v2/frame/g"
@@ -12,10 +15,23 @@ func NewGFRepository() *GFRepository {
 	return &GFRepository{}
 }
 
+func isNoRowsError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, sql.ErrNoRows) {
+		return true
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "no rows in result set")
+}
+
 func (r *GFRepository) GetById(id string) (*Agent, error) {
 	var agent Agent
 	err := g.DB().Model("agents").Where("id = ?", id).Scan(&agent)
 	if err != nil {
+		if isNoRowsError(err) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	if agent.Id == "" {

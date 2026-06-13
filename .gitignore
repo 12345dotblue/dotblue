@@ -4,6 +4,7 @@
 .windsai/
 .continue/
 .copilot/
+.trae/
 .agent-local-notes.md
 local-docs/
 backend/.gocache/

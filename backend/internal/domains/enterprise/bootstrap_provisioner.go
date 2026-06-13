@@ -13,6 +13,7 @@ const enterpriseBootstrapGrantSourceType = "enterprise_bootstrap"
 
 type BootstrapProvisioner interface {
 	BootstrapNewEnterprise(enterpriseId string) error
+	EnsureBootstrapCredits(enterpriseId string) error
 }
 
 type platformBootstrapProvisioner struct{}
@@ -26,7 +27,19 @@ func (noopBootstrapProvisioner) BootstrapNewEnterprise(string) error {
 	return nil
 }
 
+func (noopBootstrapProvisioner) EnsureBootstrapCredits(string) error {
+	return nil
+}
+
 func (p *platformBootstrapProvisioner) BootstrapNewEnterprise(enterpriseId string) error {
+	return p.ensureBootstrapCredits(enterpriseId)
+}
+
+func (p *platformBootstrapProvisioner) EnsureBootstrapCredits(enterpriseId string) error {
+	return p.ensureBootstrapCredits(enterpriseId)
+}
+
+func (p *platformBootstrapProvisioner) ensureBootstrapCredits(enterpriseId string) error {
 	cfg, err := settings.GetPlatformConfig()
 	if err != nil {
 		return err

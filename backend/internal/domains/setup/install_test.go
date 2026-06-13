@@ -207,7 +207,7 @@ func TestInstallExecutorRun(t *testing.T) {
 		So(addedApp.Name, ShouldEqual, "dotblue-web")
 		So(addedApp.ClientId, ShouldEqual, "bootstrap-client")
 		So(addedApp.ClientSecret, ShouldEqual, "bootstrap-secret")
-		So(addedApp.DefaultGroup, ShouldEqual, AdminGroupName)
+		So(addedApp.DefaultGroup, ShouldEqual, "")
 
 		So(addedGroup, ShouldNotBeNil)
 		So(addedGroup.Owner, ShouldEqual, "acme")
@@ -304,5 +304,49 @@ func TestInstallExecutorEnsureAdminUser(t *testing.T) {
 		So(updatedUser.IsAdmin, ShouldBeTrue)
 		So(updatedUser.SignupApplication, ShouldEqual, "dotblue-web")
 		So(updatedUser.Groups, ShouldContain, AdminGroupName)
+	})
+}
+
+func TestInstallExecutorEnsureApplicationClearsDefaultGroup(t *testing.T) {
+	Convey("ensureApplication 会清理应用上错误的默认 admin group", t, func() {
+		var updatedApp *casdoorsdk.Application
+		executor := &installExecutor{
+			loadRuntimeConfig: func(ctx context.Context) (*casdoorConfig, error) {
+				return &casdoorConfig{
+					ClientId:     "bootstrap-client",
+					ClientSecret: "bootstrap-secret",
+				}, nil
+			},
+			nowString: func() string { return "2026-05-20T10:00:00+08:00" },
+		}
+		client := &stubSetupClient{
+			getApplicationFunc: func(name string) (*casdoorsdk.Application, error) {
+				return &casdoorsdk.Application{
+					Name:         name,
+					DisplayName:  "DotBlue",
+					Organization: "acme",
+					DefaultGroup: AdminGroupName,
+				}, nil
+			},
+			updateApplicationFunc: func(app *casdoorsdk.Application) (bool, error) {
+				updatedApp = app
+				return true, nil
+			},
+		}
+
+		err := executor.ensureApplication(context.Background(), client, &installPlan{
+			OrganizationName: "acme",
+			ApplicationName:  "dotblue-web",
+			InitData: &InitData{
+				Application: &InitApplication{
+					DisplayName:  "DotBlue",
+					RedirectUris: []string{"http://localhost:9000/callback"},
+				},
+			},
+		})
+
+		So(err, ShouldBeNil)
+		So(updatedApp, ShouldNotBeNil)
+		So(updatedApp.DefaultGroup, ShouldEqual, "")
 	})
 }

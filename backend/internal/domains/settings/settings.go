@@ -8,16 +8,16 @@ import (
 
 // PlatformConfig holds core platform settings (stored as JSONB).
 type PlatformConfig struct {
-	DataBasePath                     string                `json:"dataBasePath"`
-	DataMountPath                    string                `json:"dataMountPath,omitempty"`
-	ContainerPort                    int                   `json:"containerPort"`
-	RuntimeMode                      string                `json:"runtimeMode,omitempty"`
-	EndpointMode                     string                `json:"endpointMode,omitempty"`
-	DockerEndpoint                   string                `json:"dockerEndpoint,omitempty"`
-	DockerNetwork                    string                `json:"dockerNetwork,omitempty"`
-	NewEnterprisePlatformCredits     int64                 `json:"newEnterprisePlatformCredits"`
-	DefaultCreditSettlementCurrency  string                `json:"defaultCreditSettlementCurrency,omitempty"`
-	RuntimeEngines                   []RuntimeEngineConfig `json:"runtimeEngines,omitempty"`
+	DataBasePath                    string                `json:"dataBasePath"`
+	DataMountPath                   string                `json:"dataMountPath,omitempty"`
+	ContainerPort                   int                   `json:"containerPort"`
+	RuntimeMode                     string                `json:"runtimeMode,omitempty"`
+	EndpointMode                    string                `json:"endpointMode,omitempty"`
+	DockerEndpoint                  string                `json:"dockerEndpoint,omitempty"`
+	DockerNetwork                   string                `json:"dockerNetwork,omitempty"`
+	NewEnterprisePlatformCredits    int64                 `json:"newEnterprisePlatformCredits"`
+	DefaultCreditSettlementCurrency string                `json:"defaultCreditSettlementCurrency,omitempty"`
+	RuntimeEngines                  []RuntimeEngineConfig `json:"runtimeEngines,omitempty"`
 }
 
 // RuntimeEngineConfig is the platform-level runtime registry entry exposed to
@@ -41,6 +41,7 @@ type ProviderConfig struct {
 
 // SysSettings is the single-row global settings table mapping.
 type SysSettings struct {
+	Id          int             `json:"id"`
 	Initialized bool            `json:"initialized"`
 	Platform    json.RawMessage `json:"platform"`
 	Provider    json.RawMessage `json:"provider"`

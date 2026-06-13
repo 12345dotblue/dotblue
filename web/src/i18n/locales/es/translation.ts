@@ -833,6 +833,8 @@ export const translation = {
     "enterprise_admin_pending_invites": "Invitaciones pendientes",
     "enterprise_admin_summary_title": "Resumen de la empresa",
     "enterprise_admin_summary_desc": "Consulta en un solo lugar la empresa actual, el alcance de tu rol, miembros, departamentos e invitaciones pendientes.",
+    "enterprise_admin_open_c_end_chat": "Gestionar chat C-end",
+    "enterprise_admin_open_c_end_chat_desc": "Configura el uso compartido publico, el acceso embebido y los puntos de entrada del chat publico.",
     "enterprise_admin_tab_organization": "Organizacion",
     "enterprise_admin_tab_members": "Miembros",
     "enterprise_admin_tab_invitations": "Invitaciones",

@@ -47,6 +47,25 @@ type stubRepository struct {
 	deleteLLMModelFunc              func(enterpriseId, id string) error
 }
 
+type stubBootstrapProvisioner struct {
+	bootstrapNewEnterpriseFunc   func(enterpriseId string) error
+	ensureBootstrapCreditsFunc   func(enterpriseId string) error
+}
+
+func (s stubBootstrapProvisioner) BootstrapNewEnterprise(enterpriseId string) error {
+	if s.bootstrapNewEnterpriseFunc != nil {
+		return s.bootstrapNewEnterpriseFunc(enterpriseId)
+	}
+	return nil
+}
+
+func (s stubBootstrapProvisioner) EnsureBootstrapCredits(enterpriseId string) error {
+	if s.ensureBootstrapCreditsFunc != nil {
+		return s.ensureBootstrapCreditsFunc(enterpriseId)
+	}
+	return nil
+}
+
 func (s *stubRepository) CountMembershipsByUser(userId string) (int, error) {
 	if s.countMembershipsByUserFunc != nil {
 		return s.countMembershipsByUserFunc(userId)
@@ -329,6 +348,7 @@ func TestServiceResolveCurrentEnterprise(t *testing.T) {
 func TestServiceEnsureBootstrapMembership(t *testing.T) {
 	Convey("EnsureBootstrapMembership 在首次进入时创建企业并写入最后企业", t, func() {
 		var savedLastEnterprise string
+		var bootstrappedEnterprise string
 		repo := &stubRepository{
 			countMembershipsByUserFunc: func(userId string) (int, error) {
 				return 0, nil
@@ -367,6 +387,12 @@ func TestServiceEnsureBootstrapMembership(t *testing.T) {
 			},
 		}
 		service := NewService(repo)
+		service.bootstrapProvisioner = stubBootstrapProvisioner{
+			bootstrapNewEnterpriseFunc: func(enterpriseId string) error {
+				bootstrappedEnterprise = enterpriseId
+				return nil
+			},
+		}
 		service.idGenerator = func() string { return "org-1" }
 		service.now = func() time.Time { return time.Date(2026, 5, 20, 9, 0, 0, 0, time.UTC) }
 
@@ -374,6 +400,7 @@ func TestServiceEnsureBootstrapMembership(t *testing.T) {
 
 		So(err, ShouldBeNil)
 		So(savedLastEnterprise, ShouldEqual, "user-1")
+		So(bootstrappedEnterprise, ShouldEqual, "user-1")
 	})
 
 	Convey("EnsureBootstrapMembership 不复用共享认证组织作为企业 ID", t, func() {
@@ -557,8 +584,9 @@ func TestServiceAddExistingMember(t *testing.T) {
 }
 
 func TestServiceResolveMemberContext(t *testing.T) {
-	Convey("ResolveMemberContext 负责 bootstrap、解析当前企业并记录最后企业", t, func() {
+	Convey("ResolveMemberContext 负责 bootstrap、补齐企业点数并记录最后企业", t, func() {
 		var savedEnterprise string
+		var ensuredEnterprise string
 		repo := &stubRepository{
 			countMembershipsByUserFunc: func(userId string) (int, error) {
 				return 1, nil
@@ -571,11 +599,19 @@ func TestServiceResolveMemberContext(t *testing.T) {
 				return nil
 			},
 		}
+		service := NewService(repo)
+		service.bootstrapProvisioner = stubBootstrapProvisioner{
+			ensureBootstrapCreditsFunc: func(enterpriseId string) error {
+				ensuredEnterprise = enterpriseId
+				return nil
+			},
+		}
 
-		current, err := NewService(repo).ResolveMemberContext("user-1", "", "", "ent-1")
+		current, err := service.ResolveMemberContext("user-1", "", "", "ent-1")
 
 		So(err, ShouldBeNil)
 		So(current, ShouldNotBeNil)
+		So(ensuredEnterprise, ShouldEqual, "ent-1")
 		So(current.EnterpriseId, ShouldEqual, "ent-1")
 		So(savedEnterprise, ShouldEqual, "ent-1")
 	})

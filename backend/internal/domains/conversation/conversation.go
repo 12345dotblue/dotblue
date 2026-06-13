@@ -106,6 +106,14 @@ func ListByUserId(userId, enterpriseId string, cursor string, limit int) ([]*Con
 	return defaultService.ListByUserId(userId, enterpriseId, cursor, limit)
 }
 
+func CreatePublicForUser(userId, enterpriseId, agentId, title string) (*ConversationPublic, error) {
+	return defaultService.CreatePublicForUser(userId, enterpriseId, agentId, title)
+}
+
+func GetPublicForUser(id, userId, enterpriseId string) (*ConversationPublic, error) {
+	return defaultService.GetPublicForUser(id, userId, enterpriseId)
+}
+
 func GetById(id string) (*Conversation, error) {
 	return defaultService.GetById(id)
 }

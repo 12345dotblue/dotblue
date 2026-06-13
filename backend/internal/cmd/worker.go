@@ -8,7 +8,6 @@ import (
 
 	"dotblue/internal/domains/engine"
 	"dotblue/internal/domains/execution"
-	"dotblue/internal/domains/setup"
 	"dotblue/internal/infrastructure/dbschema"
 )
 
@@ -24,9 +23,6 @@ var Worker = gcmd.Command{
 		if err := dbschema.Ensure(ctx); err != nil {
 			g.Log().Fatalf(ctx, "Failed to initialize database schema: %v", err)
 		}
-		if err := setup.TryAutoInstall(ctx); err != nil {
-			g.Log().Fatalf(ctx, "Automatic setup failed: %v", err)
-		}
 		w, err := execution.Default(ctx)
 		if err != nil {
 			g.Log().Fatalf(ctx, "Failed to initialize worker: %v", err)
@@ -34,4 +30,3 @@ var Worker = gcmd.Command{
 		return w.Run(ctx)
 	},
 }
-

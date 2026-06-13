@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Card, Drawer, Empty, Form, Input, Modal, Select, Space, Table, Tag, Typography, message } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import axios from 'axios';
@@ -74,7 +74,7 @@ interface GovernedSkillDetail {
 }
 
 interface EnterpriseSkillsTabProps {
-  createSignal: number;
+  createSignal?: number;
 }
 
 interface EnableSkillFormValues {
@@ -292,7 +292,7 @@ const EnterpriseSkillsTab: React.FC<EnterpriseSkillsTabProps> = ({ createSignal 
   }, []);
 
   useEffect(() => {
-    if (createSignal > 0) {
+    if ((createSignal || 0) > 0) {
       setCreateModalOpen(true);
       setActiveView('governance');
     }

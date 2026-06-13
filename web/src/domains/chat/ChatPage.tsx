@@ -73,6 +73,43 @@ interface PendingUpload {
   error?: string;
 }
 
+interface ConversationListResponse {
+  items: any[];
+  hasMore: boolean;
+  nextCursor?: string;
+}
+
+type ChatAuthHeaders = () => { headers: Record<string, string> };
+type ChatProviderFactory = (agentId: string, events: { onTitleUpdated?: (conversationId: string, title: string) => void }) => ReturnType<typeof getOrCreateProvider>;
+type ChatUploadResponse = {
+  id: string;
+  previewUrl?: string;
+  downloadUrl?: string;
+  width?: number;
+  height?: number;
+};
+
+export interface ChatPageProps {
+  getJwt?: () => string | null;
+  authHeaders?: ChatAuthHeaders;
+  listAgents?: () => Promise<AgentOption[]>;
+  listConversations?: (cursor?: string) => Promise<ConversationListResponse>;
+  createConversation?: (agentId: string) => Promise<any>;
+  deleteConversation?: (conversationId: string) => Promise<void>;
+  loadMessages?: (conversationId: string) => Promise<any[]>;
+  uploadFile?: (conversationId: string, file: File, kind: 'image' | 'file') => Promise<ChatUploadResponse>;
+  createProvider?: ChatProviderFactory;
+  fixedAgentId?: string | null;
+  fixedAgentName?: string;
+  showSidebar?: boolean;
+  showDashboardButton?: boolean;
+  showLanguageSwitcher?: boolean;
+  showUserMenu?: boolean;
+  allowDeleteConversation?: boolean;
+  allowFileUpload?: boolean;
+  brandNavigatePath?: string;
+}
+
 const renderConversationLabel = (title: string | undefined, agentName: string | undefined, t: any): React.ReactNode => {
   const base = title || t('chat_untitled');
   const agent = ((agentName || '').trim()) || t('chat_select_agent');
@@ -392,8 +429,10 @@ interface ConversationPaneProps {
   selectedAgentName?: string;
   runtimeFooter: string;
   provider: ReturnType<typeof getOrCreateProvider> | undefined;
-  authHeaders: () => { headers: Record<string, string> };
   getJwt: () => string | null;
+  loadMessages: (conversationId: string) => Promise<any[]>;
+  uploadFile?: (conversationId: string, file: File, kind: 'image' | 'file') => Promise<ChatUploadResponse>;
+  allowFileUpload: boolean;
   t: any;
   bubbleRole: any;
 }
@@ -404,8 +443,10 @@ const ConversationPane: React.FC<ConversationPaneProps> = ({
   selectedAgentName,
   runtimeFooter,
   provider,
-  authHeaders,
   getJwt,
+  loadMessages,
+  uploadFile,
+  allowFileUpload,
   t,
   bubbleRole,
 }) => {
@@ -426,8 +467,8 @@ const ConversationPane: React.FC<ConversationPaneProps> = ({
           const jwt = getJwt();
           if (!jwt) return [];
           try {
-            const res = await axios.get(`${BACKEND_URL}/api/conversations/${conversationId}/messages?limit=50`, authHeaders());
-            return (res.data || []).map((m: any, i: number) => ({
+            const items = await loadMessages(conversationId);
+            return (items || []).map((m: any, i: number) => ({
               id: m.id || `hist_${String(i).padStart(6, '0')}`,
               message: {
                 role: m.role,
@@ -468,7 +509,7 @@ const ConversationPane: React.FC<ConversationPaneProps> = ({
 
   const uploadFiles = useCallback(async (files: FileList | File[]) => {
     const list = Array.from(files || []);
-    if (!conversationId || list.length === 0) return;
+    if (!conversationId || list.length === 0 || !uploadFile) return;
     const jwt = getJwt();
     if (!jwt) return;
 
@@ -486,21 +527,17 @@ const ConversationPane: React.FC<ConversationPaneProps> = ({
       const currentFile = list[index];
       const formData = new FormData();
       formData.append('file', currentFile);
-      formData.append('conversationId', conversationId);
-      formData.append('kind', item.kind);
       try {
-        const res = await axios.post(`${BACKEND_URL}/api/files`, formData, {
-          headers: getChatAuthHeaderMap(jwt),
-        });
+        const res = await uploadFile(conversationId, currentFile, item.kind);
         setPendingUploads((prev) => prev.map((upload) => (
           upload.uid === item.uid
             ? {
                 ...upload,
-                fileId: res.data.id,
-                previewUrl: res.data.previewUrl,
-                downloadUrl: res.data.downloadUrl,
-                width: res.data.width,
-                height: res.data.height,
+                fileId: res.id,
+                previewUrl: res.previewUrl,
+                downloadUrl: res.downloadUrl,
+                width: res.width,
+                height: res.height,
                 status: 'uploaded',
               }
             : upload
@@ -517,7 +554,7 @@ const ConversationPane: React.FC<ConversationPaneProps> = ({
         )));
       }
     }));
-  }, [conversationId, getJwt, t]);
+  }, [conversationId, getJwt, t, uploadFile]);
 
   const handleSend = useCallback((content: string) => {
     if (!selectedAgentId || !conversationId || uploadingCount > 0) return;
@@ -622,7 +659,7 @@ const ConversationPane: React.FC<ConversationPaneProps> = ({
           loading={isRequesting}
           onSubmit={handleSend}
           onCancel={() => abort()}
-          onPasteFile={(files) => { void uploadFiles(files); }}
+          onPasteFile={(files) => { if (allowFileUpload) void uploadFiles(files); }}
           placeholder={conversationId ? t('chat_placeholder') : t('chat_select_conversation_first')}
           disabled={!conversationId || uploadingCount > 0}
           header={pendingUploads.length > 0 ? (
@@ -658,7 +695,8 @@ const ConversationPane: React.FC<ConversationPaneProps> = ({
                   type="text"
                   icon={<PaperClipOutlined />}
                   onClick={handleOpenFilePicker}
-                  disabled={!conversationId || isRequesting}
+                  disabled={!conversationId || isRequesting || !allowFileUpload}
+                  style={{ display: allowFileUpload ? undefined : 'none' }}
                 />
               </Tooltip>
               {oriNode}
@@ -678,7 +716,26 @@ const ConversationPane: React.FC<ConversationPaneProps> = ({
 
 // --- Component ---
 
-const ChatPage: React.FC = () => {
+const ChatPage: React.FC<ChatPageProps> = ({
+  getJwt: getJwtProp,
+  authHeaders: authHeadersProp,
+  listAgents: listAgentsProp,
+  listConversations: listConversationsProp,
+  createConversation: createConversationProp,
+  deleteConversation: deleteConversationProp,
+  loadMessages: loadMessagesProp,
+  uploadFile: uploadFileProp,
+  createProvider: createProviderProp,
+  fixedAgentId = null,
+  fixedAgentName,
+  showSidebar = true,
+  showDashboardButton = true,
+  showLanguageSwitcher = true,
+  showUserMenu = true,
+  allowDeleteConversation = true,
+  allowFileUpload = true,
+  brandNavigatePath = '/',
+}) => {
   const { t, i18n } = useTranslation();
   const { token } = theme.useToken();
   const { resolvedTheme } = useThemeMode();
@@ -703,11 +760,73 @@ const ChatPage: React.FC = () => {
   );
   const verifyFlowHandledRef = useRef(false);
 
-  const getJwt = useCallback(() => localStorage.getItem('casdoor_token'), []);
-  const authHeaders = useCallback(() => ({
-    headers: getChatAuthHeaderMap(getJwt()),
-  }), [getJwt]);
+  const getJwt = useCallback(() => (getJwtProp ? getJwtProp() : localStorage.getItem('casdoor_token')), [getJwtProp]);
+  const authHeaders = useCallback(() => (
+    authHeadersProp ? authHeadersProp() : { headers: getChatAuthHeaderMap(getJwt()) }
+  ), [authHeadersProp, getJwt]);
   const assetToken = getJwt();
+  const listAgents = useCallback(async () => {
+    if (listAgentsProp) {
+      return listAgentsProp();
+    }
+    const res = await axios.get(`${BACKEND_URL}/api/agents`, authHeaders());
+    return (res.data || [])
+      .map((a: any) => ({
+        id: a.id,
+        agentName: a.agentName,
+        engineType: a.engineType || 'hermes',
+      }))
+      .filter((agent: AgentOption, index: number, all: AgentOption[]) =>
+        all.findIndex((candidate) => candidate.id === agent.id) === index,
+      );
+  }, [authHeaders, listAgentsProp]);
+  const listConversations = useCallback(async (cursor?: string) => {
+    if (listConversationsProp) {
+      return listConversationsProp(cursor);
+    }
+    const params = new URLSearchParams();
+    params.set('limit', '20');
+    if (cursor) params.set('cursor', cursor);
+    const res = await axios.get(`${BACKEND_URL}/api/conversations?${params}`, authHeaders());
+    return res.data;
+  }, [authHeaders, listConversationsProp]);
+  const createConversation = useCallback(async (agentId: string) => {
+    if (createConversationProp) {
+      return createConversationProp(agentId);
+    }
+    const res = await axios.post(`${BACKEND_URL}/api/conversations`, { agentId }, authHeaders());
+    return res.data;
+  }, [authHeaders, createConversationProp]);
+  const deleteConversation = useCallback(async (conversationId: string) => {
+    if (deleteConversationProp) {
+      await deleteConversationProp(conversationId);
+      return;
+    }
+    await axios.delete(`${BACKEND_URL}/api/conversations/${conversationId}`, authHeaders());
+  }, [authHeaders, deleteConversationProp]);
+  const loadMessages = useCallback(async (conversationId: string) => {
+    if (loadMessagesProp) {
+      return loadMessagesProp(conversationId);
+    }
+    const res = await axios.get(`${BACKEND_URL}/api/conversations/${conversationId}/messages?limit=50`, authHeaders());
+    return res.data || [];
+  }, [authHeaders, loadMessagesProp]);
+  const uploadFile = useCallback(async (conversationId: string, file: File, kind: 'image' | 'file') => {
+    if (uploadFileProp) {
+      return uploadFileProp(conversationId, file, kind);
+    }
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('conversationId', conversationId);
+    formData.append('kind', kind);
+    const res = await axios.post(`${BACKEND_URL}/api/files`, formData, {
+      headers: getChatAuthHeaderMap(getJwt()),
+    });
+    return res.data;
+  }, [getJwt, uploadFileProp]);
+  const createProvider = useCallback<ChatProviderFactory>((agentId, events) => (
+    createProviderProp ? createProviderProp(agentId, events) : getOrCreateProvider(agentId, events)
+  ), [createProviderProp]);
 
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [curConvId, setCurConvId] = useState('');
@@ -740,39 +859,47 @@ const ChatPage: React.FC = () => {
 
   // X-SDK: Chat messages
   const provider = selectedAgentId
-    ? getOrCreateProvider(selectedAgentId, { onTitleUpdated })
+    ? createProvider(selectedAgentId, { onTitleUpdated })
     : undefined;
 
   // --- Fetch agents ---
   useEffect(() => {
     const jwt = getJwt();
     if (!jwt) { setAgentsLoading(false); return; }
-    axios.get(`${BACKEND_URL}/api/agents`, authHeaders()).then(res => {
-      const list: AgentOption[] = (res.data || [])
-        .map((a: any) => ({
-          id: a.id,
-          agentName: a.agentName,
-          engineType: a.engineType || 'hermes',
-        }))
-        .filter((agent: AgentOption, index: number, all: AgentOption[]) =>
-          all.findIndex((candidate) => candidate.id === agent.id) === index,
-        );
-      setAgents(list);
-    }).catch(() => setAgents([])).finally(() => setAgentsLoading(false));
-  }, []);
+    listAgents()
+      .then((items) => {
+        let next = items;
+        if (fixedAgentId && !items.find((item: AgentOption) => item.id === fixedAgentId)) {
+          next = [{
+            id: fixedAgentId,
+            agentName: fixedAgentName || fixedAgentId,
+            engineType: 'hermes',
+          }, ...items];
+        }
+        setAgents(next);
+        if (fixedAgentId) {
+          setSelectedAgentId(fixedAgentId);
+        }
+      })
+      .catch(() => {
+        setAgents(fixedAgentId ? [{
+          id: fixedAgentId,
+          agentName: fixedAgentName || fixedAgentId,
+          engineType: 'hermes',
+        }] : []);
+      })
+      .finally(() => setAgentsLoading(false));
+  }, [fixedAgentId, fixedAgentName, getJwt, listAgents]);
 
   // --- Fetch conversations from server ---
   const fetchConversations = useCallback((cursor?: string) => {
     const jwt = getJwt();
     if (!jwt) return;
     setConvLoading(true);
-    const params = new URLSearchParams();
-    params.set('limit', '20');
-    if (cursor) params.set('cursor', cursor);
-    axios.get(`${BACKEND_URL}/api/conversations?${params}`, authHeaders()).then(res => {
+    listConversations(cursor).then((res) => {
       const currentConvs = conversationsRef.current;
       const currentActiveId = curConvIdRef.current;
-      const { items, hasMore, nextCursor } = res.data;
+      const { items, hasMore, nextCursor } = res;
       const mapped = (items || []).map((c: any) => mapConversationFromApi(c, getGroupLabel, t));
       if (cursor) {
         const existingIds = new Set(currentConvs.map(c => c.key));
@@ -789,7 +916,7 @@ const ChatPage: React.FC = () => {
       setConvHasMore(hasMore);
       setConvNextCursor(nextCursor || '');
     }).catch(() => {}).finally(() => setConvLoading(false));
-  }, [getJwt, authHeaders, t]);
+  }, [getJwt, listConversations, t]);
 
   useEffect(() => { fetchConversations(); }, []);
 
@@ -807,8 +934,7 @@ const ChatPage: React.FC = () => {
     const jwt = getJwt();
     if (!jwt) return;
     const knownIds = new Set(conversationsRef.current.map(conv => conv.key));
-    axios.post(`${BACKEND_URL}/api/conversations`, { agentId }, authHeaders()).then(async (res) => {
-      const data = res.data;
+    createConversation(agentId).then(async (data) => {
       const fallbackAgentId = data.agentId || agentId;
       const fallbackAgentName = data.agentName || '';
       const fallbackConversation: ConversationItem = {
@@ -822,8 +948,8 @@ const ChatPage: React.FC = () => {
       };
 
       try {
-        const listRes = await axios.get(`${BACKEND_URL}/api/conversations?limit=20`, authHeaders());
-        const latestItems: ConversationItem[] = (listRes.data?.items || [])
+        const listRes = await listConversations();
+        const latestItems: ConversationItem[] = (listRes?.items || [])
           .map((item: any) => mapConversationFromApi(item, getGroupLabel, t));
 
         const resolvedConversation = latestItems.find(item =>
@@ -844,7 +970,7 @@ const ChatPage: React.FC = () => {
         setSelectedAgentId(fallbackConversation.agentId);
       }
     }).catch(() => {});
-  }, [getJwt, authHeaders, t, upsertConversation]);
+  }, [createConversation, getJwt, listConversations, t, upsertConversation]);
 
   useEffect(() => {
     if (agentsLoading || !verifyHint?.verifyAgentId || verifyFlowHandledRef.current) {
@@ -860,6 +986,13 @@ const ChatPage: React.FC = () => {
     handleNewConversation(targetAgent.id);
   }, [agents, agentsLoading, handleNewConversation, verifyHint]);
 
+  useEffect(() => {
+    if (agentsLoading || !fixedAgentId || curConvId || verifyHint?.verifyAgentId) {
+      return;
+    }
+    handleNewConversation(fixedAgentId);
+  }, [agentsLoading, curConvId, fixedAgentId, handleNewConversation, verifyHint]);
+
   // --- Delete conversation ---
   const curConvIdRef = useRef(curConvId);
   curConvIdRef.current = curConvId;
@@ -873,13 +1006,13 @@ const ChatPage: React.FC = () => {
     const isActive = convId === curConvIdRef.current;
     const remaining = conversationsRef.current.filter(c => c.key !== convId);
     const nextActive = isActive && remaining.length > 0 ? remaining[0].key : (isActive ? '' : undefined);
-    axios.delete(`${BACKEND_URL}/api/conversations/${convId}`, authHeaders()).then(() => {
+    deleteConversation(convId).then(() => {
       setConversations(prev => prev.filter(conv => conv.key !== convId));
       if (nextActive !== undefined) {
         setCurConvId(nextActive);
       }
     }).catch(() => {});
-  }, [getJwt, authHeaders]);
+  }, [deleteConversation, getJwt]);
 
   // --- Load more conversations ---
   const handleLoadMoreConvs = useCallback(() => {
@@ -1142,13 +1275,13 @@ const ChatPage: React.FC = () => {
               src={resolvedTheme === 'dark' ? '/brand/dotblue-logo-dark.svg' : '/brand/dotblue-logo-light.svg'}
               alt={t('app_name')}
               className="chat-header-brand-logo"
-              onClick={() => navigate(getLocalizedPath('/', currentLanguage))}
+              onClick={() => navigate(getLocalizedPath(brandNavigatePath, currentLanguage))}
             />
           </div>
         </Space>
         <Space size="middle">
           <ThemeModeDropdown />
-          <Button
+          {showDashboardButton ? <Button
             type="default"
             size="small"
             className="chat-header-dashboard-button"
@@ -1156,8 +1289,8 @@ const ChatPage: React.FC = () => {
             onClick={() => navigate(getLocalizedPath('/dashboard', currentLanguage))}
           >
             {t('go_to_dashboard')}
-          </Button>
-          <Dropdown menu={{
+          </Button> : null}
+          {showLanguageSwitcher ? <Dropdown menu={{
             items: LANGUAGE_OPTIONS.map((option) => ({
               key: option.value,
               label: option.label,
@@ -1171,20 +1304,20 @@ const ChatPage: React.FC = () => {
             <Button type="text" size="small" icon={<GlobalOutlined />}>
               {currentLanguageLabel}
             </Button>
-          </Dropdown>
-          <Dropdown menu={{ items: [
+          </Dropdown> : null}
+          {showUserMenu ? <Dropdown menu={{ items: [
             { key: 'agents', label: t('agent_settings'), icon: <AppstoreOutlined />, onClick: () => navigate(getLocalizedPath('/dashboard', currentLanguage)) },
             { type: 'divider' as const },
             { key: 'logout', label: t('logout'), icon: <LogoutOutlined />, onClick: () => { casdoorService.removeToken(); window.location.href = getLocalizedPath('/login', currentLanguage); } },
           ]}}>
             <Avatar size="small" icon={<UserOutlined />} style={{ background: token.colorPrimary, cursor: 'pointer' }} />
-          </Dropdown>
+          </Dropdown> : null}
         </Space>
       </Layout.Header>
 
       <Layout>
         {/* Sidebar — Conversations */}
-        <Layout.Sider
+        {showSidebar ? <Layout.Sider
           width={CHAT_SIDEBAR_WIDTH}
           collapsedWidth={CHAT_SIDEBAR_COLLAPSED_WIDTH}
           collapsed={sidebarCollapsed}
@@ -1239,7 +1372,7 @@ const ChatPage: React.FC = () => {
                     activeKey={curConvId || undefined}
                     onActiveChange={(key) => setCurConvId(key as string)}
                     groupable
-                    menu={(conv) => ({
+                    menu={allowDeleteConversation ? (conv) => ({
                       items: [
                         { key: 'delete', label: t('chat_delete_conversation'), icon: <DeleteOutlined />, danger: true },
                       ],
@@ -1248,7 +1381,7 @@ const ChatPage: React.FC = () => {
                           handleDeleteConversation(conv.key as string);
                         }
                       },
-                    })}
+                    }) : undefined}
                   />
                   {convLoading && <div style={{ textAlign: 'center', padding: 12 }}><Text style={{ fontSize: 12, color: 'var(--app-nav-text-muted)' }}>{t('chat_loading_messages')}</Text></div>}
                 </div>
@@ -1256,7 +1389,7 @@ const ChatPage: React.FC = () => {
               )}
             </div>
           </div>
-        </Layout.Sider>
+        </Layout.Sider> : null}
 
         {/* Chat area */}
         <Layout.Content style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 64px)', background: 'var(--app-panel-bg)' }}>
@@ -1284,8 +1417,10 @@ const ChatPage: React.FC = () => {
             selectedAgentName={selectedAgent?.agentName}
             runtimeFooter={runtimeFooter}
             provider={provider}
-            authHeaders={authHeaders}
             getJwt={getJwt}
+            loadMessages={loadMessages}
+            uploadFile={uploadFile}
+            allowFileUpload={allowFileUpload}
             t={t}
             bubbleRole={bubbleRole}
           />
@@ -1445,4 +1580,3 @@ const ChatPage: React.FC = () => {
 };
 
 export default ChatPage;
-
