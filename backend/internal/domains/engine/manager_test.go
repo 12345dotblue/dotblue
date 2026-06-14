@@ -333,3 +333,32 @@ func TestNanobotEnginePrepareVolumeWritesConfig(t *testing.T) {
 		So(defaults["workspace"], ShouldEqual, NanobotWorkspaceDir)
 	})
 }
+
+func TestEnsureVolumeWritable(t *testing.T) {
+	Convey("ensureVolumeWritable 递归放开目录和文件权限", t, func() {
+		dir := t.TempDir()
+		subDir := filepath.Join(dir, "sub")
+		So(os.MkdirAll(subDir, 0700), ShouldBeNil)
+		filePath := filepath.Join(subDir, "test.txt")
+		So(os.WriteFile(filePath, []byte("hello"), 0600), ShouldBeNil)
+
+		So(ensureVolumeWritable(dir), ShouldBeNil)
+
+		info, err := os.Stat(dir)
+		So(err, ShouldBeNil)
+		So(info.Mode().Perm(), ShouldEqual, os.FileMode(0777))
+
+		subInfo, err := os.Stat(subDir)
+		So(err, ShouldBeNil)
+		So(subInfo.Mode().Perm(), ShouldEqual, os.FileMode(0777))
+
+		fileInfo, err := os.Stat(filePath)
+		So(err, ShouldBeNil)
+		So(fileInfo.Mode().Perm(), ShouldEqual, os.FileMode(0666))
+	})
+
+	Convey("ensureVolumeWritable 对空路径不报错", t, func() {
+		So(ensureVolumeWritable(""), ShouldBeNil)
+		So(ensureVolumeWritable("  "), ShouldBeNil)
+	})
+}

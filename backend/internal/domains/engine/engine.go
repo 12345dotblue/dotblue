@@ -61,6 +61,31 @@ type ProviderConfig struct {
 // ErrPlatformConfigMissing is returned when platform core configuration is missing.
 var ErrPlatformConfigMissing = fmt.Errorf("platform core configuration is missing, please contact administrator")
 
+// ensureVolumeWritable recursively sets permissive permissions on a directory tree
+// so that both the backend and engine containers can read/write regardless of which
+// user created or last modified the files. This prevents permission conflicts when
+// an engine container's agent modifies file ownership or mode at runtime.
+// Requires the caller to have sufficient privileges (typically root).
+func ensureVolumeWritable(rootPath string) error {
+	if strings.TrimSpace(rootPath) == "" {
+		return nil
+	}
+	if err := os.Chmod(rootPath, 0777); err != nil {
+		return fmt.Errorf("failed to chmod root %s: %w", rootPath, err)
+	}
+	return filepath.WalkDir(rootPath, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			_ = os.Chmod(path, 0777)
+		} else {
+			_ = os.Chmod(path, 0666)
+		}
+		return nil
+	})
+}
+
 func writeManagedSkills(rootPath string, skills []RuntimeSkill) error {
 	if strings.TrimSpace(rootPath) == "" {
 		return nil

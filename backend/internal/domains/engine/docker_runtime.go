@@ -256,11 +256,21 @@ func (d *DockerRuntime) EnsureRunning(ctx context.Context, orgID, userID, agentI
 		}
 	}
 
+	// Reset permissions before writing so the backend can always update
+	// engine config even if a previous engine container changed ownership.
+	if err := ensureVolumeWritable(plan.workspacePath); err != nil {
+		g.Log().Warningf(ctx, "Failed to reset volume permissions for agent %s: %v", agentID, err)
+	}
 	if err := plan.engineImpl.PrepareVolume(ctx, plan.workspacePath, agentCfg, plan.providerConfig); err != nil {
 		return nil, fmt.Errorf("failed to initialize volume: %w", err)
 	}
 	if err := writeRuntimeFingerprint(plan.workspacePath, desiredFingerprint); err != nil {
 		return nil, fmt.Errorf("failed to persist runtime fingerprint: %w", err)
+	}
+	// Open permissions after writing so the engine container can read/write
+	// regardless of which user it runs as inside the image.
+	if err := ensureVolumeWritable(plan.workspacePath); err != nil {
+		g.Log().Warningf(ctx, "Failed to open volume permissions for agent %s: %v", agentID, err)
 	}
 
 	spec, err := plan.engineImpl.ContainerSpec(agentID, plan.workspacePath, plan.containerPort)
