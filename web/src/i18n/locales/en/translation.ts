@@ -1227,6 +1227,8 @@ export const translation = {
     "chat_expand_sidebar": "Expand sidebar",
     "chat_collapse_sidebar": "Collapse sidebar",
     "chat_assistant_name": "Assistant",
+    "chat_error_insufficient_credits": "Insufficient credits. Please contact your administrator to top up.",
+    "chat_error_generic": "Something went wrong. Please try again later.",
     "agent_list_usage_load_failed": "Failed to load agent usage",
     "agent_list_tokens_label": "Tokens",
     "agent_list_today_tokens": "Tokens today",

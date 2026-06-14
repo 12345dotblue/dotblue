@@ -296,8 +296,27 @@ function createAuthFetch(getHeaders?: () => Record<string, string>): typeof fetc
     const bodyLen = typeof options?.body === 'string' ? options.body.length : undefined;
     sseLog('fetch', { method, url, bodyLen });
     return fetch(url, { ...options, headers })
-      .then((res) => {
+      .then(async (res) => {
         sseLog('fetch_res', { status: res.status, ok: res.ok, contentType: res.headers.get('content-type') });
+        if (!res.ok) {
+          let errMsg = `Request failed with status ${res.status}`;
+          try {
+            const body = await res.text();
+            const parsed = JSON.parse(body);
+            if (parsed?.error || parsed?.message) {
+              errMsg = parsed.error || parsed.message;
+            } else if (body) {
+              errMsg = body.slice(0, 200);
+            }
+          } catch {
+            // ignore parse errors, use default message
+          }
+          sseLog('fetch_http_error', { status: res.status, message: errMsg });
+          return new Response(
+            `event: error\ndata: ${JSON.stringify({ content: errMsg, status: 'error' })}\n\nevent: message\ndata: [DONE]\n\n`,
+            { status: 200, headers: { 'Content-Type': 'text/event-stream' } },
+          );
+        }
         return res;
       })
       .catch((err) => {

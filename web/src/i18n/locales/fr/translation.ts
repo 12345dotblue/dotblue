@@ -667,6 +667,8 @@ export const translation = {
     "chat_expand_sidebar": "Ouvrir la barre laterale",
     "chat_collapse_sidebar": "Replier la barre laterale",
     "chat_assistant_name": "Assistant",
+    "chat_error_insufficient_credits": "Crédits insuffisants. Veuillez contacter votre administrateur.",
+    "chat_error_generic": "Une erreur est survenue. Veuillez réessayer plus tard.",
     "agent_list_usage_load_failed": "Impossible de charger l usage de l agent",
     "agent_list_tokens_label": "Jetons",
     "agent_list_today_tokens": "Tokens aujourd hui",

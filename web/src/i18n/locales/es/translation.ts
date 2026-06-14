@@ -481,6 +481,8 @@ export const translation = {
     "chat_expand_sidebar": "Expandir barra lateral",
     "chat_collapse_sidebar": "Contraer barra lateral",
     "chat_assistant_name": "Asistente",
+    "chat_error_insufficient_credits": "Créditos insuficientes. Contacte a su administrador.",
+    "chat_error_generic": "Algo salió mal. Inténtelo de nuevo más tarde.",
     "agent_list_usage_load_failed": "No se pudo cargar el uso del asistente",
     "agent_list_tokens_label": "Tokens",
     "agent_list_today_tokens": "Tokens de hoy",

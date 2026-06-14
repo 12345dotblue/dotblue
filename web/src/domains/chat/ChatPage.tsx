@@ -1205,6 +1205,20 @@ const ChatPage: React.FC<ChatPageProps> = ({
       contentRender: (_: string, { extraInfo }: { extraInfo?: any }) => {
         const msg: ChatMessage = extraInfo?.chatMsg;
         if (!msg) return null;
+        if (msg.status === 'error') {
+          const errorKey = msg.content?.includes('insufficient credits')
+            ? 'chat_error_insufficient_credits'
+            : 'chat_error_generic';
+          return (
+            <Alert
+              type="error"
+              showIcon
+              icon={<CloseCircleOutlined />}
+              message={t(errorKey)}
+              style={{ maxWidth: 420 }}
+            />
+          );
+        }
         return (
           <div>
             {msg.toolCalls && msg.toolCalls.length > 0 && renderToolCalls(msg.toolCalls)}

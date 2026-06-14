@@ -1091,6 +1091,8 @@ export const translation = {
     "chat_expand_sidebar": "展开侧边栏",
     "chat_collapse_sidebar": "收起侧边栏",
     "chat_assistant_name": "助手",
+    "chat_error_insufficient_credits": "余额不足，请联系管理员充值。",
+    "chat_error_generic": "出错了，请稍后重试。",
     "agent_list_usage_load_failed": "加载 Agent 用量失败",
     "agent_list_tokens_label": "Token 数",
     "agent_list_today_tokens": "今日 Tokens",

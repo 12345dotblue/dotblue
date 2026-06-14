@@ -667,6 +667,8 @@ export const translation = {
     "chat_expand_sidebar": "サイドバーを展開",
     "chat_collapse_sidebar": "サイドバーを折りたたむ",
     "chat_assistant_name": "アシスタント",
+    "chat_error_insufficient_credits": "クレジットが不足しています。管理者にお問い合わせください。",
+    "chat_error_generic": "エラーが発生しました。後でもう一度お試しください。",
     "agent_list_usage_load_failed": "Agent 使用量の読み込みに失敗しました",
     "agent_list_tokens_label": "トークン",
     "agent_list_today_tokens": "本日の Tokens",

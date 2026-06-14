@@ -6,6 +6,7 @@ import type { Dayjs } from 'dayjs';
 import { useTranslation } from 'react-i18next';
 import { BACKEND_URL } from '../../config';
 import { casdoorService } from '../identity/CasdoorService';
+import EnterpriseSearchSelect from '../../components/EnterpriseSearchSelect';
 
 const { Paragraph } = Typography;
 
@@ -72,7 +73,7 @@ interface PriceBookFormValues {
   status: string;
 }
 
-function getAuthHeaders() {
+function getAuthHeaders(): Record<string, string> {
   const token = casdoorService.getToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
@@ -328,17 +329,11 @@ const PlatformCreditSettingsCard: React.FC = () => {
           {t('platform_credit_desc')}
         </Paragraph>
         <Space.Compact style={{ width: '100%', marginBottom: 16 }}>
-          <Select
-            showSearch
-            allowClear
-            placeholder={t('platform_credit_target_enterprise')}
+          <EnterpriseSearchSelect
             value={enterpriseId}
             onChange={(value) => setEnterpriseId(value || '')}
-            options={enterprises.map((item) => ({
-              label: `${item.name} (${item.enterpriseId})`,
-              value: item.enterpriseId,
-            }))}
-            optionFilterProp="label"
+            getHeaders={getAuthHeaders}
+            placeholder={t('platform_credit_target_enterprise')}
             style={{ width: '100%' }}
           />
           <Button onClick={() => loadOverview()}>{t('platform_credit_load_overview')}</Button>
@@ -442,14 +437,10 @@ const PlatformCreditSettingsCard: React.FC = () => {
       >
         <Form form={grantForm} layout="vertical">
           <Form.Item label={t('platform_credit_target_enterprise')} name="enterpriseId" rules={[{ required: true, message: requiredMessage(t('platform_credit_target_enterprise')) }]}>
-            <Select
-              showSearch
-              options={enterprises.map((item) => ({
-                label: `${item.name} (${item.enterpriseId})`,
-                value: item.enterpriseId,
-              }))}
-              optionFilterProp="label"
+            <EnterpriseSearchSelect
+              getHeaders={getAuthHeaders}
               placeholder={t('platform_credit_target_enterprise')}
+              style={{ width: '100%' }}
             />
           </Form.Item>
           <Form.Item label={t('credit_credit_type_label')} name="creditType" rules={[{ required: true, message: requiredMessage(t('credit_credit_type_label')) }]}>
@@ -486,15 +477,10 @@ const PlatformCreditSettingsCard: React.FC = () => {
       >
         <Form form={priceBookForm} layout="vertical">
           <Form.Item label={t('platform_credit_override_scope')} name="enterpriseId">
-            <Select
-              allowClear
-              showSearch
+            <EnterpriseSearchSelect
+              getHeaders={getAuthHeaders}
               placeholder={t('platform_credit_override_scope_placeholder')}
-              options={enterprises.map((item) => ({
-                label: `${item.name} (${item.enterpriseId})`,
-                value: item.enterpriseId,
-              }))}
-              optionFilterProp="label"
+              style={{ width: '100%' }}
             />
           </Form.Item>
           <Form.Item label={t('credit_model_label')} name="modelId" rules={[{ required: true, message: requiredMessage(t('credit_model_label')) }]}>

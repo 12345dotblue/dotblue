@@ -323,6 +323,21 @@ func ListEnterprisesHandler(r *ghttp.Request) {
 	r.Response.WriteJson(list)
 }
 
+func SearchEnterprisesHandler(r *ghttp.Request) {
+	keyword := strings.TrimSpace(r.Get("keyword").String())
+	page := r.Get("page").Int()
+	pageSize := r.Get("pageSize").Int()
+	list, total, err := defaultService.SearchEnterprises(keyword, page, pageSize)
+	if err != nil {
+		r.Response.WriteStatus(http.StatusInternalServerError, "Failed to search enterprises")
+		return
+	}
+	r.Response.WriteJson(g.Map{
+		"items": list,
+		"total": total,
+	})
+}
+
 func GetCurrentEnterpriseHandler(r *ghttp.Request) {
 	currentId := defaultSessions.CurrentEnterpriseID(r)
 	userId := defaultSessions.UserID(r)

@@ -126,6 +126,7 @@ var (
 				group.GET("/admin/platform/usage/overview", metering.PlatformUsageOverviewHandler)
 				group.GET("/admin/platform/usage/trends", metering.PlatformUsageTrendsHandler)
 				group.GET("/admin/platform/usage/events", metering.PlatformUsageEventsHandler)
+				group.GET("/admin/platform/enterprises/search", enterprise.SearchEnterprisesHandler)
 				group.GET("/admin/platform/credits/overview", credit.PlatformCreditOverviewHandler)
 				group.GET("/admin/platform/credits/wallets", credit.PlatformCreditWalletsHandler)
 				group.GET("/admin/platform/credits/ledger", credit.PlatformCreditLedgerHandler)

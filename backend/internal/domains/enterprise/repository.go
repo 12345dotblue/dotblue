@@ -15,6 +15,7 @@ type Repository interface {
 	UpsertLastEnterprise(userId, enterpriseId string, updatedAt time.Time) error
 	GetLastEnterprise(userId string) (string, error)
 	ListEnterprisesByUser(userId string) ([]EnterpriseMembership, error)
+	SearchEnterprises(keyword string, page, pageSize int) ([]Enterprise, int, error)
 	GetPrimaryOrgUnitAssignment(enterpriseId, userId string) (*OrgUnitAssignment, error)
 	DeletePrimaryOrgUnitAssignments(enterpriseId, userId string) error
 	UpsertPrimaryOrgUnitAssignment(id, enterpriseId, orgUnitId, userId string, createdAt time.Time) error

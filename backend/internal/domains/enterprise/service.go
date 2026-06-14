@@ -356,6 +356,13 @@ func (s *Service) SearchUsers(query string) ([]ExistingUser, error) {
 	return s.repo.SearchUsers(query, 20)
 }
 
+func (s *Service) SearchEnterprises(keyword string, page, pageSize int) ([]Enterprise, int, error) {
+	if s == nil || s.repo == nil {
+		return nil, 0, errors.New("enterprise repository is not configured")
+	}
+	return s.repo.SearchEnterprises(keyword, page, pageSize)
+}
+
 func (s *Service) AddExistingMember(enterpriseId string, req addExistingMemberReq) error {
 	if s == nil || s.repo == nil {
 		return errors.New("enterprise repository is not configured")

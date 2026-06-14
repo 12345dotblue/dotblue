@@ -17,6 +17,7 @@ type stubRepository struct {
 	upsertLastEnterpriseFunc        func(userId, enterpriseId string, updatedAt time.Time) error
 	getLastEnterpriseFunc           func(userId string) (string, error)
 	listEnterprisesByUserFunc       func(userId string) ([]EnterpriseMembership, error)
+	searchEnterprisesFunc           func(keyword string, page, pageSize int) ([]Enterprise, int, error)
 	getPrimaryOrgUnitAssignmentFunc func(enterpriseId, userId string) (*OrgUnitAssignment, error)
 	deletePrimaryAssignmentsFunc    func(enterpriseId, userId string) error
 	upsertPrimaryAssignmentFunc     func(id, enterpriseId, orgUnitId, userId string, createdAt time.Time) error
@@ -225,6 +226,13 @@ func (s *stubRepository) SearchUsers(query string, limit int) ([]ExistingUser, e
 		return s.searchUsersFunc(query, limit)
 	}
 	return nil, nil
+}
+
+func (s *stubRepository) SearchEnterprises(keyword string, page, pageSize int) ([]Enterprise, int, error) {
+	if s.searchEnterprisesFunc != nil {
+		return s.searchEnterprisesFunc(keyword, page, pageSize)
+	}
+	return nil, 0, nil
 }
 
 func (s *stubRepository) FindUserIDByEmail(email string) (string, error) {

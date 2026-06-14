@@ -483,6 +483,8 @@ export const translation = {
     "chat_expand_sidebar": "사이드바 펼치기",
     "chat_collapse_sidebar": "사이드바 접기",
     "chat_assistant_name": "어시스턴트",
+    "chat_error_insufficient_credits": "크레딧이 부족합니다. 관리자에게 문의하세요.",
+    "chat_error_generic": "오류가 발생했습니다. 나중에 다시 시도해 주세요.",
     "agent_list_usage_load_failed": "어시스턴트 사용량을 불러오지 못했습니다",
     "agent_list_tokens_label": "토큰",
     "agent_list_today_tokens": "오늘 토큰",

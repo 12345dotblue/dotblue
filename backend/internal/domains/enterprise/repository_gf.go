@@ -2,6 +2,7 @@ package enterprise
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/gogf/gf/v2/frame/g"
@@ -117,6 +118,27 @@ func (r *GFRepository) ListEnterprisesByUser(userId string) ([]EnterpriseMembers
 		Order("em.joined_at ASC").
 		Scan(&list)
 	return list, err
+}
+
+func (r *GFRepository) SearchEnterprises(keyword string, page, pageSize int) ([]Enterprise, int, error) {
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+	model := g.DB().Model("enterprises")
+	if keyword = strings.TrimSpace(keyword); keyword != "" {
+		like := "%" + keyword + "%"
+		model = model.Where("name ILIKE ? OR id ILIKE ? OR slug ILIKE ?", like, like, like)
+	}
+	total, err := model.Count()
+	if err != nil {
+		return nil, 0, err
+	}
+	var list []Enterprise
+	err = model.Order("created_at DESC").Page(page, pageSize).Scan(&list)
+	return list, total, err
 }
 
 func (r *GFRepository) GetPrimaryOrgUnitAssignment(enterpriseId, userId string) (*OrgUnitAssignment, error) {
