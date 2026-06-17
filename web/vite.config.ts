@@ -13,6 +13,19 @@ export default defineConfig({
       '/api': {
         target: backendTarget,
         changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on('proxyRes', (proxyRes, _req, res) => {
+            const ct = proxyRes.headers['content-type'] || '';
+            if (ct.includes('text/event-stream')) {
+              proxyRes.headers['cache-control'] = 'no-cache';
+              proxyRes.headers['x-accel-buffering'] = 'no';
+              delete proxyRes.headers['content-length'];
+              if (!res.headersSent) {
+                res.flushHeaders();
+              }
+            }
+          });
+        },
       },
     },
   },

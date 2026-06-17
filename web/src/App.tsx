@@ -37,6 +37,7 @@ import Terms from './domains/legal/Terms'
 import Privacy from './domains/legal/Privacy'
 import Refund from './domains/legal/Refund'
 import { ThemeModeProvider, buildAntdThemeConfig, useThemeMode } from './theme/themeMode'
+import { AnalyticsProvider } from './domains/analytics/AnalyticsProvider'
 
 import { BACKEND_URL } from './config'
 
@@ -177,6 +178,7 @@ function AppContent() {
         theme={buildAntdThemeConfig(resolvedTheme)}
       >
         <BrowserRouter>
+          <AnalyticsProvider />
           <Helmet>
             <title>{t('app_name')}</title>
             <meta name="description" content={t('description')} />

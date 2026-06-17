@@ -3,6 +3,7 @@
   xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
   xmlns:xhtml="http://www.w3.org/1999/xhtml"
 >
+  <!-- Home -->
   <url>
     <loc>https://dotblue.ai/en</loc>
     <xhtml:link rel="alternate" hreflang="en" href="https://dotblue.ai/en" />
@@ -15,6 +16,22 @@
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
+
+  <!-- Login -->
+  <url>
+    <loc>https://dotblue.ai/en/login</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://dotblue.ai/en/login" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://dotblue.ai/zh-CN/login" />
+    <xhtml:link rel="alternate" hreflang="ja" href="https://dotblue.ai/ja/login" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://dotblue.ai/ko/login" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://dotblue.ai/fr/login" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://dotblue.ai/es/login" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://dotblue.ai/login" />
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- Docs Home -->
   <url>
     <loc>https://dotblue.ai/en/docs</loc>
     <xhtml:link rel="alternate" hreflang="en" href="https://dotblue.ai/en/docs" />
@@ -27,6 +44,8 @@
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
+
+  <!-- Docs: Getting Started -->
   <url>
     <loc>https://dotblue.ai/en/docs/getting-started/dotblue-overview</loc>
     <xhtml:link rel="alternate" hreflang="en" href="https://dotblue.ai/en/docs/getting-started/dotblue-overview" />
@@ -63,6 +82,8 @@
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
+
+  <!-- Docs: Use dotblue -->
   <url>
     <loc>https://dotblue.ai/en/docs/use-dotblue/assistants-and-workspaces</loc>
     <xhtml:link rel="alternate" hreflang="en" href="https://dotblue.ai/en/docs/use-dotblue/assistants-and-workspaces" />
@@ -99,6 +120,8 @@
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
+
+  <!-- Docs: Advanced -->
   <url>
     <loc>https://dotblue.ai/en/docs/advanced/deployment-architecture</loc>
     <xhtml:link rel="alternate" hreflang="en" href="https://dotblue.ai/en/docs/advanced/deployment-architecture" />
@@ -135,6 +158,8 @@
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
+
+  <!-- Legal -->
   <url>
     <loc>https://dotblue.ai/en/terms</loc>
     <xhtml:link rel="alternate" hreflang="en" href="https://dotblue.ai/en/terms" />

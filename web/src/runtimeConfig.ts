@@ -5,6 +5,7 @@ type RuntimeConfigSource = Partial<{
   VITE_CASDOOR_APP_NAME: string;
   VITE_CASDOOR_REDIRECT_URL: string;
   VITE_BACKEND_URL: string;
+  VITE_CLARITY_PROJECT_ID: string;
 }>;
 
 declare global {
@@ -55,5 +56,9 @@ export const runtimeConfig = {
   backendUrl: readValue(
     runtimeConfigSource.VITE_BACKEND_URL,
     import.meta.env.VITE_BACKEND_URL,
+  ),
+  clarityProjectId: readValue(
+    runtimeConfigSource.VITE_CLARITY_PROJECT_ID,
+    import.meta.env.VITE_CLARITY_PROJECT_ID,
   ),
 };

@@ -11,6 +11,7 @@ casdoor_org_name="${DOTBLUE_WEB_CASDOOR_ORG_NAME:-${VITE_CASDOOR_ORG_NAME:-}}"
 casdoor_app_name="${DOTBLUE_WEB_CASDOOR_APP_NAME:-${VITE_CASDOOR_APP_NAME:-}}"
 casdoor_redirect_url="${DOTBLUE_WEB_CASDOOR_REDIRECT_URL:-${VITE_CASDOOR_REDIRECT_URL:-}}"
 backend_url="${DOTBLUE_WEB_BACKEND_URL:-${VITE_BACKEND_URL:-}}"
+clarity_project_id="${DOTBLUE_WEB_CLARITY_PROJECT_ID:-${VITE_CLARITY_PROJECT_ID:-}}"
 
 cat > /usr/share/nginx/html/runtime-config.js <<EOF
 window.__DOTBLUE_CONFIG__ = {
@@ -19,6 +20,7 @@ window.__DOTBLUE_CONFIG__ = {
   VITE_CASDOOR_ORG_NAME: "$(escape_js "$casdoor_org_name")",
   VITE_CASDOOR_APP_NAME: "$(escape_js "$casdoor_app_name")",
   VITE_CASDOOR_REDIRECT_URL: "$(escape_js "$casdoor_redirect_url")",
-  VITE_BACKEND_URL: "$(escape_js "$backend_url")"
+  VITE_BACKEND_URL: "$(escape_js "$backend_url")",
+  VITE_CLARITY_PROJECT_ID: "$(escape_js "$clarity_project_id")"
 };
 EOF
